@@ -1,7 +1,7 @@
-import { NestInterceptor, ExecutionContext, CallHandler } from '@nestjs/common';
+import { CallHandler, ExecutionContext, NestInterceptor } from '@nestjs/common';
 import { Observable } from 'rxjs';
-import { MetricsService } from '../metrics/metrics.service';
 import { LoggerService } from '../logger/logger.service';
+import { MetricsService } from '../metrics/metrics.service';
 /**
  * Interceptor to trace HTTP requests and collect metrics
  * This interceptor will:
@@ -13,7 +13,7 @@ export declare class HttpTraceInterceptor implements NestInterceptor {
     private readonly metricsService;
     private readonly logger;
     constructor(metricsService: MetricsService, logger: LoggerService);
-    intercept(executionContext: ExecutionContext, next: CallHandler): Observable<any>;
+    intercept(executionContext: ExecutionContext, next: CallHandler): Observable<unknown>;
     /**
      * Normalize a route path to avoid high cardinality in metrics
      * For example, /users/123 becomes /users/:id

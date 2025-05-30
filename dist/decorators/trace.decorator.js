@@ -1,18 +1,5 @@
-import { trace, SpanStatusCode, } from '@opentelemetry/api';
+import { SpanStatusCode, trace } from '@opentelemetry/api';
 import { LoggerService } from '../logger/logger.service';
-/**
- * Get the logger service from the application context
- * @param target The target object that might contain a logger
- * @returns The logger service instance
- */
-function getLoggerService(target) {
-    if (!target)
-        return undefined;
-    // Try to get the logger from the instance
-    return target.logger instanceof LoggerService
-        ? target.logger
-        : undefined;
-}
 /**
  * Decorator to trace a method execution
  *
@@ -21,7 +8,7 @@ function getLoggerService(target) {
  * @returns Method decorator
  */
 export function Trace(spanName, options = {}) {
-    const { logStart = true, logSuccess = true, logError = true, captureArgs = true, } = options;
+    const { captureArgs = true, logError = true, logStart = true, logSuccess = true } = options;
     return function (target, propertyKey, descriptor) {
         const originalMethod = descriptor.value;
         const methodName = propertyKey;
@@ -30,7 +17,7 @@ export function Trace(spanName, options = {}) {
             const tracer = trace.getTracer('application-tracer');
             const logger = getLoggerService(this);
             const contextName = className;
-            return tracer.startActiveSpan(spanName || methodName, async (span) => {
+            return tracer.startActiveSpan(spanName ?? methodName, async (span) => {
                 // Add basic attributes
                 span.setAttribute('class.name', className);
                 span.setAttribute('method.name', methodName);
@@ -43,20 +30,19 @@ export function Trace(spanName, options = {}) {
                                 if (typeof arg === 'object') {
                                     // For objects, try to capture id or similar identifying field
                                     if ('id' in arg)
-                                        span.setAttribute(`arg.${index}.id`, String(arg.id));
+                                        span.setAttribute(`arg.${String(index)}.id`, String(arg.id));
                                     if ('name' in arg)
-                                        span.setAttribute(`arg.${index}.name`, String(arg.name));
+                                        span.setAttribute(`arg.${String(index)}.name`, String(arg.name));
                                     if ('title' in arg)
-                                        span.setAttribute(`arg.${index}.title`, String(arg.title));
+                                        span.setAttribute(`arg.${String(index)}.title`, String(arg.title));
                                 }
-                                else if (['string', 'number', 'boolean'].includes(typeof arg)) {
+                                else if (['boolean', 'number', 'string'].includes(typeof arg)) {
                                     // For primitives, capture the actual value as string
                                     if (typeof arg === 'string') {
-                                        span.setAttribute(`arg.${index}`, arg);
+                                        span.setAttribute(`arg.${String(index)}`, arg);
                                     }
-                                    else if (typeof arg === 'number' ||
-                                        typeof arg === 'boolean') {
-                                        span.setAttribute(`arg.${index}`, String(arg));
+                                    else if (typeof arg === 'number' || typeof arg === 'boolean') {
+                                        span.setAttribute(`arg.${String(index)}`, String(arg));
                                     }
                                 }
                             }
@@ -105,5 +91,18 @@ export function Trace(spanName, options = {}) {
         };
         return descriptor;
     };
+}
+/**
+ * Get the logger service from the application context
+ * @param target The target object that might contain a logger
+ * @returns The logger service instance
+ */
+function getLoggerService(target) {
+    if (!target)
+        return undefined;
+    // Try to get the logger from the instance
+    return target.logger instanceof LoggerService
+        ? target.logger
+        : undefined;
 }
 //# sourceMappingURL=trace.decorator.js.map

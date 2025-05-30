@@ -46,7 +46,7 @@
     "monitoring"
   ],
   "author": "Paystack, Inc.",
-  "license": "MIT",
+  "license": "PROPRIETARY",
   "repository": {
     "type": "git",
     "url": "https://github.com/paystackhq/nestjs-observability.git"

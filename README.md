@@ -530,15 +530,7 @@ curl http://localhost:3000/metrics
 
 ## License
 
-MIT
-
-## Contributing
-
-1. Fork the repository
-2. Create a feature branch
-3. Add tests for your changes
-4. Ensure all tests pass
-5. Submit a pull request
+PROPRIETARY - Copyright (c) 2025 Paystack, Inc. All rights reserved.
 
 ## Support
 

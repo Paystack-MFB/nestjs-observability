@@ -7,9 +7,9 @@ var __decorate = (this && this.__decorate) || function (decorators, target, key,
 var __metadata = (this && this.__metadata) || function (k, v) {
     if (typeof Reflect === "object" && typeof Reflect.metadata === "function") return Reflect.metadata(k, v);
 };
-import { Injectable, } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
+import { SpanStatusCode, trace } from '@opentelemetry/api';
 import { tap } from 'rxjs/operators';
-import { trace, SpanStatusCode } from '@opentelemetry/api';
 import { LoggerService } from '../logger/logger.service';
 /**
  * Interceptor to automatically trace controller methods
@@ -32,10 +32,8 @@ let ControllerMethodTraceInterceptor = class ControllerMethodTraceInterceptor {
         let httpPath = '';
         if (executionContext.getType() === 'http') {
             const request = executionContext.switchToHttp().getRequest();
-            if (request) {
-                httpMethod = request.method || '';
-                httpPath = request.route?.path || request.originalUrl || '';
-            }
+            httpMethod = request.method ?? '';
+            httpPath = request.route?.path ?? request.originalUrl ?? '';
         }
         // Get the tracer
         const tracer = trace.getTracer('controller-method-tracer');
@@ -53,13 +51,6 @@ let ControllerMethodTraceInterceptor = class ControllerMethodTraceInterceptor {
             }
             const startTime = Date.now();
             return next.handle().pipe(tap({
-                next: (value) => {
-                    // Set the span status to OK
-                    span.setStatus({ code: SpanStatusCode.OK });
-                    // End the span
-                    span.end();
-                    return value;
-                },
                 error: (error) => {
                     const duration = (Date.now() - startTime) / 1000;
                     // Set the span status to ERROR
@@ -70,9 +61,16 @@ let ControllerMethodTraceInterceptor = class ControllerMethodTraceInterceptor {
                     // Record the exception in the span
                     span.recordException(error);
                     // Log error
-                    this.logger.error(`Error executing ${spanName} after ${duration.toFixed(3)}s: ${error.message}`, error.stack || '', 'ControllerMethodTraceInterceptor');
+                    this.logger.error(`Error executing ${spanName} after ${duration.toFixed(3)}s: ${error.message}`, error.stack ?? '', 'ControllerMethodTraceInterceptor');
                     // End the span
                     span.end();
+                },
+                next: (value) => {
+                    // Set the span status to OK
+                    span.setStatus({ code: SpanStatusCode.OK });
+                    // End the span
+                    span.end();
+                    return value;
                 },
             }));
         });

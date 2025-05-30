@@ -14,5 +14,5 @@ import 'reflect-metadata';
  *   async myMethod() { ... }
  * }
  */
-export declare function TraceableClass(): (target: Type<any>) => Type<any>;
+export declare function TraceableClass(): (target: Type) => Type<any>;
 //# sourceMappingURL=traceable-class.decorator.d.ts.map

@@ -24,19 +24,19 @@ export declare class LoggerService extends ConsoleLogger {
     /**
      * Enhanced debug method
      */
-    debug(message: any, context?: string): void;
+    debug(message: unknown, context?: string): void;
     /**
      * Enhanced error method with better error handling
      */
-    error(message: any, stackOrContext?: string, context?: string): void;
+    error(message: unknown, stackOrContext?: string, context?: string): void;
     /**
      * Enhanced fatal method (maps to error with fatal level)
      */
-    fatal(message: any, context?: string): void;
+    fatal(message: unknown, context?: string): void;
     /**
      * Enhanced log method with context support
      */
-    log(message: any, context?: string): void;
+    log(message: unknown, context?: string): void;
     /**
      * Log with additional context data
      */
@@ -44,11 +44,11 @@ export declare class LoggerService extends ConsoleLogger {
     /**
      * Enhanced verbose method
      */
-    verbose(message: any, context?: string): void;
+    verbose(message: unknown, context?: string): void;
     /**
      * Enhanced warn method
      */
-    warn(message: any, context?: string): void;
+    warn(message: unknown, context?: string): void;
     /**
      * Colorize text for development mode
      */

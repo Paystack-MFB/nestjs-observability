@@ -33,7 +33,7 @@ let TracingService = class TracingService {
         this.logger = logger;
     }
     async onApplicationShutdown() {
-        if (this.sdk && this.config.tracing.enabled && isTracingSdkInitialized) {
+        if (this.config.tracing.enabled && isTracingSdkInitialized) {
             try {
                 // Only shutdown the SDK if we're the original instance that created it
                 if (this.sdk === globalSdkInstance) {
@@ -122,13 +122,14 @@ let TracingService = class TracingService {
         instrumentations.push(new RouterInstrumentation());
         // Add remaining auto-instrumentations if HTTP instrumentation is enabled
         if (tracing.instrumentations.http) {
-            instrumentations.push(getNodeAutoInstrumentations({
+            const autoInstrumentations = getNodeAutoInstrumentations({
                 '@opentelemetry/instrumentation-express': { enabled: false },
                 '@opentelemetry/instrumentation-nestjs-core': { enabled: false },
                 '@opentelemetry/instrumentation-router': { enabled: false },
                 // Disable instrumentation for modules we're explicitly configuring
                 '@opentelemetry/instrumentation-winston': { enabled: false },
-            }));
+            });
+            instrumentations.push(...autoInstrumentations);
         }
         // Create span processor from exporter
         const spanProcessor = new BatchSpanProcessor(traceExporter);
@@ -138,8 +139,8 @@ let TracingService = class TracingService {
         this.sdk = new NodeSDK({
             instrumentations,
             sampler,
-            serviceName: serviceName ?? 'unknown-service',
-            spanProcessors: [spanProcessor],
+            serviceName: serviceName || 'unknown-service',
+            spanProcessors: [spanProcessor], // Using type assertion to avoid compatibility issues
         });
         // Store reference to the SDK instance globally
         globalSdkInstance = this.sdk;

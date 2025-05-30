@@ -8,7 +8,7 @@ import tseslint from 'typescript-eslint';
 
 export default tseslint.config(
   {
-    ignores: ['dist/**', 'node_modules/**', 'coverage/**', '*.js', '*.mjs'],
+    ignores: ['dist/**', 'node_modules/**', 'coverage/**', 'examples/**', '*.js', '*.mjs'],
   },
   eslint.configs.recommended,
   ...tseslint.configs.strictTypeChecked,

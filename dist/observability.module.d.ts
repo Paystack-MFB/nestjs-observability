@@ -1,10 +1,10 @@
-import { DynamicModule } from '@nestjs/common';
+import { DynamicModule, Type } from '@nestjs/common';
 import { ObservabilityConfig } from './config/observability.config';
 export declare class ObservabilityModule {
     static forRoot(config?: Partial<ObservabilityConfig>): DynamicModule;
     static forRootAsync(options: {
-        useFactory: (...args: any[]) => ObservabilityConfig | Promise<ObservabilityConfig>;
-        inject?: any[];
+        inject?: Type<unknown>[];
+        useFactory: (...args: unknown[]) => ObservabilityConfig | Promise<ObservabilityConfig>;
     }): DynamicModule;
     /**
      * Register the module with providers and controllers

@@ -196,11 +196,9 @@ let LoggerService = LoggerService_1 = class LoggerService extends ConsoleLogger 
         if (typeof message === 'string')
             return message;
         if (typeof message === 'object' && message !== null) {
-            // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
             const obj = message;
-            // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
-            if (obj.message ?? obj.msg)
-                return String(obj.message ?? obj.msg);
+            if (obj['message'] ?? obj['msg'])
+                return String(obj['message'] ?? obj['msg']);
             return JSON.stringify(message);
         }
         return String(message);
