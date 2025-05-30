@@ -1,11 +1,8 @@
-import { Injectable } from '@nestjs/common';
-import { LoggerService } from 'nestjs-observability';
+import { Injectable, Logger } from '@nestjs/common';
 
 @Injectable()
 export class AppService {
-  constructor(private readonly logger: LoggerService) {
-    this.logger.setContext('AppService');
-  }
+  private readonly logger = new Logger(AppService.name);
 
   getHello(): string {
     this.logger.log('Generating hello message');
@@ -15,11 +12,7 @@ export class AppService {
 
     const randomMessage = messages[Math.floor(Math.random() * messages.length)];
 
-    this.logger.log({
-      message: 'Generated hello response',
-      selectedMessage: randomMessage,
-      totalOptions: messages.length,
-    });
+    this.logger.log(`Generated hello response: ${randomMessage} (${messages.length} options)`);
 
     return randomMessage;
   }

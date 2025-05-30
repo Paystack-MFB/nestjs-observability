@@ -30,6 +30,7 @@
     "test:coverage": "vitest run --coverage",
     "clean": "rm -rf dist",
     "prepublishOnly": "pnpm run clean && pnpm run build && pnpm run test:run",
+    "release": "pnpm run clean && pnpm run build && changeset publish",
     "changeset": "changeset",
     "changeset:version": "changeset version",
     "changeset:publish": "changeset publish",

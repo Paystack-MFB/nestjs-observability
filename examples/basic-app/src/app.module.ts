@@ -3,7 +3,6 @@ import { ConfigModule } from '@nestjs/config';
 import { ObservabilityModule } from 'nestjs-observability';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
-import { UsersModule } from './users/users.module';
 
 @Module({
   imports: [
@@ -18,9 +17,13 @@ import { UsersModule } from './users/users.module';
       serviceVersion: process.env.SERVICE_VERSION || '1.0.0',
       environment: process.env.NODE_ENV || 'development',
       logging: {
-        level: (process.env.LOG_LEVEL || 'info') as any,
+        level: process.env.LOG_LEVEL || 'info',
         structuredLogging: process.env.NODE_ENV === 'production',
         consoleOutput: true,
+        otlpExport: {
+          enabled: process.env.OTLP_LOGS_ENABLED === 'true',
+          endpoint: process.env.OTLP_LOGS_ENDPOINT || 'http://localhost:4318/v1/logs',
+        },
       },
       metrics: {
         enabled: process.env.METRICS_ENABLED !== 'false',
@@ -35,11 +38,11 @@ import { UsersModule } from './users/users.module';
       tracing: {
         enabled: process.env.TRACING_ENABLED !== 'false',
         sampler: {
-          type: 'always_on' as const,
+          type: 'always_on',
           ratio: 0.1,
         },
         exporter: {
-          type: 'otlp' as const,
+          type: 'otlp',
           endpoint: process.env.OTLP_TRACES_ENDPOINT || 'http://localhost:4318/v1/traces',
           headers: process.env.OTLP_HEADERS ? JSON.parse(process.env.OTLP_HEADERS) : undefined,
         },
@@ -50,9 +53,6 @@ import { UsersModule } from './users/users.module';
         },
       },
     }),
-
-    // Feature modules
-    UsersModule,
   ],
   controllers: [AppController],
   providers: [AppService],
