@@ -1,0 +1,10 @@
+dist
+node_modules
+coverage
+*.min.js
+*.min.css
+.changeset
+pnpm-lock.yaml
+*.log
+.env*
+!.env.example
