@@ -3,9 +3,10 @@ export * from './config/observability.config';
 
 // Controllers
 export * from './controllers/metrics.controller';
-export * from './decorators/trace.decorator';
+
+export * from './decorators/auto-trace.decorators';
 // Decorators
-export * from './decorators/traceable-class.decorator';
+export * from './decorators/trace.decorator';
 
 export * from './interceptors/controller-method-trace.interceptor';
 // Interceptors

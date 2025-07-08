@@ -289,3 +289,4 @@ tramp
 
 # Project specific
 # NOTE: dist/ is NOT ignored - we want to track built files for library distribution
+dist/
