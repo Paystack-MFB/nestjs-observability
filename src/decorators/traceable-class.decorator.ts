@@ -1,11 +1,18 @@
 import { Type } from '@nestjs/common';
 import 'reflect-metadata';
 
-import { LoggerService } from '../logger/logger.service';
+/**
+ * Check if a class is marked as traceable
+ */
+export function isTraceableClass(target: Type): boolean {
+  return Reflect.getMetadata('traceable', target) === true;
+}
 
 /**
- * Decorator to automatically inject a logger into a class
- * and set up the context name based on the class name
+ * Simplified decorator to mark a class as traceable
+ *
+ * This decorator serves as a marker and can be used for future enhancements
+ * like automatic logger injection or trace context setup.
  *
  * Usage:
  * @Injectable()
@@ -18,18 +25,9 @@ import { LoggerService } from '../logger/logger.service';
  * }
  */
 export function TraceableClass() {
-  return function (target: Type) {
-    // Ensure the class has a logger property
-    const paramTypes = Reflect.getOwnMetadata('design:paramtypes', target) as Type[] | undefined;
-
-    const hasLogger = paramTypes?.some((param: Type) => param === LoggerService) ?? false;
-
-    if (!hasLogger) {
-      console.warn(
-        `Class ${target.name} is decorated with @TraceableClass but doesn't have LoggerService injected. ` +
-          `Make sure to inject LoggerService in the constructor.`
-      );
-    }
+  return function <T extends Type>(target: T): T {
+    // Add metadata to mark this class as traceable
+    Reflect.defineMetadata('traceable', true, target);
 
     return target;
   };

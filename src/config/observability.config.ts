@@ -32,9 +32,12 @@ export interface ObservabilityConfig {
       type: 'otlp';
     };
     instrumentations: {
-      http: boolean;
-      nestJs: boolean;
-      winston: boolean;
+      // Enable all auto-instrumentations by default for maximum coverage
+      autoInstrumentations: boolean;
+      // Blacklist specific instrumentations that cause issues
+      disabled: string[];
+      // Override configuration for specific instrumentations
+      overrides: Record<string, Record<string, unknown>>;
     };
     sampler: {
       ratio?: number; // Only used for trace_id_ratio type
@@ -70,6 +73,33 @@ const createTracingExporter = (): ObservabilityConfig['tracing']['exporter'] => 
 };
 
 /**
+ * Parse disabled instrumentations from environment variable
+ * Expected format: "instrumentation1,instrumentation2,instrumentation3"
+ */
+const getDisabledInstrumentations = (): string[] => {
+  const disabled = process.env['TRACING_DISABLED_INSTRUMENTATIONS'];
+  if (!disabled) return [];
+  return disabled
+    .split(',')
+    .map((name) => name.trim())
+    .filter(Boolean);
+};
+
+/**
+ * Parse instrumentation overrides from environment variable
+ * Expected format: JSON string like {"@opentelemetry/instrumentation-fs": {"enabled": false}}
+ */
+const getInstrumentationOverrides = (): Record<string, Record<string, unknown>> => {
+  const overrides = process.env['TRACING_INSTRUMENTATION_OVERRIDES'];
+  if (!overrides) return {};
+  try {
+    return JSON.parse(overrides) as Record<string, Record<string, unknown>>;
+  } catch {
+    return {};
+  }
+};
+
+/**
  * Default configuration for the ObservabilityModule
  */
 export const defaultObservabilityConfig: ObservabilityConfig = {
@@ -101,9 +131,12 @@ export const defaultObservabilityConfig: ObservabilityConfig = {
     enabled: process.env['TRACING_ENABLED'] !== 'false',
     exporter: createTracingExporter(),
     instrumentations: {
-      http: true,
-      nestJs: true,
-      winston: true,
+      // Enable all auto-instrumentations by default for maximum coverage
+      autoInstrumentations: process.env['TRACING_AUTO_INSTRUMENTATIONS'] !== 'false',
+      // Common instrumentations that might need to be disabled in certain environments
+      disabled: getDisabledInstrumentations(),
+      // Override configuration for specific instrumentations
+      overrides: getInstrumentationOverrides(),
     },
     sampler: {
       ratio: process.env['TRACING_SAMPLER_RATIO'] ? parseFloat(process.env['TRACING_SAMPLER_RATIO']) : 1.0,

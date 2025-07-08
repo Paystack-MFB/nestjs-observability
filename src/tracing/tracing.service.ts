@@ -1,10 +1,6 @@
 import { Injectable, OnApplicationShutdown, OnModuleInit } from '@nestjs/common';
 import { getNodeAutoInstrumentations } from '@opentelemetry/auto-instrumentations-node';
 import { OTLPTraceExporter } from '@opentelemetry/exporter-trace-otlp-http';
-import { ExpressInstrumentation } from '@opentelemetry/instrumentation-express';
-import { NestInstrumentation } from '@opentelemetry/instrumentation-nestjs-core';
-import { RouterInstrumentation } from '@opentelemetry/instrumentation-router';
-import { WinstonInstrumentation } from '@opentelemetry/instrumentation-winston';
 import { NodeSDK } from '@opentelemetry/sdk-node';
 import {
   AlwaysOffSampler,
@@ -83,6 +79,51 @@ export class TracingService implements OnApplicationShutdown, OnModuleInit {
   }
 
   /**
+   * Configure instrumentations using auto-instrumentations with blacklist/override support
+   * This provides maximum coverage out of the box while allowing fine-grained control
+   * @returns Configured OpenTelemetry instrumentations
+   */
+  private configureInstrumentations(): ReturnType<typeof getNodeAutoInstrumentations> {
+    const { instrumentations } = this.config.tracing;
+
+    if (!instrumentations.autoInstrumentations) {
+      this.logger.log('Auto-instrumentations disabled, no instrumentations will be loaded', 'TracingService');
+      return [];
+    }
+
+    // Start with default auto-instrumentations configuration
+    const instrumentationConfig: Record<string, Record<string, unknown>> = {};
+
+    // Apply disabled instrumentations (blacklist approach)
+    if (instrumentations.disabled.length > 0) {
+      this.logger.log(`Disabling instrumentations: ${instrumentations.disabled.join(', ')}`, 'TracingService');
+
+      for (const instrumentationName of instrumentations.disabled) {
+        instrumentationConfig[instrumentationName] = { enabled: false };
+      }
+    }
+
+    // Apply custom overrides for specific instrumentations
+    if (Object.keys(instrumentations.overrides).length > 0) {
+      this.logger.log(
+        `Applying instrumentation overrides: ${Object.keys(instrumentations.overrides).join(', ')}`,
+        'TracingService'
+      );
+
+      for (const [instrumentationName, config] of Object.entries(instrumentations.overrides)) {
+        instrumentationConfig[instrumentationName] = {
+          ...instrumentationConfig[instrumentationName],
+          ...config,
+        };
+      }
+    }
+
+    // Get all auto-instrumentations with our configuration
+    // This will include HTTP, Express, NestJS, databases, queues, etc.
+    return getNodeAutoInstrumentations(instrumentationConfig);
+  }
+
+  /**
    * Configure the appropriate sampler based on configuration
    * @returns Configured OpenTelemetry sampler
    */
@@ -137,32 +178,7 @@ export class TracingService implements OnApplicationShutdown, OnModuleInit {
     const sampler = this.configureSampler();
 
     // Configure instrumentations
-    const instrumentations = [];
-
-    // Add explicit instrumentations to fix warnings
-    if (tracing.instrumentations.nestJs) {
-      instrumentations.push(new NestInstrumentation());
-    }
-
-    if (tracing.instrumentations.winston) {
-      instrumentations.push(new WinstonInstrumentation());
-    }
-
-    // Add Express and Router instrumentations
-    instrumentations.push(new ExpressInstrumentation());
-    instrumentations.push(new RouterInstrumentation());
-
-    // Add remaining auto-instrumentations if HTTP instrumentation is enabled
-    if (tracing.instrumentations.http) {
-      const autoInstrumentations = getNodeAutoInstrumentations({
-        '@opentelemetry/instrumentation-express': { enabled: false },
-        '@opentelemetry/instrumentation-nestjs-core': { enabled: false },
-        '@opentelemetry/instrumentation-router': { enabled: false },
-        // Disable instrumentation for modules we're explicitly configuring
-        '@opentelemetry/instrumentation-winston': { enabled: false },
-      });
-      instrumentations.push(...autoInstrumentations);
-    }
+    const instrumentations = this.configureInstrumentations();
 
     // Create span processor from exporter
     const spanProcessor = new BatchSpanProcessor(traceExporter);

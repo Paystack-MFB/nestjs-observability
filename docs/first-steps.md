@@ -1,221 +1,230 @@
-# NestJS Observability Library - Migration Plan
+# First Steps
 
-## Overview
+## Getting Started
 
-Moving `libs/nestjs-observability` from `~/Projects/test-nest/libs/nestjs-observability` to standalone library at `~/Projects/nestjs-observability` with modern tooling and best practices for 2025.
+This guide will help you get started with the NestJS Observability module.
 
-## Migration Plan
+## Installation
 
-### ✅ Phase 1: Project Setup
+```bash
+npm install nestjs-observability
+```
 
-- [x] Create project structure at correct location (`~/Projects/nestjs-observability`)
-- [x] Research best practices for 2025
-- [x] Copy source files from `~/Projects/test-nest/libs/nestjs-observability`
-- [x] Create package.json with proper metadata
-- [x] Setup TypeScript configuration
+## Basic Setup
 
-### ✅ Phase 2: Development Tooling
+```typescript
+import { Module } from '@nestjs/common';
+import { ObservabilityModule } from 'nestjs-observability';
 
-- [x] Setup ESLint with modern flat config
-- [x] Setup Prettier for code formatting
-- [x] Setup Husky and lint-staged for pre-commit hooks
-- [x] Configure VS Code settings and extensions
+@Module({
+  imports: [
+    ObservabilityModule.forRoot({
+      serviceName: 'my-app',
+      serviceVersion: '1.0.0',
+      tracing: {
+        enabled: true,
+        exporter: {
+          endpoint: 'http://localhost:4318/v1/traces',
+          type: 'otlp',
+        },
+      },
+    }),
+  ],
+})
+export class AppModule {}
+```
 
-### ✅ Phase 3: Dependencies & Build
+## Instrumentation Configuration
 
-- [x] Identify and add peer dependencies
-- [x] Setup build process with TypeScript
-- [x] Configure proper export structure
-- [x] Add test framework (Vitest for modern setup)
+The module uses a modern approach to instrumentation configuration that provides maximum coverage out of the box while allowing fine-grained control when needed.
 
-### ✅ Phase 4: CI/CD & Publishing
+### Default Behavior (Recommended)
 
-- [x] Setup GitHub Actions workflows
-- [x] Configure changesets for version management
-- [x] Setup automated testing, linting, formatting
-- [x] Configure npm publishing workflow
+By default, **all available auto-instrumentations are enabled**. This includes:
 
-### ✅ Phase 5: Documentation & Final Setup
+- **HTTP/Express/NestJS**: Web framework instrumentations
+- **Database**: PostgreSQL, MySQL, MongoDB, Redis, etc.
+- **Message Queues**: AWS SQS, RabbitMQ, Kafka, etc.
+- **Logging**: Winston, Pino, Bunyan, etc.
+- **File System**: FS operations
+- **Network**: DNS, Net, HTTP client requests
+- **And many more...**
 
-- [x] Add proprietary license
-- [x] Migrate and update README
-- [x] Create contribution guidelines
-- [x] Setup examples directory structure
-- [x] Complete basic example application (ready for use after building library)
-- [ ] Test and document the build and publishing process via Github pipelines
+This means you get comprehensive tracing for your entire application without any additional configuration.
 
-## Best Practices Research Summary
+### Environment Variables
 
-### Modern Node.js Library Setup (2025)
+```bash
+# Enable/disable all auto-instrumentations (default: true)
+TRACING_AUTO_INSTRUMENTATIONS=true
 
-- **Package Manager**: pnpm (faster, more efficient than npm) ✅
-- **Module System**: ES Modules (`"type": "module"`) ✅
-- **TypeScript**: Use `tsx` for development, `tsc` for building ✅
-- **Linting**: ESLint with flat config (`eslint.config.js`) ✅
-- **Formatting**: Prettier with standard configuration ✅
-- **Git Hooks**: Husky + lint-staged for pre-commit checks ✅
-- **Testing**: Vitest (better ESM/TypeScript support than Jest) ✅
-- **Version Management**: Changesets for semantic versioning ✅
-- **CI/CD**: GitHub Actions with automated workflows ✅
+# Disable specific instrumentations (comma-separated list)
+TRACING_DISABLED_INSTRUMENTATIONS="@opentelemetry/instrumentation-fs,@opentelemetry/instrumentation-dns"
 
-### Key Dependencies Implemented
+# Override specific instrumentation configurations (JSON format)
+TRACING_INSTRUMENTATION_OVERRIDES='{"@opentelemetry/instrumentation-http": {"requestHook": "custom"}, "@opentelemetry/instrumentation-express": {"requestHook": "custom"}}'
+```
 
-- **Peer Dependencies**:
-  - `@nestjs/common` (core NestJS functionality)
-  - `@nestjs/core` (core decorators and interceptors)
-  - `@nestjs/config` (configuration module)
-  - `@nestjs/swagger` (API documentation - optional)
-- **Core Dependencies**:
-  - `@opentelemetry/api` (tracing API)
-  - `@opentelemetry/sdk-node` (Node.js SDK)
-  - `@opentelemetry/auto-instrumentations-node` (auto instrumentation)
-  - `@opentelemetry/exporter-trace-otlp-http` (OTLP exporter)
-  - `@opentelemetry/instrumentation-*` (various instrumentations)
-  - `prom-client` (Prometheus metrics)
-  - `rxjs` (reactive extensions)
+### Configuration Examples
 
-## Files Created
+#### Example 1: Basic Setup (All instrumentations enabled)
 
-### Configuration Files
+```typescript
+// This enables ALL available instrumentations automatically
+ObservabilityModule.forRoot({
+  serviceName: 'my-app',
+  tracing: {
+    enabled: true,
+    instrumentations: {
+      autoInstrumentations: true, // Default: true
+      disabled: [],
+      overrides: {},
+    },
+  },
+});
+```
 
-- ✅ `package.json` - Modern ESM package with pnpm, PROPRIETARY license
-- ✅ `tsconfig.json` - Strict TypeScript configuration
-- ✅ `eslint.config.js` - Modern flat config with TypeScript
-- ✅ `.prettierrc` - Code formatting rules
-- ✅ `.prettierignore` - Files to exclude from formatting
-- ✅ `vitest.config.ts` - Test configuration
-- ✅ `.gitignore` - Comprehensive ignore rules
-- ✅ `LICENSE` - PROPRIETARY license for Paystack, Inc.
+#### Example 2: Disable problematic instrumentations
 
-### Development Tooling
+```typescript
+// Disable file system and DNS instrumentations if they're too noisy
+ObservabilityModule.forRoot({
+  serviceName: 'my-app',
+  tracing: {
+    enabled: true,
+    instrumentations: {
+      autoInstrumentations: true,
+      disabled: ['@opentelemetry/instrumentation-fs', '@opentelemetry/instrumentation-dns'],
+      overrides: {},
+    },
+  },
+});
+```
 
-- ✅ `.husky/pre-commit` - Pre-commit hooks with comprehensive quality checks
-- ✅ `.vscode/settings.json` - VS Code workspace settings
-- ✅ `.vscode/extensions.json` - Recommended extensions
+#### Example 3: Custom configuration for specific instrumentations
 
-### CI/CD Workflows
+```typescript
+// Fine-tune specific instrumentations
+ObservabilityModule.forRoot({
+  serviceName: 'my-app',
+  tracing: {
+    enabled: true,
+    instrumentations: {
+      autoInstrumentations: true,
+      disabled: [],
+      overrides: {
+        '@opentelemetry/instrumentation-http': {
+          requestHook: (span, request) => {
+            // Custom request hook
+          },
+        },
+        '@opentelemetry/instrumentation-pg': {
+          addSqlCommenterCommentToQueries: true,
+        },
+      },
+    },
+  },
+});
+```
 
-- ✅ `.github/workflows/ci.yml` - Testing and quality checks
-- ✅ `.github/workflows/release.yml` - Automated releases with changesets
+#### Example 4: Production-optimized configuration
 
-### Version Management
+```typescript
+// Disable noisy instrumentations in production
+ObservabilityModule.forRoot({
+  serviceName: 'my-app',
+  tracing: {
+    enabled: true,
+    instrumentations: {
+      autoInstrumentations: true,
+      disabled: [
+        '@opentelemetry/instrumentation-fs',
+        '@opentelemetry/instrumentation-dns',
+        '@opentelemetry/instrumentation-net',
+      ],
+      overrides: {
+        '@opentelemetry/instrumentation-http': {
+          ignoreOutgoingRequestHook: (req) => {
+            // Ignore health checks and metrics endpoints
+            return req.path === '/health' || req.path === '/metrics';
+          },
+        },
+      },
+    },
+  },
+});
+```
 
-- ✅ `.changeset/` - Changesets configuration for version management
+### Supported Technologies
 
-### Documentation & Examples
+With auto-instrumentations enabled, you automatically get tracing for:
 
-- ✅ `README.md` - Updated with proprietary license
-- ✅ `CONTRIBUTING.md` - Comprehensive contribution guidelines for proprietary project
-- ✅ `examples/README.md` - Examples directory structure and documentation
-- 🟡 `examples/basic-app/` - Basic example app (structure created, needs library build)
+**Web Frameworks:**
 
-## Progress Tracking
+- Express.js
+- NestJS
+- Fastify
+- Koa
 
-### Current Status: ✅ Phase 5 Complete - Production Ready! 🚀
+**Databases:**
 
-- Started: January 2025
-- Phase: 5 (Documentation & Final Setup) - **COMPLETE** ✅
-- Location: `~/Projects/nestjs-observability` ✅
-- Next Steps: Test CI/CD pipelines in production environment
+- PostgreSQL
+- MySQL/MySQL2
+- MongoDB
+- Redis
+- Cassandra
+- DynamoDB
 
-### ✅ Completed Setup
+**Message Queues:**
 
-- ✅ Modern package structure with ESM
-- ✅ All development tooling configured
-- ✅ Pre-commit hooks working with comprehensive quality checks (type-check, lint, format, test)
-- ✅ CI/CD pipelines ready
-- ✅ Changesets for version management
-- ✅ TypeScript build process (compiles successfully!)
-- ✅ Testing framework ready
-- ✅ Source code migrated and type-checked
-- ✅ Formatting and linting configured
-- ✅ **All linting errors resolved (52 → 0)**
-- ✅ **Proprietary licensing implemented**
-- ✅ **Comprehensive contribution guidelines created**
-- ✅ **Examples directory structure complete with working basic app**
-- ✅ **Complete .gitignore setup (library tracks dist/, examples ignore dist/)**
-- ✅ **Pre-commit pipeline tested and working perfectly**
+- AWS SQS
+- RabbitMQ/AMQP
+- Kafka
+- Google Pub/Sub
 
-### 📋 Remaining Tasks
+**Logging:**
 
-#### Only Remaining Step:
+- Winston
+- Pino
+- Bunyan
 
-1. **Test CI/CD pipelines** in production environment (when ready to deploy)
+**Cloud Services:**
 
-#### Future Enhancements:
+- AWS SDK
+- Google Cloud
+- Azure
 
-- [ ] Add comprehensive unit tests
-- [ ] Create more advanced examples (microservices, monitoring stack)
-- [ ] Add performance benchmarks
-- [ ] Create internal documentation
+**And many more...**
 
-### Key Achievements This Session
+### Best Practices
 
-1. **Fixed Build Hanging Issue**:
+1. **Start with defaults**: Enable all auto-instrumentations and only disable specific ones that cause issues
+2. **Use environment variables**: Configure instrumentations via environment variables for different environments
+3. **Monitor performance**: Some instrumentations can be noisy in high-traffic applications
+4. **Test thoroughly**: Validate that your specific technology stack works well with the enabled instrumentations
 
-   - Root cause: Vitest watch mode in pre-commit hook
-   - Solution: Comprehensive pre-commit pipeline with `test:run`
+### Migration from Previous Versions
 
-2. **Resolved All Linting Errors**:
+If you're upgrading from an older version that used the `http`, `nestJs`, and `winston` flags:
 
-   - 52 ESLint errors systematically fixed
-   - Improved type safety (removed all `any` types)
-   - Fixed nullish coalescing and template literal issues
+```typescript
+// Old approach (deprecated)
+tracing: {
+  instrumentations: {
+    http: true,
+    nestJs: true,
+    winston: true,
+  },
+}
 
-3. **Established Quality Gates**:
+// New approach (recommended)
+tracing: {
+  instrumentations: {
+    autoInstrumentations: true, // Enables ALL instrumentations including the above
+    disabled: [], // Disable specific ones if needed
+    overrides: {}, // Fine-tune specific ones if needed
+  },
+}
+```
 
-   - Pre-commit: type-check + lint + format + test
-   - All pipeline steps verified working
-   - Build process now reliable and fast
-
-4. **Proprietary Project Setup**:
-   - PROPRIETARY license implemented
-   - Contribution guidelines for internal team
-   - Professional project structure
-
-### Notes
-
-- ✅ **Build system completely functional**
-- ✅ **Code quality pipeline enforced and tested**
-- ✅ **Ready for team collaboration**
-- ✅ **Professional documentation complete**
-- ✅ **Examples complete and ready to use**
-- ✅ **All quality gates working (52 linting errors → 0)**
-- ✅ **Pre-commit hooks tested successfully**
-
-## 🎉 MIGRATION COMPLETE!
-
-The NestJS Observability Library is now **production-ready** and follows 2025 best practices!
-
-### Summary of Achievements:
-
-**🔧 Technical Excellence:**
-
-- Modern ESM package with TypeScript
-- Comprehensive quality pipeline (type-check + lint + format + test)
-- Zero linting errors with strict TypeScript configuration
-- Pre-commit hooks preventing bad commits
-- Ready for automated CI/CD deployment
-
-**📚 Professional Documentation:**
-
-- Complete README with usage examples
-- Contribution guidelines for internal team
-- Comprehensive examples directory
-- Clear licensing (PROPRIETARY for Paystack, Inc.)
-
-**🏗️ Development Experience:**
-
-- Working basic example application
-- Proper .gitignore setup (library tracks dist/, examples don't)
-- Modern tooling (pnpm, Vitest, ESLint flat config, Prettier)
-- VS Code integration ready
-
-**🚀 Ready for Production:**
-
-- All 5 phases complete
-- Build artifacts generated and tested
-- Publishing workflow configured
-- Team-ready development environment
-
-The library can now be used internally at Paystack and is ready for CI/CD integration! 🚀
+The new approach provides much more comprehensive coverage and is future-proof for new technologies.

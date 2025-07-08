@@ -1,131 +1,114 @@
 import { AttributeValue, Exception, Span, SpanStatusCode, trace } from '@opentelemetry/api';
 
-import { LoggerService } from '../logger/logger.service';
-
 /**
- * Decorator to trace a method execution
+ * Simplified decorator to trace method execution
  *
  * @param spanName Optional custom span name (defaults to method name)
- * @param options Additional options for the span
+ * @param captureArgs Whether to capture method arguments (default: true)
  * @returns Method decorator
+ *
+ * @example
+ * ```typescript
+ * // Basic usage
+ * @Trace()
+ * async getUserById(id: string) { ... }
+ *
+ * // Custom span name
+ * @Trace('fetch-user-profile')
+ * async getUserById(id: string) { ... }
+ *
+ * // Without argument capture
+ * @Trace(undefined, false)
+ * async processLargeData(data: unknown[]) { ... }
+ * ```
  */
-export function Trace(
-  spanName?: string,
-  options: {
-    captureArgs?: boolean;
-    logError?: boolean;
-    logStart?: boolean;
-    logSuccess?: boolean;
-  } = {}
-) {
-  const { captureArgs = true, logError = true, logStart = true, logSuccess = true } = options;
+export function Trace(spanName?: string, captureArgs = true) {
+  return function <T extends (...args: unknown[]) => Promise<unknown>>(
+    target: object,
+    propertyKey: string,
+    descriptor: TypedPropertyDescriptor<T>
+  ) {
+    const originalMethod = descriptor.value;
+    if (!originalMethod) {
+      throw new Error('Method descriptor value is required');
+    }
 
-  return function (target: object, propertyKey: string, descriptor: PropertyDescriptor) {
-    const originalMethod = descriptor.value as (...args: unknown[]) => Promise<unknown>;
-    const methodName = propertyKey;
-    const className = (target.constructor as { name: string }).name;
+    const className = target.constructor.name;
 
-    descriptor.value = async function (...args: unknown[]) {
+    descriptor.value = async function (this: unknown, ...args: Parameters<T>) {
       const tracer = trace.getTracer('application-tracer');
-      const logger = getLoggerService(this);
-      const contextName = className;
+      const finalSpanName = spanName ?? `${className}.${propertyKey}`;
 
-      return tracer.startActiveSpan(spanName ?? methodName, async (span: Span) => {
+      return tracer.startActiveSpan(finalSpanName, async (span: Span) => {
         // Add basic attributes
-        span.setAttribute('class.name', className);
-        span.setAttribute('method.name', methodName);
+        span.setAttributes({
+          'class.name': className,
+          'method.name': propertyKey,
+        });
 
-        // Capture arguments if enabled and there are arguments
+        // Capture arguments if enabled
         if (captureArgs && args.length > 0) {
-          try {
-            // Safely capture primitive arguments and object IDs
-            args.forEach((arg, index) => {
-              if (arg !== null && arg !== undefined) {
-                if (typeof arg === 'object') {
-                  // For objects, try to capture id or similar identifying field
-                  if ('id' in arg) span.setAttribute(`arg.${String(index)}.id`, String((arg as { id: unknown }).id));
-
-                  if ('name' in arg)
-                    span.setAttribute(`arg.${String(index)}.name`, String((arg as { name: unknown }).name));
-
-                  if ('title' in arg)
-                    span.setAttribute(`arg.${String(index)}.title`, String((arg as { title: unknown }).title));
-                } else if (['boolean', 'number', 'string'].includes(typeof arg)) {
-                  // For primitives, capture the actual value as string
-                  if (typeof arg === 'string') {
-                    span.setAttribute(`arg.${String(index)}`, arg as AttributeValue);
-                  } else if (typeof arg === 'number' || typeof arg === 'boolean') {
-                    span.setAttribute(`arg.${String(index)}`, String(arg) as AttributeValue);
-                  }
-                }
-              }
-            });
-          } catch {
-            // Silently fail if we can't capture arguments
-          }
-        }
-
-        // Log the method start if enabled
-        if (logStart && logger) {
-          logger.log(`Executing ${methodName}`, contextName);
+          captureMethodArguments(span, args);
         }
 
         try {
-          // Execute the original method
-          // Using type assertion to handle the result type safely
-          const result: unknown = await originalMethod.apply(this, args);
-
-          // Set the span status to OK
+          const result = await originalMethod.apply(this, args);
           span.setStatus({ code: SpanStatusCode.OK });
-
-          // Log the method success if enabled
-          if (logSuccess && logger) {
-            logger.debug(`Successfully executed ${methodName}`, contextName);
-          }
-
           return result;
         } catch (error) {
-          // Set the span status to ERROR
           span.setStatus({
             code: SpanStatusCode.ERROR,
             message: (error as Error).message,
           });
-
-          // Record the exception in the span
           span.recordException(error as Exception);
-
-          // Log the method error if enabled
-          if (logError && logger) {
-            logger.error(
-              `Error executing ${methodName}: ${(error as Error).message}`,
-              (error as Error).stack,
-              contextName
-            );
-          }
-
-          // Re-throw the error
           throw error;
         } finally {
-          // End the span
           span.end();
         }
       });
-    };
+    } as T;
 
     return descriptor;
   };
 }
 
 /**
- * Get the logger service from the application context
- * @param target The target object that might contain a logger
- * @returns The logger service instance
+ * Simplified argument capture - only captures serializable values
  */
-function getLoggerService(target: unknown): LoggerService | undefined {
-  if (!target) return undefined;
+function captureMethodArguments(span: Span, args: unknown[]): void {
+  try {
+    args.forEach((arg, index) => {
+      if (arg == null) return;
 
-  // Try to get the logger from the instance
-  return (target as { logger?: unknown }).logger instanceof LoggerService
-    ? (target as { logger: LoggerService }).logger
-    : undefined;
+      const argKey = `arg.${String(index)}`;
+
+      // Handle primitive types
+      if (typeof arg === 'string' || typeof arg === 'number' || typeof arg === 'boolean') {
+        span.setAttribute(argKey, arg as AttributeValue);
+        return;
+      }
+
+      // Handle objects - try to extract common identifying fields
+      if (typeof arg === 'object') {
+        const obj = arg as Record<string, unknown>;
+
+        // Common ID fields
+        if ('id' in obj && (typeof obj['id'] === 'string' || typeof obj['id'] === 'number')) {
+          span.setAttribute(`${argKey}.id`, String(obj['id']));
+        }
+
+        // Common name fields
+        if ('name' in obj && typeof obj['name'] === 'string') {
+          span.setAttribute(`${argKey}.name`, obj['name']);
+        }
+
+        // For arrays, capture length
+        if (Array.isArray(arg)) {
+          span.setAttribute(`${argKey}.length`, arg.length);
+        }
+      }
+    });
+  } catch {
+    // Silently ignore argument capture errors
+  }
 }
