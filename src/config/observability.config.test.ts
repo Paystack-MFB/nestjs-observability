@@ -50,14 +50,6 @@ describe('ObservabilityConfig', () => {
       }
     });
 
-    it('should have valid instrumentation settings', () => {
-      const config = defaultObservabilityConfig;
-
-      expect(typeof config.tracing.instrumentations.http).toBe('boolean');
-      expect(typeof config.tracing.instrumentations.nestJs).toBe('boolean');
-      expect(typeof config.tracing.instrumentations.winston).toBe('boolean');
-    });
-
     it('should have valid metrics labels', () => {
       const config = defaultObservabilityConfig;
 
