@@ -3,6 +3,7 @@ import { ConfigModule } from '@nestjs/config';
 import { ObservabilityModule } from 'nestjs-observability';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
+import { HealthController } from './health.controller';
 import { LoggingService } from './logging.service';
 import { PaymentService } from './payment.service';
 import { UserService } from './user.service';
@@ -63,7 +64,7 @@ import { UserService } from './user.service';
       },
     }),
   ],
-  controllers: [AppController],
+  controllers: [AppController, HealthController],
   providers: [AppService, UserService, PaymentService, LoggingService],
 })
 export class AppModule {}

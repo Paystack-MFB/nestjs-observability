@@ -1,227 +1,185 @@
-# Basic NestJS Observability Example
+# NestJS Observability - Basic Example
 
-This is a minimal example demonstrating how to integrate the `nestjs-observability` library into a NestJS application.
+This example demonstrates how to use the `nestjs-observability` library in a basic NestJS application with tracing, metrics, and logging.
 
-## Features Demonstrated
+## Features
 
-- ✅ Enhanced logging with context and trace correlation
-- ✅ Automatic metrics collection (`/metrics` endpoint)
-- ✅ Distributed tracing with OpenTelemetry
-- ✅ Health check endpoint
-- ✅ Environment-based configuration
-- ✅ Structured logging in production vs. pretty logging in development
+- **Automatic Tracing**: Controllers are automatically traced by default
+- **Configurable Instrumentation**: Use decorators to control tracing behavior
+- **Metrics Collection**: Automatic collection of HTTP metrics
+- **Structured Logging**: Comprehensive logging with OpenTelemetry integration
+- **Health Endpoints**: Untraced health check endpoints for monitoring
 
-## Quick Start
+## Key Components
 
-### 1. Install Dependencies
+### Controllers
+
+#### AppController (Traced)
+
+- **Location**: `src/app.controller.ts`
+- **Behavior**: All public methods are automatically traced
+- **Endpoints**: User management, payments, logging, status checks
+
+#### HealthController (NOT Traced)
+
+- **Location**: `src/health.controller.ts`
+- **Behavior**: Uses `@NoTraceClass()` decorator to exclude entire controller from tracing
+- **Purpose**: Health check endpoints that don't need tracing for performance and noise reduction
+- **Endpoints**:
+  - `GET /health` - Basic health check
+  - `GET /health/ready` - Readiness probe
+  - `GET /health/live` - Liveness probe
+  - `GET /health/metrics` - System metrics
+  - `GET /health/version` - Version information
+
+### Services
+
+#### UserService (Traced)
+
+- **Location**: `src/user.service.ts`
+- **Behavior**: Uses `@TraceAllMethods()` decorator to trace all public methods
+- **Purpose**: Demonstrates service-level tracing
+
+#### PaymentService (Selective Tracing)
+
+- **Location**: `src/payment.service.ts`
+- **Behavior**: Uses `@TraceMethod()` and `@NoTrace()` decorators for selective tracing
+- **Purpose**: Demonstrates fine-grained tracing control
+
+## Decorator Examples
+
+### Class-Level Exclusion
+
+```typescript
+@Controller('health')
+@NoTraceClass() // Excludes entire controller from auto-tracing
+export class HealthController {
+  @Get()
+  getHealth() {
+    // This method will NOT be traced
+    return { status: 'healthy' };
+  }
+}
+```
+
+### Service-Level Tracing
+
+```typescript
+@Injectable()
+@TraceAllMethods() // Traces all public methods
+export class UserService {
+  findUser(id: string) {
+    // This method will be traced
+  }
+
+  @NoTrace() // Excludes specific method from tracing
+  private internalHelper() {
+    // This method will NOT be traced
+  }
+}
+```
+
+### Method-Level Tracing
+
+```typescript
+@Injectable()
+export class PaymentService {
+  @TraceMethod('custom-payment-span') // Custom span name
+  processPayment(data: any) {
+    // This method will be traced with custom span name
+  }
+
+  @NoTrace() // Excludes from tracing
+  processSensitiveData(data: any) {
+    // This method will NOT be traced
+  }
+}
+```
+
+## Running the Example
+
+1. Install dependencies:
 
 ```bash
 pnpm install
 ```
 
-### 2. Environment Configuration
-
-Copy the example environment file and modify as needed:
+2. Build the application:
 
 ```bash
-cp .env.example .env
+pnpm build
 ```
 
-### 3. Run the Application
+3. Start the application:
 
 ```bash
-# Development mode with file watching
 pnpm start:dev
-
-# Production mode
-pnpm start:prod
 ```
 
-### 4. Test the Observability Features
+4. Test the endpoints:
 
 ```bash
-# Health check
-curl http://localhost:3000/health
+node test-endpoints.js
+```
 
-# Hello endpoint (generates logs and metrics)
-curl http://localhost:3000
+## Testing Tracing Behavior
 
-# Metrics endpoint (Prometheus format)
-curl http://localhost:3000/metrics
+### Traced Endpoints (will generate spans)
 
-# Users endpoint (more complex example)
-curl http://localhost:3000/users
+- `GET /` - Hello message
+- `GET /status` - Application status
+- `GET /complex` - Complex operation
+- `GET /users/:id` - User operations
+- `POST /payments` - Payment operations
+- `POST /logs/*` - Logging operations
+
+### Non-Traced Endpoints (will NOT generate spans)
+
+- `GET /health` - Health check
+- `GET /health/ready` - Readiness check
+- `GET /health/live` - Liveness check
+- `GET /health/metrics` - System metrics
+- `GET /health/version` - Version info
+
+## Configuration
+
+The observability configuration is in `src/app.module.ts`:
+
+```typescript
+ObservabilityModule.forRoot({
+  serviceName: 'basic-example',
+  tracing: {
+    enabled: true,
+    autoInstrumentation: {
+      enabled: true,
+      captureArguments: true,
+    },
+  },
+  // ... other config
+});
 ```
 
 ## Environment Variables
 
-| Variable               | Default                           | Description                               |
-| ---------------------- | --------------------------------- | ----------------------------------------- |
-| `SERVICE_NAME`         | `basic-example`                   | Service name for logging and tracing      |
-| `SERVICE_VERSION`      | `1.0.0`                           | Service version                           |
-| `NODE_ENV`             | `development`                     | Environment (development/production)      |
-| `PORT`                 | `3000`                            | HTTP port                                 |
-| `LOG_LEVEL`            | `info`                            | Log level (error/warn/info/debug/verbose) |
-| `METRICS_ENABLED`      | `true`                            | Enable/disable metrics collection         |
-| `TRACING_ENABLED`      | `true`                            | Enable/disable distributed tracing        |
-| `OTLP_TRACES_ENDPOINT` | `http://localhost:4318/v1/traces` | OpenTelemetry traces endpoint             |
+- `TRACING_ENABLED` - Enable/disable tracing (default: true)
+- `AUTO_INSTRUMENTATION_ENABLED` - Enable/disable auto-instrumentation (default: true)
+- `CAPTURE_ARGUMENTS` - Capture method arguments in traces (default: true)
+- `OTLP_TRACES_ENDPOINT` - OpenTelemetry traces endpoint
+- `OTLP_LOGS_ENDPOINT` - OpenTelemetry logs endpoint
 
-## Observability Features
+## Observability Stack
 
-### Logging
+This example works best with:
 
-The example demonstrates different logging patterns:
+- **Jaeger** for distributed tracing
+- **Prometheus** for metrics collection
+- **Grafana** for visualization
+- **OpenTelemetry Collector** for telemetry aggregation
 
-- **Context-based logging**: Each service/controller sets its own context
-- **Structured logging**: Logs include metadata objects in production
-- **Trace correlation**: Logs automatically include trace IDs when available
-- **Error handling**: Proper error logging with stack traces
+## Key Learning Points
 
-### Metrics
-
-Automatic metrics are collected for:
-
-- HTTP requests (method, status code, duration)
-- Response sizes
-- Error rates
-- Custom business metrics (demonstrated in UserService)
-
-### Tracing
-
-OpenTelemetry traces are automatically generated for:
-
-- HTTP requests
-- Database calls (if configured)
-- Custom spans (demonstrated with decorators)
-
-## Project Structure
-
-```
-src/
-├── main.ts              # Bootstrap with observability setup
-├── app.module.ts        # Main module with ObservabilityModule import
-├── app.controller.ts    # Basic endpoints with logging
-├── app.service.ts       # Service layer with observability
-└── users/
-    ├── users.module.ts  # Feature module example
-    ├── users.controller.ts  # REST API with observability
-    └── users.service.ts     # Business logic with custom metrics
-```
-
-## Development vs Production
-
-### Development Mode
-
-- Pretty-formatted logs with colors
-- Verbose output for debugging
-- All features enabled for testing
-
-### Production Mode
-
-- Structured JSON logs
-- Efficient logging with proper levels
-- Trace correlation for debugging
-- Metrics for monitoring
-
-## Monitoring Setup
-
-For a complete monitoring stack, see the [docker-compose example](../docker-compose/).
-
-The basic example includes:
-
-- **Application logs**: Console output with trace correlation
-- **Metrics endpoint**: Prometheus-compatible metrics at `/metrics`
-- **Health checks**: Application health at `/health`
-
-## Common Patterns
-
-### Service with Logging
-
-```typescript
-@Injectable()
-export class MyService {
-  constructor(private readonly logger: LoggerService) {
-    this.logger.setContext('MyService');
-  }
-
-  async processData(data: any) {
-    this.logger.log('Processing data', { dataType: typeof data });
-
-    try {
-      // Business logic
-      const result = await this.doWork(data);
-
-      this.logger.log('Data processed successfully', {
-        resultSize: result.length,
-        processingTime: Date.now() - start,
-      });
-
-      return result;
-    } catch (error) {
-      this.logger.error('Failed to process data', error.stack, 'MyService');
-      throw error;
-    }
-  }
-}
-```
-
-### Controller with Metrics
-
-```typescript
-@Controller('api')
-export class ApiController {
-  constructor(
-    private readonly service: MyService,
-    private readonly logger: LoggerService,
-    private readonly metricsService: MetricsService
-  ) {
-    this.logger.setContext('ApiController');
-  }
-
-  @Get('data')
-  async getData() {
-    const timer = this.metricsService.startTimer('api_request_duration', {
-      endpoint: 'getData',
-      method: 'GET',
-    });
-
-    try {
-      this.logger.log('GET /api/data requested');
-      const result = await this.service.processData();
-
-      timer.end({ status: 'success' });
-      return result;
-    } catch (error) {
-      timer.end({ status: 'error' });
-      throw error;
-    }
-  }
-}
-```
-
-## Troubleshooting
-
-### Logs not showing trace context
-
-- Ensure tracing is enabled (`TRACING_ENABLED=true`)
-- Check OpenTelemetry endpoint connectivity
-- Verify the application is receiving requests (trace context appears on active requests)
-
-### Metrics not appearing
-
-- Check `/metrics` endpoint is accessible
-- Verify `METRICS_ENABLED=true`
-- Ensure requests are being made to generate metrics
-
-### Application not starting
-
-- Check all environment variables are set correctly
-- Verify dependencies are installed (`pnpm install`)
-- Review logs for specific error messages
-
-## Next Steps
-
-- Explore [advanced examples](../README.md) for more complex scenarios
-- Set up a [monitoring stack](../docker-compose/) for visualization
-- Implement [custom metrics](../custom-metrics/) for your business logic
-- Add [distributed tracing](../microservice/) across multiple services
+1. **Default Behavior**: Controllers are traced automatically
+2. **Selective Exclusion**: Use `@NoTraceClass()` to exclude entire controllers
+3. **Service Tracing**: Use `@TraceAllMethods()` for comprehensive service tracing
+4. **Method Control**: Use `@TraceMethod()` and `@NoTrace()` for fine-grained control
+5. **Performance**: Health checks and monitoring endpoints should typically be excluded from tracing

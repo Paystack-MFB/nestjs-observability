@@ -6,6 +6,7 @@ import type { ObservabilityConfig } from '../config/observability.config';
 
 import {
   getTraceMethodOptions,
+  isNoTraceClassEnabled,
   isNoTraceEnabled,
   isTraceAllMethodsEnabled,
   TraceMethodOptions,
@@ -288,11 +289,11 @@ export class AutoInstrumentationService implements OnModuleInit {
   }
 
   /**
-   * Discovers and instruments all NestJS controllers
+   * Discovers and instruments all controllers found by the DiscoveryService
    *
    * This method uses the NestJS DiscoveryService to find all controllers in the application
-   * and automatically instruments their public methods. Controllers are always instrumented
-   * regardless of decorators (unless explicitly excluded in configuration).
+   * and automatically instruments their public methods. Controllers are traced by default
+   * unless excluded by configuration or decorated with @NoTrace.
    *
    * The process:
    * 1. Gets all controllers from DiscoveryService
@@ -311,8 +312,8 @@ export class AutoInstrumentationService implements OnModuleInit {
 
       const className = controller.metatype.name;
 
-      // Skip if class is excluded
-      if (this.isClassExcluded(className)) {
+      // Skip if class is excluded (ensure metatype is a Type constructor)
+      if (typeof controller.metatype === 'function' && this.isClassExcluded(className, controller.metatype as Type)) {
         this.logger.debug(`Skipping excluded controller: ${className}`, 'AutoInstrumentationService');
         continue;
       }
@@ -385,8 +386,8 @@ export class AutoInstrumentationService implements OnModuleInit {
 
       const className = provider.metatype.name;
 
-      // Skip if class is excluded
-      if (this.isClassExcluded(className)) {
+      // Skip if class is excluded (ensure metatype is a Type constructor)
+      if (typeof provider.metatype === 'function' && this.isClassExcluded(className, provider.metatype as Type)) {
         this.logger.debug(`Skipping excluded provider: ${className}`, 'AutoInstrumentationService');
         continue;
       }
@@ -429,7 +430,12 @@ export class AutoInstrumentationService implements OnModuleInit {
    * @param className - The name of the class to check
    * @returns true if the class should be excluded from instrumentation
    */
-  private isClassExcluded(className: string): boolean {
+  private isClassExcluded(className: string, classType: Type): boolean {
+    // Check if class has @NoTraceClass decorator
+    if (isNoTraceClassEnabled(classType)) {
+      return true;
+    }
+
     // Hard-coded sensible defaults for excluded classes
     const defaultExcludedClasses = [
       'LoggerService',

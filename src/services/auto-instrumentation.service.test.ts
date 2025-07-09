@@ -6,7 +6,7 @@ import { SpanStatusCode } from '@opentelemetry/api';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { ObservabilityConfig } from '../config/observability.config';
-import { NoTrace, TraceAllMethods, TraceMethod } from '../decorators/auto-trace.decorators';
+import { NoTrace, NoTraceClass, TraceAllMethods, TraceMethod } from '../decorators/auto-trace.decorators';
 import { LoggerService } from '../logger/logger.service';
 import { AutoInstrumentationService } from './auto-instrumentation.service';
 
@@ -48,6 +48,7 @@ class ErrorController {
 }
 
 @Controller('excluded')
+@NoTraceClass()
 class ExcludedController {
   excludedMethod(): string {
     return 'excluded';
@@ -402,57 +403,19 @@ describe('AutoInstrumentationService', () => {
       });
     });
 
-    it('should handle excluded controllers', async () => {
+    it('should handle excluded controllers', () => {
       const excludedController = new ExcludedController();
       const originalMethod = excludedController.excludedMethod;
-
-      // Override config for this test
-      const testModule = await Test.createTestingModule({
-        providers: [
-          {
-            provide: DiscoveryService,
-            useValue: mockDiscoveryService,
-          },
-          {
-            provide: LoggerService,
-            useValue: mockLogger,
-          },
-          {
-            provide: 'OBSERVABILITY_CONFIG',
-            useValue: {
-              ...defaultConfig,
-              tracing: {
-                ...defaultConfig.tracing,
-                autoInstrumentation: {
-                  ...defaultConfig.tracing.autoInstrumentation,
-                  excludeClasses: ['ExcludedController'],
-                },
-              },
-            },
-          },
-          {
-            inject: [DiscoveryService, LoggerService, 'OBSERVABILITY_CONFIG'],
-            provide: AutoInstrumentationService,
-            useFactory: (discoveryService: DiscoveryService, logger: LoggerService, config: ObservabilityConfig) => {
-              return new AutoInstrumentationService(discoveryService, logger, config);
-            },
-          },
-        ],
-      }).compile();
-
-      const serviceWithExclusions = testModule.get<AutoInstrumentationService>(AutoInstrumentationService);
 
       mockDiscoveryService.getControllers.mockReturnValue([
         { instance: excludedController, metatype: ExcludedController },
       ]);
       mockDiscoveryService.getProviders.mockReturnValue([]);
 
-      serviceWithExclusions.onModuleInit();
+      service.onModuleInit();
 
       // Method should NOT be wrapped
       expect(excludedController.excludedMethod).toBe(originalMethod);
-
-      await testModule.close();
     });
 
     it('should handle synchronous methods correctly', () => {

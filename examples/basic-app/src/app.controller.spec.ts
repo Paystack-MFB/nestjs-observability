@@ -22,7 +22,6 @@ describe('AppController', () => {
           useValue: {
             getHello: vi.fn().mockResolvedValue('Hello World!'),
             getStatus: vi.fn().mockResolvedValue({ status: 'ok' }),
-            getHealth: vi.fn().mockResolvedValue({ healthy: true }),
             performComplexOperation: vi.fn().mockResolvedValue({ result: 'done' }),
           },
         },
@@ -76,13 +75,6 @@ describe('AppController', () => {
     it('should return status', async () => {
       const result = await appController.getStatus();
       expect(result).toEqual({ status: 'ok' });
-    });
-  });
-
-  describe('health', () => {
-    it('should return health check', async () => {
-      const result = await appController.getHealth();
-      expect(result).toEqual({ healthy: true });
     });
   });
 

@@ -23,11 +23,6 @@ export class AppController {
     return this.appService.getStatus();
   }
 
-  @Get('health')
-  async getHealth(): Promise<any> {
-    return this.appService.getHealth();
-  }
-
   @Get('complex')
   async performComplexOperation(): Promise<any> {
     return this.appService.performComplexOperation();

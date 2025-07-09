@@ -15,10 +15,31 @@ const endpoints = [
     path: '/status',
     description: 'Get application status',
   },
+  // Health endpoints that are NOT traced due to @NoTraceClass decorator
   {
     method: 'GET',
     path: '/health',
-    description: 'Health check endpoint',
+    description: 'Health check endpoint (NOT TRACED - uses @NoTraceClass)',
+  },
+  {
+    method: 'GET',
+    path: '/health/ready',
+    description: 'Readiness check endpoint (NOT TRACED - uses @NoTraceClass)',
+  },
+  {
+    method: 'GET',
+    path: '/health/live',
+    description: 'Liveness check endpoint (NOT TRACED - uses @NoTraceClass)',
+  },
+  {
+    method: 'GET',
+    path: '/health/metrics',
+    description: 'System metrics endpoint (NOT TRACED - uses @NoTraceClass)',
+  },
+  {
+    method: 'GET',
+    path: '/health/version',
+    description: 'Version information endpoint (NOT TRACED - uses @NoTraceClass)',
   },
   {
     method: 'GET',

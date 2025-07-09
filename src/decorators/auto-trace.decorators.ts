@@ -5,6 +5,7 @@ import 'reflect-metadata';
 const TRACE_ALL_METHODS_KEY = 'trace:all-methods';
 const TRACE_METHOD_KEY = 'trace:method';
 const NO_TRACE_KEY = 'trace:no-trace';
+const NO_TRACE_CLASS_KEY = 'trace:no-trace-class';
 
 // Interface for TraceMethod options
 export interface TraceMethodOptions {
@@ -38,6 +39,18 @@ export function getTraceMethodOptions(target: object, propertyKey: string): Trac
 }
 
 /**
+ * Checks if a class has the @NoTraceClass decorator applied.
+ *
+ * @param target - The class constructor to check
+ * @returns true if the class is decorated with @NoTraceClass
+ */
+export function isNoTraceClassEnabled(target: Type): boolean {
+  return Reflect.getMetadata(NO_TRACE_CLASS_KEY, target) === true;
+}
+
+// Helper functions for metadata reading
+
+/**
  * Checks if a method has the @NoTrace decorator applied.
  *
  * @param target - The class prototype or instance
@@ -47,8 +60,6 @@ export function getTraceMethodOptions(target: object, propertyKey: string): Trac
 export function isNoTraceEnabled(target: object, propertyKey: string): boolean {
   return Reflect.getMetadata(NO_TRACE_KEY, target, propertyKey) === true;
 }
-
-// Helper functions for metadata reading
 
 /**
  * Checks if a class has the @TraceAllMethods decorator applied.
@@ -80,6 +91,27 @@ export function NoTrace() {
   return function (target: object, propertyKey: string, descriptor: PropertyDescriptor) {
     Reflect.defineMetadata(NO_TRACE_KEY, true, target, propertyKey);
     return descriptor;
+  };
+}
+
+/**
+ * Class decorator that excludes an entire class from auto-tracing.
+ * Use this to exclude specific controllers or providers from auto-tracing.
+ *
+ * @example
+ * ```typescript
+ * @Controller('health')
+ * @NoTraceClass()
+ * class HealthController {
+ *   // No methods will be traced automatically
+ *   getHealth() { ... }
+ * }
+ * ```
+ */
+export function NoTraceClass() {
+  return function <T extends Type>(target: T): T {
+    Reflect.defineMetadata(NO_TRACE_CLASS_KEY, true, target);
+    return target;
   };
 }
 

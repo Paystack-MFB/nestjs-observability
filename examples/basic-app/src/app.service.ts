@@ -29,21 +29,6 @@ export class AppService {
     };
   }
 
-  async getHealth(): Promise<any> {
-    this.logger.log('Getting health check');
-
-    // Simulate health check
-    await this.delay(5);
-
-    return {
-      healthy: true,
-      services: {
-        database: 'connected',
-        cache: 'connected',
-      },
-    };
-  }
-
   @Trace()
   async performComplexOperation(): Promise<any> {
     this.logger.log('Performing complex operation');
