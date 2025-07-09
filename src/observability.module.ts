@@ -2,7 +2,7 @@ import { DynamicModule, Global, Module, Provider, Type } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { APP_INTERCEPTOR, DiscoveryService } from '@nestjs/core';
 
-import { defaultObservabilityConfig, ObservabilityConfig } from './config/observability.config';
+import { defaultObservabilityConfig, ensureServiceLabels, ObservabilityConfig } from './config/observability.config';
 import { MetricsController } from './controllers/metrics.controller';
 import { ControllerMethodTraceInterceptor } from './interceptors/controller-method-trace.interceptor';
 import { HttpTraceInterceptor } from './interceptors/http-trace.interceptor';
@@ -16,10 +16,13 @@ import { TracingService } from './tracing/tracing.service';
 // eslint-disable-next-line @typescript-eslint/no-extraneous-class
 export class ObservabilityModule {
   static forRoot(config?: Partial<ObservabilityConfig>): DynamicModule {
-    const actualConfig = {
+    const mergedConfig = {
       ...defaultObservabilityConfig,
       ...config,
     };
+
+    // Ensure service and version are always included in metrics labels
+    const actualConfig = ensureServiceLabels(mergedConfig);
 
     return this.registerModule(actualConfig);
   }
@@ -31,7 +34,11 @@ export class ObservabilityModule {
     const configProvider = {
       inject: options.inject ?? [],
       provide: 'OBSERVABILITY_CONFIG',
-      useFactory: options.useFactory,
+      useFactory: async (...args: unknown[]) => {
+        const config = await options.useFactory(...args);
+        // Ensure service and version are always included in metrics labels
+        return ensureServiceLabels(config);
+      },
     };
 
     return this.registerModule(null, configProvider);

@@ -20,7 +20,6 @@ import { UserService } from './user.service';
       environment: process.env.NODE_ENV || 'development',
       logging: {
         level: process.env.LOG_LEVEL || 'info',
-        structuredLogging: process.env.STRUCTURED_LOGGING === 'true',
         consoleOutput: true,
         otlpExport: {
           enabled: process.env.OTLP_LOGS_ENABLED === 'true',

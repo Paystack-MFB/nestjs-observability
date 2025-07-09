@@ -125,7 +125,6 @@ describe('AutoInstrumentationService', () => {
         enabled: false,
         endpoint: 'http://localhost:4318/v1/logs',
       },
-      structuredLogging: true,
     },
     metrics: {
       defaultLabels: {},

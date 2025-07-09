@@ -11,7 +11,6 @@ export interface ObservabilityConfig {
       enabled: boolean;
       endpoint: string;
     };
-    structuredLogging: boolean;
   };
   metrics: {
     defaultLabels: Record<string, string>;
@@ -47,6 +46,27 @@ export interface ObservabilityConfig {
       ratio?: number;
       type: 'always_off' | 'always_on' | 'trace_id_ratio';
     };
+  };
+}
+
+/**
+ * Helper function to ensure service and version are always included in metrics labels
+ * This function processes the configuration to guarantee that service and version labels
+ * are present, even when users provide their own defaultLabels configuration
+ */
+export function ensureServiceLabels(config: ObservabilityConfig): ObservabilityConfig {
+  return {
+    ...config,
+    metrics: {
+      ...config.metrics,
+      defaultLabels: {
+        // Start with user-provided labels
+        ...config.metrics.defaultLabels,
+        // Always ensure service and version are present (will override user values if provided)
+        service: config.serviceName,
+        version: config.serviceVersion,
+      },
+    },
   };
 }
 
@@ -130,12 +150,12 @@ export const defaultObservabilityConfig: ObservabilityConfig = {
       enabled: process.env['OTLP_LOGS_ENABLED'] === 'true',
       endpoint: process.env['OTLP_LOGS_ENDPOINT'] ?? 'http://localhost:4318/v1/logs',
     },
-    structuredLogging: process.env['NODE_ENV'] === 'production',
   },
   metrics: {
     defaultLabels: {
       environment: process.env['NODE_ENV'] ?? 'development',
       service: process.env['SERVICE_NAME'] ?? 'nestjs-service',
+      version: process.env['SERVICE_VERSION'] ?? '1.0.0',
     },
     defaultMetrics: true,
     enabled: process.env['METRICS_ENABLED'] !== 'false',
@@ -143,8 +163,7 @@ export const defaultObservabilityConfig: ObservabilityConfig = {
   },
 
   serviceName: process.env['SERVICE_NAME'] ?? 'nestjs-service',
-
-  serviceVersion: '1.0.0',
+  serviceVersion: process.env['SERVICE_VERSION'] ?? '1.0.0',
 
   tracing: {
     autoInstrumentation: getAutoInstrumentationConfig(),

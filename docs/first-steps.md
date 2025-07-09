@@ -196,7 +196,6 @@ ObservabilityModule.forRoot({
   // Logging Configuration
   logging: {
     level: process.env.LOG_LEVEL || 'info',
-    structuredLogging: process.env.NODE_ENV === 'production',
     consoleOutput: true,
     otlpExport: {
       enabled: process.env.OTLP_LOGS_ENABLED === 'true',
@@ -210,8 +209,12 @@ ObservabilityModule.forRoot({
     endpoint: process.env.METRICS_ENDPOINT || '/metrics',
     defaultMetrics: true,
     defaultLabels: {
-      service: process.env.SERVICE_NAME || 'my-service',
-      version: process.env.SERVICE_VERSION || '1.0.0',
+      // Note: 'service' and 'version' labels are ALWAYS automatically added from
+      // the top-level serviceName and serviceVersion configuration, even if you
+      // provide your own service and version labels here - they will be overridden
+      environment: process.env.NODE_ENV || 'development',
+      region: process.env.AWS_REGION || 'us-east-1',
+      customLabel: 'your-custom-value',
     },
   },
 
@@ -254,7 +257,13 @@ ObservabilityModule.forRoot({
 - Use `@TraceMethod` for custom span names that better describe business operations
 - Keep span names consistent across your application
 
-### 4. Error Handling
+### 4. Logging Format
+
+- The logger automatically uses **structured logging** (JSON format) for all environments except `development`
+- In `development` environment, it uses **pretty formatting** for better readability
+- No manual configuration needed - this is handled automatically based on `NODE_ENV`
+
+### 5. Error Handling
 
 The auto-tracing system automatically captures errors and marks spans as failed. Your error handling remains unchanged:
 

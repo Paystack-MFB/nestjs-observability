@@ -60,17 +60,21 @@ import { ObservabilityModule } from 'nestjs-observability';
     // Or with custom configuration
     ObservabilityModule.forRoot({
       serviceName: 'my-service',
+      serviceVersion: '1.0.0',
       environment: process.env.NODE_ENV || 'development',
       logging: {
         level: 'info',
-        structuredLogging: process.env.NODE_ENV === 'production', // Structured in prod, pretty in dev
         consoleOutput: true,
       },
       metrics: {
         enabled: true,
         defaultLabels: {
-          service: 'my-service',
-          version: '1.0.0',
+          // Note: 'service' and 'version' labels are ALWAYS automatically added from
+          // the top-level serviceName and serviceVersion configuration, even if you
+          // provide your own service and version labels here - they will be overridden
+          environment: 'production',
+          region: 'us-east-1',
+          customLabel: 'your-value',
         },
       },
       tracing: {
@@ -103,10 +107,10 @@ async function bootstrap() {
   // Configure the global logger to replace NestJS's default logger
   const config = {
     serviceName: 'my-service',
+    serviceVersion: '1.0.0',
     environment: process.env.NODE_ENV || 'development',
     logging: {
       level: process.env.LOG_LEVEL || 'info',
-      structuredLogging: process.env.NODE_ENV === 'production',
       consoleOutput: true,
     },
     // ... other config options
@@ -140,14 +144,19 @@ import { ObservabilityModule } from 'nestjs-observability';
     ObservabilityModule.forRootAsync({
       useFactory: (configService: ConfigService) => ({
         serviceName: configService.get('SERVICE_NAME', 'my-service'),
+        serviceVersion: configService.get('SERVICE_VERSION', '1.0.0'),
         environment: configService.get('NODE_ENV', 'development'),
         logging: {
           level: configService.get('LOG_LEVEL', 'info'),
-          structuredLogging: configService.get('NODE_ENV') === 'production',
           consoleOutput: true,
         },
         metrics: {
           enabled: configService.get('METRICS_ENABLED', 'true') === 'true',
+          defaultLabels: {
+            service: configService.get('SERVICE_NAME', 'my-service'),
+            version: configService.get('SERVICE_VERSION', '1.0.0'),
+            environment: configService.get('NODE_ENV', 'development'),
+          },
         },
         tracing: {
           enabled: configService.get('TRACING_ENABLED', 'true') === 'true',
@@ -595,7 +604,6 @@ interface ObservabilityConfig {
   logging: {
     level: 'error' | 'warn' | 'info' | 'debug' | 'verbose';
     consoleOutput: boolean;
-    structuredLogging: boolean;
     otlpExport: {
       enabled: boolean;
       endpoint: string;
@@ -628,102 +636,3 @@ interface ObservabilityConfig {
   };
 }
 ```
-
-## API Reference
-
-### LoggerService
-
-The enhanced logger extends NestJS's native ConsoleLogger and provides:
-
-- `log(message, context?)`: Info level logging
-- `error(message, stack?, context?)`: Error level logging
-- `warn(message, context?)`: Warning level logging
-- `debug(message, context?)`: Debug level logging
-- `verbose(message, context?)`: Verbose level logging
-- `fatal(message, context?)`: Fatal level logging (maps to error)
-- `logWithContext(level, message, contextData, contextName?)`: Structured logging
-- `createChildLogger(context, persistentContext?)`: Create child logger with persistent context
-- `setContext(context)`: Set the context name for the logger
-
-### LoggerFactory
-
-Factory methods for creating and configuring loggers:
-
-- `LoggerFactory.create(config)`: Create a logger instance
-- `LoggerFactory.createChild(config, context, additionalContext?)`: Create child logger
-- `LoggerFactory.configureGlobalLogger(config)`: Configure global NestJS logger
-- `LoggerFactory.createForService(config, serviceName)`: Create service-specific logger
-
-## Migration from Winston
-
-If you're migrating from Winston-based logging:
-
-1. Remove Winston dependencies and imports
-2. Replace Winston logger injection with `LoggerService`
-3. Update logging calls to use native NestJS logger methods
-4. Configure environment-specific structured/pretty formatting
-5. Set up OpenTelemetry integration for trace correlation
-
-The enhanced logger maintains compatibility with existing NestJS logging patterns while adding observability features.
-
-## Metrics Endpoint
-
-The package automatically exposes a `/metrics` endpoint (configurable) that returns Prometheus-formatted metrics:
-
-```bash
-curl http://localhost:3000/metrics
-```
-
-### Automatic Controller Registration
-
-When you import `ObservabilityModule` into your NestJS application, the `MetricsController` is **automatically registered** if metrics are enabled (which is the default). This means:
-
-1. **No manual controller registration needed** - The `/metrics` endpoint becomes available immediately
-2. **Conditional registration** - The controller is only registered when `metrics.enabled !== false`
-3. **Configurable endpoint** - You can customize the metrics endpoint path through configuration
-
-```typescript
-// The controller is automatically included with default config
-ObservabilityModule.forRoot();
-
-// Or explicitly enable/disable it
-ObservabilityModule.forRoot({
-  metrics: {
-    enabled: true, // MetricsController will be registered
-    endpoint: '/custom-metrics', // Custom endpoint path (future feature)
-  },
-});
-
-// To disable the metrics endpoint entirely
-ObservabilityModule.forRoot({
-  metrics: {
-    enabled: false, // MetricsController will NOT be registered
-  },
-});
-```
-
-### What this means for your application:
-
-- **Zero configuration**: Import the module and `/metrics` endpoint is ready
-- **Production ready**: Metrics are available for Prometheus scraping immediately
-- **No route conflicts**: The controller uses the standard `/metrics` path
-- **Automatic headers**: Proper `Content-Type: text/plain; charset=utf-8` headers are set
-
-```bash
-# Test the metrics endpoint
-curl http://localhost:3000/metrics
-
-# Expected response format:
-# HELP http_requests_total Total number of HTTP requests
-# TYPE http_requests_total counter
-# http_requests_total{method="GET",status="200"} 42
-# ...
-```
-
-## License
-
-PROPRIETARY - Copyright (c) 2025 Paystack, Inc. All rights reserved.
-
-## Support
-
-For issues and questions, please use the GitHub issue tracker.
