@@ -2,6 +2,40 @@
  * Configuration for the ObservabilityModule
  * This file contains all the configuration options for the observability components
  */
+
+export interface ArgumentSanitizationConfig {
+  /**
+   * Additional regex patterns to identify sensitive values
+   * These will be combined with the default patterns
+   * @default []
+   */
+  additionalSensitivePatterns: RegExp[];
+
+  /**
+   * Whether to capture arguments at all
+   * @default true
+   */
+  enabled: boolean;
+
+  /**
+   * Object field names to extract as identifiers
+   * @default ['id', 'userId', 'name', 'email', 'type', 'status']
+   */
+  identifierFields: string[];
+
+  /**
+   * Maximum string length before truncation
+   * @default 100
+   */
+  maxStringLength: number;
+
+  /**
+   * Custom replacement text for redacted values
+   * @default '[REDACTED]'
+   */
+  redactedPlaceholder: string;
+}
+
 export interface ObservabilityConfig {
   environment: string;
   logging: {
@@ -21,13 +55,10 @@ export interface ObservabilityConfig {
   serviceName: string;
   serviceVersion: string;
   tracing: {
-    // Simplified auto-instrumentation settings
-    autoInstrumentation: {
-      // Whether to capture method arguments in traces
-      captureArguments: boolean;
-      // Whether to enable the auto-tracing system
-      enabled: boolean;
-    };
+    /**
+     * Configuration for argument sanitization in traces
+     */
+    argumentSanitization: ArgumentSanitizationConfig;
     enabled: boolean;
     exporter: {
       endpoint: string;
@@ -90,16 +121,6 @@ function createTracingExporter(): ObservabilityConfig['tracing']['exporter'] {
   }
 
   return config;
-}
-
-/**
- * Helper function to get simplified auto-instrumentation configuration
- */
-function getAutoInstrumentationConfig(): ObservabilityConfig['tracing']['autoInstrumentation'] {
-  return {
-    captureArguments: process.env['CAPTURE_ARGUMENTS'] !== 'false',
-    enabled: process.env['AUTO_INSTRUMENTATION_ENABLED'] !== 'false',
-  };
 }
 
 /**
@@ -166,15 +187,18 @@ export const defaultObservabilityConfig: ObservabilityConfig = {
   serviceVersion: process.env['SERVICE_VERSION'] ?? '1.0.0',
 
   tracing: {
-    autoInstrumentation: getAutoInstrumentationConfig(),
+    argumentSanitization: {
+      additionalSensitivePatterns: [],
+      enabled: true,
+      identifierFields: ['id', 'userId', 'name', 'email', 'type', 'status'],
+      maxStringLength: 100,
+      redactedPlaceholder: '[REDACTED]',
+    },
     enabled: process.env['TRACING_ENABLED'] !== 'false',
     exporter: createTracingExporter(),
     instrumentations: {
-      // Enable all auto-instrumentations by default for maximum coverage
-      autoInstrumentations: process.env['TRACING_AUTO_INSTRUMENTATIONS'] !== 'false',
-      // Common instrumentations that might need to be disabled in certain environments
+      autoInstrumentations: true,
       disabled: getDisabledInstrumentations(),
-      // Override configuration for specific instrumentations
       overrides: getInstrumentationOverrides(),
     },
     sampler: {

@@ -1,4 +1,4 @@
-import { ConsoleLogger, Injectable, LogLevel, Scope } from '@nestjs/common';
+import { ConsoleLogger, Inject, Injectable, LogLevel, Scope } from '@nestjs/common';
 import { trace } from '@opentelemetry/api';
 
 import type { ObservabilityConfig } from '../config/observability.config';
@@ -17,7 +17,7 @@ interface LogContext extends Record<string, unknown> {
 export class LoggerService extends ConsoleLogger {
   private readonly persistentContext: LogContext = {};
 
-  constructor(private readonly config: ObservabilityConfig) {
+  constructor(@Inject('OBSERVABILITY_CONFIG') private readonly config: ObservabilityConfig) {
     super('LoggerService', {
       logLevels: LoggerService.getLogLevels(config.logging.level),
     });

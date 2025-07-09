@@ -2,7 +2,8 @@ name: Release
 
 on:
   push:
-    branches: [main]
+    branches:
+      - main
 
 concurrency: ${{ github.workflow }}-${{ github.ref }}
 
@@ -10,17 +11,13 @@ jobs:
   release:
     name: Release
     runs-on: ubuntu-latest
-    permissions:
-      contents: write
-      packages: write
-      id-token: write
-
     steps:
-      - name: Checkout code
+      - name: Checkout
         uses: actions/checkout@v4
         with:
-          # This makes Actions fetch all Git history so that Changesets can generate changelogs with the correct commits
+          # We need to fetch history to run changesets correctly
           fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Setup pnpm
         uses: pnpm/action-setup@v4
@@ -35,50 +32,41 @@ jobs:
           registry-url: 'https://registry.npmjs.org'
 
       - name: Install dependencies
-        run: pnpm install --frozen-lockfile
+        run: pnpm install
 
-      - name: Create Release Pull Request or Publish to npm
+      - name: Check for Changeset files
         id: changesets
-        uses: changesets/action@v1
-        with:
-          # This expects you to have a script called release which does a build for your packages and calls changeset publish
-          publish: pnpm run release
-          title: 'chore: release package'
-          commit: 'chore: release package'
+        run: |
+          if [ -n "$(ls .changeset/*.md 2>/dev/null | grep -v README)" ]; then
+            echo "has_changesets=true" >> $GITHUB_OUTPUT
+            echo "Found changeset files - proceeding with release"
+          else
+            echo "has_changesets=false" >> $GITHUB_OUTPUT
+            echo "No changeset files found - skipping release"
+          fi
+
+      - name: Create Release and Publish
+        if: steps.changesets.outputs.has_changesets == 'true'
+        run: |
+          # Configure git for the bot
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+
+          echo "Running changeset version..."
+          pnpm changeset version
+
+          echo "Committing version changes..."
+          git add .
+          git commit -m "chore(release): version packages" || echo "No changes to commit"
+
+          echo "Pushing changes to repository..."
+          git push origin main
+
+          echo "Publishing to npm..."
+          pnpm changeset publish
+
+          echo "Pushing tags to repository..."
+          git push --tags
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
-
-  # Alternative job for internal npm registry
-  publish-internal:
-    name: Publish to Internal Registry
-    runs-on: ubuntu-latest
-    if: github.ref == 'refs/heads/main'
-    needs: release
-
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Setup pnpm
-        uses: pnpm/action-setup@v4
-        with:
-          version: 10
-
-      - name: Setup Node.js 22
-        uses: actions/setup-node@v4
-        with:
-          node-version: 22
-          cache: 'pnpm'
-          registry-url: ${{ vars.INTERNAL_NPM_REGISTRY_URL || 'https://npm.paystack.co' }}
-
-      - name: Install dependencies
-        run: pnpm install --frozen-lockfile
-
-      - name: Build
-        run: pnpm run build
-
-      - name: Publish to internal registry
-        run: pnpm publish --no-git-checks
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.INTERNAL_NPM_TOKEN }}
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}

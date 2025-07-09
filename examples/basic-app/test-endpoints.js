@@ -17,7 +17,7 @@ async function makeRequest(method, url, data = null) {
 
   try {
     const response = await fetch(url, options);
-    const result = await response.json();
+    const result = await response.text();
     console.log(`${method} ${url}`);
     console.log('Response:', result);
     console.log('---');

@@ -1,14 +1,12 @@
 import { DynamicModule, Global, Module, Provider, Type } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
-import { APP_INTERCEPTOR, DiscoveryService } from '@nestjs/core';
+import { APP_INTERCEPTOR } from '@nestjs/core';
 
 import { defaultObservabilityConfig, ensureServiceLabels, ObservabilityConfig } from './config/observability.config';
 import { MetricsController } from './controllers/metrics.controller';
-import { ControllerMethodTraceInterceptor } from './interceptors/controller-method-trace.interceptor';
-import { HttpTraceInterceptor } from './interceptors/http-trace.interceptor';
+import { AutoTraceInterceptor } from './interceptors/auto-trace.interceptor';
 import { LoggerService } from './logger/logger.service';
 import { MetricsService } from './metrics/metrics.service';
-import { AutoInstrumentationService } from './services/auto-instrumentation.service';
 import { TracingService } from './tracing/tracing.service';
 
 @Global()
@@ -54,60 +52,35 @@ export class ObservabilityModule {
         provide: 'OBSERVABILITY_CONFIG',
         useValue: config,
       },
-      {
-        inject: ['OBSERVABILITY_CONFIG'],
-        provide: LoggerService,
-        useFactory: (config: ObservabilityConfig) => {
-          return new LoggerService(config);
-        },
-      },
-      {
-        inject: ['OBSERVABILITY_CONFIG', LoggerService],
-        provide: MetricsService,
-        useFactory: (config: ObservabilityConfig, logger: LoggerService) => {
-          return new MetricsService(config, logger);
-        },
-      },
-      {
-        inject: ['OBSERVABILITY_CONFIG', LoggerService],
-        provide: TracingService,
-        useFactory: (config: ObservabilityConfig, logger: LoggerService) => {
-          return new TracingService(config, logger);
-        },
-      },
-      // Add the auto-instrumentation service
-      {
-        inject: [DiscoveryService, LoggerService, 'OBSERVABILITY_CONFIG'],
-        provide: AutoInstrumentationService,
-        useFactory: (discoveryService: DiscoveryService, logger: LoggerService, config: ObservabilityConfig) => {
-          return new AutoInstrumentationService(discoveryService, logger, config);
-        },
-      },
-      {
-        inject: [MetricsService, LoggerService],
-        provide: APP_INTERCEPTOR,
-        useFactory: (metricsService: MetricsService, logger: LoggerService) => {
-          return new HttpTraceInterceptor(metricsService, logger);
-        },
-      },
-      // Add the controller method trace interceptor globally
-      {
-        inject: [LoggerService],
-        provide: APP_INTERCEPTOR,
-        useFactory: (logger: LoggerService) => {
-          return new ControllerMethodTraceInterceptor(logger);
-        },
-      },
+      LoggerService,
+      MetricsService,
+      TracingService,
     ];
+
+    // V2 Auto-Tracing: Use new AutoTraceInterceptor
+    // This replaces both the old interceptors and the AutoInstrumentationService
+    // Controllers are traced automatically, services use @TraceAllMethods decorator
+    providers.push({
+      inject: [MetricsService, 'OBSERVABILITY_CONFIG'],
+      provide: APP_INTERCEPTOR,
+      useFactory: (metricsService: MetricsService, observabilityConfig: ObservabilityConfig) => {
+        return new AutoTraceInterceptor(metricsService, observabilityConfig);
+      },
+    });
 
     // Controllers array with conditional addition
     const controllers: Type<unknown>[] = config?.metrics.enabled !== false ? [MetricsController] : [];
 
+    // Exports - only the core services now
+    const exports: Type<unknown>[] = [LoggerService, MetricsService, TracingService];
+
+    // Simplified imports - only ConfigModule needed
+    const imports: (DynamicModule | Type<unknown>)[] = [ConfigModule];
+
     return {
       controllers,
-      exports: [LoggerService, MetricsService, TracingService, AutoInstrumentationService],
-      global: true, // Make this module global to ensure services are available everywhere
-      imports: [ConfigModule],
+      exports,
+      imports,
       module: ObservabilityModule,
       providers,
     };

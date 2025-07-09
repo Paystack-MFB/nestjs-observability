@@ -6,7 +6,6 @@ export class LoggingService {
   private readonly logger: LoggerService;
 
   constructor(private readonly loggerService: LoggerService) {
-    // Create a logger instance with context
     this.logger = this.loggerService.createChildLogger('LoggingService');
   }
 
@@ -96,7 +95,7 @@ export class LoggingService {
 
   async demonstrateContextUpdates(): Promise<void> {
     // Demonstrate context management using child loggers
-    const operationLogger = this.loggerService.createChildLogger('OperationManager', {
+    const operationLogger = this.logger.createChildLogger('OperationManager', {
       sessionId: `session-${Date.now()}`,
       operationId: 'op-456',
     });

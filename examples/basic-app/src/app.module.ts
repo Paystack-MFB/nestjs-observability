@@ -1,6 +1,6 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
-import { ObservabilityModule } from 'nestjs-observability';
+import { LoggerService, ObservabilityModule } from 'nestjs-observability';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { HealthController } from './health.controller';
@@ -13,7 +13,6 @@ import { UserService } from './user.service';
     ConfigModule.forRoot({
       isGlobal: true,
     }),
-
     ObservabilityModule.forRoot({
       serviceName: process.env.SERVICE_NAME || 'basic-example',
       serviceVersion: process.env.SERVICE_VERSION || '1.0.0',
@@ -38,10 +37,6 @@ import { UserService } from './user.service';
       },
       tracing: {
         enabled: process.env.TRACING_ENABLED !== 'false',
-        autoInstrumentation: {
-          enabled: process.env.AUTO_INSTRUMENTATION_ENABLED !== 'false',
-          captureArguments: process.env.CAPTURE_ARGUMENTS !== 'false',
-        },
         sampler: {
           type: 'always_on' as const,
           ratio: 1.0,
@@ -60,10 +55,37 @@ import { UserService } from './user.service';
             ? JSON.parse(process.env.TRACING_INSTRUMENTATION_OVERRIDES)
             : {},
         },
+        // New argument sanitization configuration
+        argumentSanitization: {
+          enabled: process.env.ARGUMENT_SANITIZATION_ENABLED !== 'false',
+          maxStringLength: process.env.ARGUMENT_SANITIZATION_MAX_LENGTH
+            ? parseInt(process.env.ARGUMENT_SANITIZATION_MAX_LENGTH, 10)
+            : 100,
+          redactedPlaceholder: process.env.ARGUMENT_SANITIZATION_PLACEHOLDER || '[REDACTED]',
+          identifierFields: process.env.ARGUMENT_SANITIZATION_IDENTIFIER_FIELDS
+            ? process.env.ARGUMENT_SANITIZATION_IDENTIFIER_FIELDS.split(',').map((s) => s.trim())
+            : ['id', 'userId', 'name', 'email', 'type', 'status'],
+          additionalSensitivePatterns: process.env.ARGUMENT_SANITIZATION_ADDITIONAL_PATTERNS
+            ? process.env.ARGUMENT_SANITIZATION_ADDITIONAL_PATTERNS.split(',').map(
+                (pattern) => new RegExp(pattern.trim(), 'i')
+              )
+            : [/api[_-]?key/i, /secret/i, /token/i, /password/i],
+        },
       },
     }),
   ],
   controllers: [AppController, HealthController],
-  providers: [AppService, UserService, PaymentService, LoggingService],
+  providers: [
+    AppService,
+    UserService,
+    PaymentService,
+    {
+      provide: LoggingService,
+      useFactory: (loggerService: LoggerService) => {
+        return new LoggingService(loggerService);
+      },
+      inject: [LoggerService],
+    },
+  ],
 })
 export class AppModule {}

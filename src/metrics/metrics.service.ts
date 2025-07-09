@@ -1,4 +1,4 @@
-import { Injectable, OnModuleInit } from '@nestjs/common';
+import { Inject, Injectable, OnModuleInit } from '@nestjs/common';
 import * as promClient from 'prom-client';
 
 import type { ObservabilityConfig } from '../config/observability.config';
@@ -18,7 +18,7 @@ export class MetricsService implements OnModuleInit {
   private registry: promClient.Registry;
 
   constructor(
-    private readonly config: ObservabilityConfig,
+    @Inject('OBSERVABILITY_CONFIG') private readonly config: ObservabilityConfig,
     private readonly logger: LoggerService
   ) {
     // Create a new registry

@@ -1,4 +1,4 @@
-import { Injectable, OnApplicationShutdown, OnModuleInit } from '@nestjs/common';
+import { Inject, Injectable, OnApplicationShutdown, OnModuleInit } from '@nestjs/common';
 import { getNodeAutoInstrumentations } from '@opentelemetry/auto-instrumentations-node';
 import { OTLPTraceExporter } from '@opentelemetry/exporter-trace-otlp-http';
 import { NodeSDK } from '@opentelemetry/sdk-node';
@@ -31,7 +31,7 @@ export class TracingService implements OnApplicationShutdown, OnModuleInit {
   private sdk!: NodeSDK;
 
   constructor(
-    private readonly config: ObservabilityConfig,
+    @Inject('OBSERVABILITY_CONFIG') private readonly config: ObservabilityConfig,
     private readonly logger: LoggerService
   ) {}
 

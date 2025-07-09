@@ -1,4 +1,4 @@
-import { Body, Controller, Get, HttpException, HttpStatus, Param, Post } from '@nestjs/common';
+import { Body, Controller, Get, HttpException, HttpStatus, Inject, Param, Post } from '@nestjs/common';
 import { AppService } from './app.service';
 import { LoggingService } from './logging.service';
 import { PaymentService } from './payment.service';
@@ -7,10 +7,10 @@ import { UserService } from './user.service';
 @Controller()
 export class AppController {
   constructor(
-    private readonly appService: AppService,
-    private readonly userService: UserService,
-    private readonly paymentService: PaymentService,
-    private readonly loggingService: LoggingService
+    @Inject(AppService) private appService: AppService,
+    @Inject(UserService) private userService: UserService,
+    @Inject(PaymentService) private paymentService: PaymentService,
+    @Inject(LoggingService) private loggingService: LoggingService
   ) {}
 
   @Get()

@@ -47,9 +47,12 @@ describe('LoggerService', () => {
     serviceName: 'test-service',
     serviceVersion: '1.0.0',
     tracing: {
-      autoInstrumentation: {
-        captureArguments: true,
+      argumentSanitization: {
+        additionalSensitivePatterns: [],
         enabled: true,
+        identifierFields: ['id', 'userId', 'name', 'email', 'type', 'status'],
+        maxStringLength: 100,
+        redactedPlaceholder: '[REDACTED]',
       },
       enabled: true,
       exporter: {

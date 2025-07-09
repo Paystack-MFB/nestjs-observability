@@ -1,498 +1,396 @@
-# NestJS Observability Basic Example
+# NestJS Observability - Basic Example App
 
-This example demonstrates the comprehensive logging capabilities of the NestJS Observability module, showcasing structured logging, context management, OpenTelemetry integration, and performance monitoring.
+This example application demonstrates the complete functionality of the `nestjs-observability` library, showcasing structured logging, metrics collection, and distributed tracing with automatic controller and service instrumentation.
 
-## Features Demonstrated
+## 🚀 Features Demonstrated
 
-### 🔧 **Core Observability Features**
+### 1. **Automatic Controller Tracing**
 
-- **Structured Logging**: JSON format for production, pretty format for development
-- **Context Management**: Persistent context across log calls and child loggers
-- **OpenTelemetry Integration**: Automatic trace ID inclusion in logs
-- **Performance Monitoring**: Built-in metrics and tracing
-- **Error Handling**: Enhanced error logging with stack traces
-- **Auto-instrumentation**: Automatic tracing of controllers and services
+- All controller methods are automatically traced with HTTP context
+- Request/response tracing with performance metrics
+- Argument sanitization for sensitive data protection
 
-### 📝 **Enhanced Logging Capabilities**
+### 2. **Service Method Tracing**
 
-- **Basic Logging**: Standard log levels (info, error, debug, warn)
-- **Structured Logging**: Rich object-based logging with metadata
-- **Context Persistence**: Maintain context across multiple log calls
-- **Child Loggers**: Isolated logging contexts for different components
-- **Business Event Logging**: Track domain-specific events
-- **Security Event Logging**: Monitor authentication and security events
-- **Performance Metrics**: Log operation timing and performance data
-- **Exception Handling**: Comprehensive error logging with context
+- `UserService` and `PaymentService` use `@TraceAllMethods()` decorator
+- Automatic tracing of all public methods
+- Nested service calls create proper parent-child trace relationships
 
-## Quick Start
+### 3. **Argument Sanitization**
 
-### Installation
+- Sensitive data (passwords, tokens, card numbers) are automatically redacted
+- Configurable sanitization patterns and placeholder text
+- Demonstration with `/payments/sensitive` endpoint
+
+### 4. **Enhanced Structured Logging**
+
+- Context-aware logging with persistent fields
+- Business event tracking
+- Performance metrics logging
+- Exception handling with context
+
+### 5. **Metrics Collection**
+
+- Prometheus metrics available at `/metrics`
+- HTTP request metrics (duration, status codes, routes)
+- Custom business metrics
+- Memory and CPU usage monitoring
+
+### 6. **OpenTelemetry Integration**
+
+- Automatic instrumentation for HTTP, database, and file system operations
+- OTLP export support for traces and logs
+- Distributed tracing across service boundaries
+
+## 📋 Quick Start
+
+### 1. Install Dependencies
 
 ```bash
-# Install dependencies
-npm install
-
-# Copy environment file
-cp env.example .env
-
-# Start the application
-npm start
+pnpm install
 ```
 
-### Testing the Logging Features
+### 2. Configure Environment
+
+Copy the example environment file:
 
 ```bash
-# Run the comprehensive test suite
+cp env.example .env
+```
+
+The example includes all available configuration options:
+
+- **Application**: service name, version, port
+- **Logging**: level, OTLP export settings
+- **Metrics**: Prometheus endpoint, labels
+- **Tracing**: OpenTelemetry configuration
+- **Argument Sanitization**: configurable data protection
+
+### 3. Run the Application
+
+```bash
+# Development mode with hot reload
+pnpm run start:dev
+
+# Production mode
+pnpm run build
+pnpm run start:prod
+```
+
+### 4. Test the Endpoints
+
+#### Automated Testing
+
+Run the included test script to hit all endpoints:
+
+```bash
 node test-endpoints.js
 ```
 
-## Logging Examples
+#### Manual Testing
 
-### 1. Basic Logging
+The app runs on `http://localhost:3000` with these endpoints:
 
-```typescript
-// Simple string logging
-logger.log('User logged in successfully');
-logger.error('Database connection failed');
-logger.debug('Processing user request');
-logger.warn('Rate limit approaching');
-```
+**Basic Endpoints:**
 
-### 2. Structured Logging
+- `GET /` - Hello world
+- `GET /status` - Service status
+- `GET /complex` - Complex operation demonstration
 
-```typescript
-// Rich object logging
-logger.log({
-  message: 'User action performed',
-  action: 'login',
-  userId: 'user-123',
-  timestamp: new Date().toISOString(),
-  metadata: {
-    ipAddress: '192.168.1.100',
-    userAgent: 'Mozilla/5.0...',
-    attempt: 1,
-  },
-});
-```
+**User Management:**
 
-### 3. Context Management
+- `POST /users` - Create user
+- `GET /users/:id` - Get user by ID
+- `GET /users/:id/profile` - Get user profile
+- `POST /users/validate` - Validate user data
+- `GET /users/:id/advanced-profile` - Complex nested operations
 
-```typescript
-// Create child logger with persistent context
-const requestLogger = logger.createChildLogger('RequestHandler', {
-  requestId: 'req-456',
-  userId: 'user-123',
-  sessionId: 'session-789',
-});
+**Payment Processing:**
 
-// All subsequent logs include the context
-requestLogger.log('Processing request');
-requestLogger.log('Validation completed');
-requestLogger.log('Request finished');
-```
+- `POST /payments` - Process payment
+- `GET /payments/:id/validate` - Validate payment
+- `GET /payments/:id/status` - Get payment status
+- `POST /payments/:id/refund` - Refund payment
+- `POST /payments/sensitive` - **Sensitive data demo** (shows argument sanitization)
 
-### 4. Performance Monitoring
+**Logging Demonstrations:**
 
-```typescript
-// Log performance metrics
-logger.log(
-  {
-    message: 'Database query performance',
-    operation: 'user_lookup',
-    duration: 250,
-    unit: 'ms',
-    threshold: 500,
-    status: 'normal',
-  },
-  'PerformanceMonitor'
-);
-```
+- `POST /logs/info` - Info logging
+- `POST /logs/error` - Error logging
+- `POST /logs/user-action` - User action tracking
+- `POST /logs/performance` - Performance metrics
+- `POST /logs/business-event` - Business event logging
+- `POST /logs/security-event` - Security event logging
+- `POST /logs/exception` - Exception handling
 
-### 5. Business Event Logging
+**Context Management:**
 
-```typescript
-// Track business events
-logger.log(
-  {
-    message: 'Payment processed',
-    eventType: 'payment_success',
-    eventData: {
-      amount: 99.99,
-      currency: 'USD',
-      customerId: 'cust-123',
-      paymentMethod: 'credit_card',
-    },
-  },
-  'BusinessEvents'
-);
-```
+- `GET /logs/demo/context-persistence` - Context persistence demo
+- `GET /logs/demo/context-updates` - Context updates demo
+- `GET /logs/demo/comprehensive` - Full transaction flow
 
-### 6. Security Event Logging
+**Error Testing:**
 
-```typescript
-// Monitor security events
-const securityLogger = logger.createChildLogger('SecurityMonitor', {
-  securityLevel: 'high',
-  eventCategory: 'authentication',
-});
+- `GET /error-test` - Error handling demonstration
 
-securityLogger.warn({
-  message: 'Failed login attempt',
-  event: 'failed_login',
-  userId: 'user-456',
-  ipAddress: '10.0.0.1',
-  timestamp: new Date().toISOString(),
-  requiresReview: true,
-});
-```
+## 🔧 Configuration Options
 
-### 7. Exception Handling
+### Environment Variables
 
-```typescript
-// Comprehensive error logging
-try {
-  await riskyOperation();
-} catch (error) {
-  const errorLogger = logger.createChildLogger('ErrorHandler', {
-    errorId: `error-${Date.now()}`,
-    severity: 'high',
-    operation: 'database_connection',
-  });
-
-  errorLogger.error(error, 'DatabaseError');
-  errorLogger.debug({
-    message: 'Additional error context',
-    connectionPool: 'main',
-    retryAttempt: 3,
-    lastSuccessful: '2024-01-15T10:30:00Z',
-  });
-}
-```
-
-## API Endpoints
-
-### Basic Logging Endpoints
-
-- `POST /logs/info` - Log info messages
-- `POST /logs/error` - Log error messages
-- `POST /logs/debug` - Log debug messages
-- `POST /logs/warning` - Log warning messages
-- `POST /logs/activity` - Log user activities
-
-### Enhanced Logging Endpoints
-
-- `POST /logs/user-action` - Log user actions with metadata
-- `POST /logs/performance` - Log performance metrics
-- `POST /logs/business-event` - Log business events
-- `POST /logs/security-event` - Log security events
-- `POST /logs/exception` - Log exceptions with context
-
-### Context Management Demonstrations
-
-- `GET /logs/demo/context-persistence` - Demonstrate context persistence
-- `GET /logs/demo/context-updates` - Demonstrate context management
-- `GET /logs/demo/comprehensive` - Comprehensive logging example
-
-## Usage Examples
-
-### Basic Info Logging
-
-```bash
-curl -X POST http://localhost:3000/logs/info \
-  -H "Content-Type: application/json" \
-  -d '{"message": "Application started successfully"}'
-```
-
-### User Action Logging
-
-```bash
-curl -X POST http://localhost:3000/logs/user-action \
-  -H "Content-Type: application/json" \
-  -d '{
-    "action": "login",
-    "userId": "user-123",
-    "metadata": {
-      "ipAddress": "192.168.1.100",
-      "userAgent": "Mozilla/5.0...",
-      "attempt": 1
-    }
-  }'
-```
-
-### Performance Metrics
-
-```bash
-curl -X POST http://localhost:3000/logs/performance \
-  -H "Content-Type: application/json" \
-  -d '{
-    "operation": "database_query",
-    "duration": 250
-  }'
-```
-
-### Business Event Logging
-
-```bash
-curl -X POST http://localhost:3000/logs/business-event \
-  -H "Content-Type: application/json" \
-  -d '{
-    "eventType": "payment_processed",
-    "eventData": {
-      "amount": 99.99,
-      "currency": "USD",
-      "customerId": "cust-123",
-      "paymentMethod": "credit_card"
-    }
-  }'
-```
-
-### Security Event Logging
-
-```bash
-curl -X POST http://localhost:3000/logs/security-event \
-  -H "Content-Type: application/json" \
-  -d '{
-    "event": "failed_login_attempt",
-    "userId": "user-suspicious",
-    "ipAddress": "10.0.0.1"
-  }'
-```
-
-### Exception Logging
-
-```bash
-curl -X POST http://localhost:3000/logs/exception \
-  -H "Content-Type: application/json" \
-  -d '{
-    "error": "Database connection failed",
-    "context": {
-      "database": "postgresql",
-      "host": "localhost",
-      "port": 5432,
-      "connectionPool": "main",
-      "retryAttempt": 3
-    }
-  }'
-```
-
-## Log Output Examples
-
-### Development Mode (Pretty Formatted)
-
-```
-[Nest] 12345  - 01/15/2024, 10:30:00 AM     LOG [RequestHandler] Processing user request
-[Nest] 12345  - 01/15/2024, 10:30:00 AM     LOG [RequestHandler] {
-  requestId: 'req-456',
-  userId: 'user-123',
-  sessionId: 'session-789',
-  message: 'Validation completed'
-}
-```
-
-### Production Mode (JSON Structured)
-
-```json
-{
-  "timestamp": "2024-01-15T10:30:00.000Z",
-  "level": "log",
-  "message": "User action performed",
-  "context": "UserActions",
-  "serviceName": "basic-example",
-  "serviceVersion": "1.0.0",
-  "environment": "production",
-  "pid": 12345,
-  "action": "login",
-  "userId": "user-123",
-  "sessionId": "session-456",
-  "traceId": "1234567890abcdef",
-  "spanId": "abcdef1234567890"
-}
-```
-
-## Context Management Demonstrations
-
-### Context Persistence Demo
-
-```bash
-curl -X GET http://localhost:3000/logs/demo/context-persistence
-```
-
-This demonstrates how child loggers maintain context across multiple log calls.
-
-### Context Updates Demo
-
-```bash
-curl -X GET http://localhost:3000/logs/demo/context-updates
-```
-
-This shows how to manage context using child loggers for different phases of operation.
-
-### Comprehensive Logging Demo
-
-```bash
-curl -X GET http://localhost:3000/logs/demo/comprehensive
-```
-
-This provides a complete example of transaction processing with full context and structured logging.
-
-## Configuration
-
-The logging behavior can be configured via environment variables:
+#### Basic Configuration
 
 ```env
-# Basic Configuration
-NODE_ENV=production              # Enables JSON structured logging
-LOG_LEVEL=info                   # Set logging level
-SERVICE_NAME=basic-example       # Service name in logs
-SERVICE_VERSION=1.0.0           # Service version in logs
+SERVICE_NAME=basic-example
+SERVICE_VERSION=1.0.0
+NODE_ENV=development
+PORT=3000
+```
 
-# OpenTelemetry Configuration
-TRACING_ENABLED=true            # Enable distributed tracing
+#### Logging Configuration
+
+```env
+LOG_LEVEL=info
+OTLP_LOGS_ENABLED=false
+OTLP_LOGS_ENDPOINT=http://localhost:4318/v1/logs
+```
+
+#### Metrics Configuration
+
+```env
+METRICS_ENABLED=true
+METRICS_ENDPOINT=/metrics
+```
+
+#### Tracing Configuration
+
+```env
+TRACING_ENABLED=true
 OTLP_TRACES_ENDPOINT=http://localhost:4318/v1/traces
-
-# Metrics Configuration
-METRICS_ENABLED=true            # Enable Prometheus metrics
-METRICS_ENDPOINT=/metrics       # Metrics endpoint path
+TRACING_SAMPLER_TYPE=always_on
+TRACING_SAMPLER_RATIO=1.0
 ```
 
-## Best Practices
+#### OpenTelemetry Auto-Instrumentations
 
-### 1. **Use Structured Logging**
-
-```typescript
-// Good: Structured with consistent fields
-logger.log({
-  message: 'User login successful',
-  userId: 'user-123',
-  timestamp: new Date().toISOString(),
-  duration: 250,
-});
-
-// Avoid: Unstructured string interpolation
-logger.log(`User ${userId} logged in after ${duration}ms`);
+```env
+TRACING_AUTO_INSTRUMENTATIONS=true
+TRACING_DISABLED_INSTRUMENTATIONS=@opentelemetry/instrumentation-fs
+TRACING_INSTRUMENTATION_OVERRIDES={}
 ```
 
-### 2. **Leverage Context Management**
+#### Argument Sanitization
 
-```typescript
-// Create child loggers for different contexts
-const authLogger = logger.createChildLogger('AuthService', {
-  module: 'authentication',
-  version: '2.0.0',
-});
-
-const paymentLogger = logger.createChildLogger('PaymentService', {
-  module: 'payments',
-  processor: 'stripe',
-});
+```env
+ARGUMENT_SANITIZATION_ENABLED=true
+ARGUMENT_SANITIZATION_MAX_LENGTH=100
+ARGUMENT_SANITIZATION_PLACEHOLDER=[REDACTED]
+ARGUMENT_SANITIZATION_IDENTIFIER_FIELDS=id,userId,name,email,type,status
+ARGUMENT_SANITIZATION_ADDITIONAL_PATTERNS=api[_-]?key,secret,token,password
 ```
 
-### 3. **Use Appropriate Log Levels**
+## 🎯 Testing Different Scenarios
 
-```typescript
-logger.debug('Detailed diagnostic information');
-logger.log('General application flow');
-logger.warn('Warning conditions');
-logger.error('Error conditions');
-logger.fatal('Critical system failures');
-```
-
-### 4. **Include Relevant Context**
-
-```typescript
-// Include operation context
-logger.log({
-  message: 'Database query executed',
-  operation: 'user_lookup',
-  duration: 150,
-  recordsFound: 1,
-  query: 'SELECT * FROM users WHERE id = ?',
-});
-```
-
-### 5. **Monitor Performance**
-
-```typescript
-const startTime = Date.now();
-await performOperation();
-const duration = Date.now() - startTime;
-
-logger.log({
-  message: 'Operation completed',
-  operation: 'data_processing',
-  duration,
-  recordsProcessed: 100,
-  status: duration > 1000 ? 'slow' : 'normal',
-});
-```
-
-## Integration with Observability Tools
-
-### OpenTelemetry
-
-- Logs automatically include trace IDs when spans are active
-- Distributed tracing correlates logs across services
-- Automatic instrumentation of HTTP requests and database calls
-
-### Prometheus Metrics
-
-- Built-in HTTP request metrics
-- Custom business metrics
-- Performance monitoring dashboards
-
-### Log Aggregation
-
-- Structured JSON logs work seamlessly with ELK stack
-- Fluentd/Fluent Bit integration
-- CloudWatch, Datadog, and other log platforms
-
-## Monitoring and Alerting
-
-### Key Metrics to Monitor
-
-- **Error Rate**: Monitor `level: "error"` logs
-- **Performance**: Track `duration` fields in performance logs
-- **Security Events**: Alert on `securityLevel: "high"` events
-- **Business Events**: Track conversion and user actions
-
-### Sample Alerting Rules
-
-```yaml
-# High error rate alert
-- alert: HighErrorRate
-  expr: rate(logs_total{level="error"}[5m]) > 0.1
-
-# Slow operations alert
-- alert: SlowOperations
-  expr: histogram_quantile(0.95, logs_duration_seconds) > 1.0
-
-# Security events alert
-- alert: SecurityEvent
-  expr: increase(logs_total{securityLevel="high"}[1m]) > 0
-```
-
-## Additional Resources
-
-- [NestJS Observability Documentation](../../README.md)
-- [OpenTelemetry Documentation](https://opentelemetry.io/docs/)
-- [Prometheus Documentation](https://prometheus.io/docs/)
-- [Structured Logging Best Practices](https://docs.microsoft.com/en-us/azure/azure-monitor/logs/structured-logs)
-
-## Troubleshooting
-
-### Common Issues
-
-1. **Logs not appearing**: Check `LOG_LEVEL` and `NODE_ENV` settings
-2. **Missing trace IDs**: Ensure tracing is enabled and spans are active
-3. **Performance impact**: Use appropriate log levels and async logging
-4. **Context not persisting**: Use child loggers for context isolation
-
-### Debug Mode
+### 1. **Argument Sanitization Testing**
 
 ```bash
-# Enable debug logging
-LOG_LEVEL=debug npm start
-
-# Enable all tracing
-TRACING_ENABLED=true npm start
+# Test sensitive data redaction
+curl -X POST http://localhost:3000/payments/sensitive \
+  -H "Content-Type: application/json" \
+  -d '{
+    "cardNumber": "4111111111111111",
+    "cvv": "123",
+    "apiKey": "secret-key-123",
+    "password": "mypassword"
+  }'
 ```
+
+Check the logs to see sensitive data is redacted as `[REDACTED]`.
+
+### 2. **Nested Service Calls**
+
+```bash
+# Test complex nested operations
+curl http://localhost:3000/users/1/advanced-profile
+```
+
+This endpoint demonstrates:
+
+- Controller -> Service -> Nested Service calls
+- Proper parent-child trace relationships
+- Argument passing and sanitization
+
+### 3. **Error Handling**
+
+```bash
+# Test error tracing
+curl http://localhost:3000/error-test
+```
+
+Shows how errors are captured in traces and logs.
+
+### 4. **Performance Monitoring**
+
+```bash
+# Generate multiple requests to see metrics
+for i in {1..10}; do
+  curl http://localhost:3000/complex
+done
+
+# Check metrics
+curl http://localhost:3000/metrics
+```
+
+## 📊 Observability Stack Setup
+
+### Local Development with Docker Compose
+
+For complete observability testing, set up the full stack:
+
+```yaml
+version: '3.8'
+services:
+  # OpenTelemetry Collector
+  otel-collector:
+    image: otel/opentelemetry-collector-contrib:latest
+    command: ['--config=/etc/otelcol-contrib/config.yaml']
+    volumes:
+      - ./otel-config.yaml:/etc/otelcol-contrib/config.yaml
+    ports:
+      - '4317:4317' # OTLP gRPC receiver
+      - '4318:4318' # OTLP HTTP receiver
+      - '8888:8888' # Prometheus metrics
+      - '8889:8889' # Prometheus exporter metrics
+
+  # Jaeger for traces
+  jaeger:
+    image: jaegertracing/all-in-one:latest
+    ports:
+      - '16686:16686'
+      - '14250:14250'
+    environment:
+      - COLLECTOR_OTLP_ENABLED=true
+
+  # Prometheus for metrics
+  prometheus:
+    image: prom/prometheus:latest
+    ports:
+      - '9090:9090'
+    volumes:
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml
+```
+
+### Viewing Observability Data
+
+1. **Traces**: Visit http://localhost:16686 (Jaeger UI)
+2. **Metrics**: Visit http://localhost:9090 (Prometheus UI)
+3. **Application Metrics**: Visit http://localhost:3000/metrics
+4. **Logs**: Check console output (pretty-printed in development)
+
+## 🔍 What to Look For
+
+### In the Logs
+
+- **Structured JSON** (when NODE_ENV != 'development')
+- **Context persistence** across service calls
+- **Argument sanitization** in sensitive endpoints
+- **Performance metrics** and timing information
+- **Error context** with stack traces and metadata
+
+### In the Traces
+
+- **HTTP request spans** with method, URL, status code
+- **Service method spans** with arguments and return values
+- **Nested service calls** with proper parent-child relationships
+- **Database/external service calls** (if any)
+- **Error spans** with exception details
+
+### In the Metrics
+
+- **HTTP request metrics**: duration, count, status codes
+- **System metrics**: memory usage, CPU, garbage collection
+- **Custom business metrics**: user actions, payment processing
+- **OpenTelemetry metrics**: trace export statistics
+
+## 🛠️ Development Commands
+
+```bash
+# Start development server
+pnpm run start:dev
+
+# Build for production
+pnpm run build
+
+# Run tests
+pnpm run test
+
+# Run tests with coverage
+pnpm run test:cov
+
+# Lint code
+pnpm run lint
+
+# Format code
+pnpm run format
+```
+
+## 🎨 Customization
+
+### Adding Custom Metrics
+
+```typescript
+// In your service
+constructor(private readonly metricsService: MetricsService) {
+  this.customCounter = this.metricsService.createCounter({
+    name: 'custom_operations_total',
+    help: 'Total custom operations',
+    labelNames: ['type', 'status']
+  });
+}
+
+someMethod() {
+  this.customCounter.inc({ type: 'user_action', status: 'success' });
+}
+```
+
+### Adding Custom Tracing
+
+```typescript
+// Use individual method tracing
+@Trace()
+async customMethod() {
+  // This method will be traced
+}
+
+// Or trace entire class
+@TraceAllMethods()
+class MyService {
+  // All public methods will be traced
+}
+```
+
+### Custom Logging Context
+
+```typescript
+// In your service
+constructor(private readonly logger: LoggerService) {}
+
+someMethod() {
+  this.logger.setContext('userId', '123');
+  this.logger.setContext('operation', 'user_creation');
+  this.logger.info('User created successfully');
+}
+```
+
+## 📝 Notes
+
+- The example uses the `@TraceAllMethods()` decorator for services to demonstrate automatic tracing
+- Controllers are automatically traced by the `AutoTraceInterceptor`
+- All configuration is environment-variable driven for easy deployment
+- The `/payments/sensitive` endpoint specifically demonstrates argument sanitization
+- Log structured output varies by environment (pretty in development, JSON in production)
+
+## 🔗 Related Documentation
+
+- [Auto-Tracing Documentation](../../docs/autotracing-v2.md)
+- [Main Library README](../../README.md)
+- [Configuration Guide](../../docs/configuration.md)

@@ -1,12 +1,12 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { Trace } from 'nestjs-observability';
+import { TraceAllMethods } from 'nestjs-observability';
 
 @Injectable()
+@TraceAllMethods()
 export class PaymentService {
   private readonly logger = new Logger(PaymentService.name);
   private readonly payments: Map<string, any> = new Map();
 
-  @Trace()
   async processPayment(paymentData: {
     amount: number;
     currency: string;
@@ -31,7 +31,6 @@ export class PaymentService {
     return payment;
   }
 
-  @Trace()
   async validatePayment(paymentId: string): Promise<boolean> {
     this.logger.log(`Validating payment: ${paymentId}`);
 
@@ -45,7 +44,6 @@ export class PaymentService {
     return isValid;
   }
 
-  @Trace()
   async getPaymentStatus(paymentId: string): Promise<string> {
     this.logger.log(`Getting payment status: ${paymentId}`);
 
@@ -55,7 +53,6 @@ export class PaymentService {
     return payment ? payment.status : 'not_found';
   }
 
-  @Trace()
   async refundPayment(paymentId: string): Promise<any> {
     this.logger.log(`Processing refund for payment: ${paymentId}`);
 
@@ -86,7 +83,7 @@ export class PaymentService {
     // Simulate sensitive data processing
     await this.delay(100);
 
-    // This method is not traced to protect sensitive information
+    // This method demonstrates argument sanitization - sensitive data like card numbers will be redacted
   }
 
   private async delay(ms: number): Promise<void> {

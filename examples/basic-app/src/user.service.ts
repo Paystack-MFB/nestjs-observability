@@ -1,7 +1,8 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { Trace } from 'nestjs-observability';
+import { NoTrace, TraceAllMethods } from 'nestjs-observability';
 
 @Injectable()
+@TraceAllMethods()
 export class UserService {
   private readonly logger = new Logger(UserService.name);
   private readonly users: Map<string, any> = new Map();
@@ -22,7 +23,6 @@ export class UserService {
     });
   }
 
-  @Trace()
   async getUserById(id: string): Promise<any> {
     this.logger.log(`Getting user by ID: ${id}`);
 
@@ -39,7 +39,6 @@ export class UserService {
     return user;
   }
 
-  @Trace()
   async createUser(userData: { name: string; email: string }): Promise<any> {
     this.logger.log(`Creating new user: ${userData.name}`);
 
@@ -58,7 +57,6 @@ export class UserService {
     return newUser;
   }
 
-  @Trace()
   async getUserProfile(id: string): Promise<any> {
     this.logger.log(`Getting profile for user: ${id}`);
 
@@ -74,7 +72,6 @@ export class UserService {
     };
   }
 
-  @Trace()
   async validateUser(userData: { email: string; name: string }): Promise<boolean> {
     this.logger.log(`Validating user: ${userData.email}`);
 
@@ -87,7 +84,6 @@ export class UserService {
     return isValid;
   }
 
-  @Trace()
   async getAdvancedUserProfile(id: string): Promise<any> {
     this.logger.log(`Getting advanced profile for user: ${id}`);
 
@@ -106,6 +102,7 @@ export class UserService {
     };
   }
 
+  @NoTrace()
   private async delay(ms: number): Promise<void> {
     return new Promise((resolve) => setTimeout(resolve, ms));
   }
