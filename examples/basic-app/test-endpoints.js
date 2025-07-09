@@ -1,212 +1,169 @@
 #!/usr/bin/env node
 
-const axios = require('axios');
-
 const BASE_URL = 'http://localhost:3000';
 
-const endpoints = [
-  {
-    method: 'GET',
-    path: '/',
-    description: 'Get hello message',
-  },
-  {
-    method: 'GET',
-    path: '/status',
-    description: 'Get application status',
-  },
-  // Health endpoints that are NOT traced due to @NoTraceClass decorator
-  {
-    method: 'GET',
-    path: '/health',
-    description: 'Health check endpoint (NOT TRACED - uses @NoTraceClass)',
-  },
-  {
-    method: 'GET',
-    path: '/health/ready',
-    description: 'Readiness check endpoint (NOT TRACED - uses @NoTraceClass)',
-  },
-  {
-    method: 'GET',
-    path: '/health/live',
-    description: 'Liveness check endpoint (NOT TRACED - uses @NoTraceClass)',
-  },
-  {
-    method: 'GET',
-    path: '/health/metrics',
-    description: 'System metrics endpoint (NOT TRACED - uses @NoTraceClass)',
-  },
-  {
-    method: 'GET',
-    path: '/health/version',
-    description: 'Version information endpoint (NOT TRACED - uses @NoTraceClass)',
-  },
-  {
-    method: 'GET',
-    path: '/complex',
-    description: 'Complex operation endpoint',
-  },
-  {
-    method: 'GET',
-    path: '/users/1',
-    description: 'Get user by ID',
-  },
-  {
-    method: 'POST',
-    path: '/users',
-    description: 'Create new user',
-    body: { name: 'Test User', email: 'test@example.com' },
-  },
-  {
-    method: 'GET',
-    path: '/users/1/profile',
-    description: 'Get user profile',
-  },
-  {
-    method: 'POST',
-    path: '/users/validate',
-    description: 'Validate user data',
-    body: { email: 'test@example.com', name: 'Test User' },
-  },
-  {
-    method: 'GET',
-    path: '/users/1/advanced-profile',
-    description: 'Get advanced user profile',
-  },
-  {
-    method: 'POST',
-    path: '/payments',
-    description: 'Process payment',
-    body: { amount: 100, currency: 'USD', customerId: '1', method: 'card' },
-  },
-  {
-    method: 'GET',
-    path: '/payments/pay_123/validate',
-    description: 'Validate payment',
-  },
-  {
-    method: 'GET',
-    path: '/payments/pay_123/status',
-    description: 'Get payment status',
-  },
-  {
-    method: 'POST',
-    path: '/payments/pay_123/refund',
-    description: 'Refund payment',
-  },
-  {
-    method: 'POST',
-    path: '/payments/sensitive',
-    description: 'Process sensitive payment data',
-    body: { cardNumber: '1234567890123456', cvv: '123' },
-  },
-  {
-    method: 'POST',
-    path: '/logs/info',
-    description: 'Log info message',
-    body: { message: 'Test info message' },
-  },
-  {
-    method: 'POST',
-    path: '/logs/error',
-    description: 'Log error message',
-    body: { error: 'Test error message', context: 'test context' },
-  },
-  {
-    method: 'POST',
-    path: '/logs/debug',
-    description: 'Log debug message',
-    body: { message: 'Test debug message' },
-  },
-  {
-    method: 'POST',
-    path: '/logs/warning',
-    description: 'Log warning message',
-    body: { message: 'Test warning message' },
-  },
-  {
-    method: 'POST',
-    path: '/logs/activity',
-    description: 'Log activity',
-    body: { activity: 'User login', userId: '1' },
-  },
-  {
-    method: 'GET',
-    path: '/error-test',
-    description: 'Test error handling',
-  },
-];
+// Helper function to make HTTP requests
+async function makeRequest(method, url, data = null) {
+  const options = {
+    method: method,
+    headers: {
+      'Content-Type': 'application/json',
+    },
+  };
 
-async function testEndpoint(endpoint) {
-  const { method, path, description, body } = endpoint;
-  const url = `${BASE_URL}${path}`;
-
-  console.log(`\n🔍 Testing: ${method} ${path}`);
-  console.log(`   Description: ${description}`);
+  if (data) {
+    options.body = JSON.stringify(data);
+  }
 
   try {
-    const config = {
-      method: method.toLowerCase(),
-      url,
-      timeout: 5000,
-    };
-
-    if (body) {
-      config.data = body;
-      config.headers = { 'Content-Type': 'application/json' };
-    }
-
-    const response = await axios(config);
-    console.log(`   ✅ Status: ${response.status}`);
-    console.log(`   📄 Response: ${JSON.stringify(response.data, null, 2)}`);
-
-    return { success: true, status: response.status };
+    const response = await fetch(url, options);
+    const result = await response.json();
+    console.log(`${method} ${url}`);
+    console.log('Response:', result);
+    console.log('---');
+    return result;
   } catch (error) {
-    if (error.response) {
-      console.log(`   ❌ Status: ${error.response.status}`);
-      console.log(`   📄 Error: ${JSON.stringify(error.response.data, null, 2)}`);
-      return { success: false, status: error.response.status };
-    } else {
-      console.log(`   💥 Network Error: ${error.message}`);
-      return { success: false, error: error.message };
-    }
+    console.error(`Error making request to ${url}:`, error);
+    console.log('---');
   }
 }
 
-async function runTests() {
-  console.log('🚀 Starting endpoint tests...');
-  console.log(`🌐 Base URL: ${BASE_URL}`);
+// Test all endpoints
+async function testAllEndpoints() {
+  console.log('🚀 Testing NestJS Observability Basic App Endpoints');
+  console.log('='.repeat(60));
 
-  const results = [];
+  // ==== BASIC ENDPOINTS ====
+  console.log('\n📍 BASIC ENDPOINTS');
+  await makeRequest('GET', `${BASE_URL}/`);
+  await makeRequest('GET', `${BASE_URL}/status`);
+  await makeRequest('GET', `${BASE_URL}/complex`);
 
-  for (const endpoint of endpoints) {
-    const result = await testEndpoint(endpoint);
-    results.push({ endpoint, result });
+  // ==== USER ENDPOINTS ====
+  console.log('\n👤 USER ENDPOINTS');
+  await makeRequest('POST', `${BASE_URL}/users`, {
+    name: 'John Doe',
+    email: 'john@example.com',
+  });
+  await makeRequest('GET', `${BASE_URL}/users/123`);
+  await makeRequest('GET', `${BASE_URL}/users/123/profile`);
+  await makeRequest('POST', `${BASE_URL}/users/validate`, {
+    email: 'test@example.com',
+    name: 'Test User',
+  });
+  await makeRequest('GET', `${BASE_URL}/users/123/advanced-profile`);
 
-    // Add delay between requests
-    await new Promise((resolve) => setTimeout(resolve, 500));
-  }
+  // ==== PAYMENT ENDPOINTS ====
+  console.log('\n💳 PAYMENT ENDPOINTS');
+  await makeRequest('POST', `${BASE_URL}/payments`, {
+    amount: 100,
+    currency: 'USD',
+    customerId: 'cust_123',
+    method: 'credit_card',
+  });
+  await makeRequest('GET', `${BASE_URL}/payments/pay_123/validate`);
+  await makeRequest('GET', `${BASE_URL}/payments/pay_123/status`);
+  await makeRequest('POST', `${BASE_URL}/payments/pay_123/refund`);
+  await makeRequest('POST', `${BASE_URL}/payments/sensitive`, {
+    cardNumber: '4111111111111111',
+    cvv: '123',
+  });
 
-  console.log('\n📊 Test Summary:');
-  console.log('================');
+  // ==== BASIC LOGGING ENDPOINTS ====
+  console.log('\n📝 BASIC LOGGING ENDPOINTS');
+  await makeRequest('POST', `${BASE_URL}/logs/info`, {
+    message: 'This is an info log message',
+  });
+  await makeRequest('POST', `${BASE_URL}/logs/error`, {
+    error: 'This is an error message',
+    context: 'TestContext',
+  });
+  await makeRequest('POST', `${BASE_URL}/logs/debug`, {
+    message: 'This is a debug message',
+  });
+  await makeRequest('POST', `${BASE_URL}/logs/warning`, {
+    message: 'This is a warning message',
+  });
+  await makeRequest('POST', `${BASE_URL}/logs/activity`, {
+    activity: 'User clicked button',
+    userId: 'user-123',
+  });
 
-  const successful = results.filter((r) => r.result.success).length;
-  const failed = results.filter((r) => !r.result.success).length;
+  // ==== ENHANCED LOGGING ENDPOINTS ====
+  console.log('\n🔍 ENHANCED LOGGING ENDPOINTS');
 
-  console.log(`✅ Successful: ${successful}`);
-  console.log(`❌ Failed: ${failed}`);
-  console.log(`📊 Total: ${results.length}`);
+  // User Action Logging
+  await makeRequest('POST', `${BASE_URL}/logs/user-action`, {
+    action: 'login',
+    userId: 'user-456',
+    metadata: {
+      ipAddress: '192.168.1.100',
+      userAgent: 'Mozilla/5.0...',
+      attempt: 1,
+    },
+  });
 
-  if (failed > 0) {
-    console.log('\n❌ Failed endpoints:');
-    results
-      .filter((r) => !r.result.success)
-      .forEach(({ endpoint, result }) => {
-        console.log(`   - ${endpoint.method} ${endpoint.path} (${result.status || 'Network Error'})`);
-      });
-  }
+  // Performance Metrics
+  await makeRequest('POST', `${BASE_URL}/logs/performance`, {
+    operation: 'database_query',
+    duration: 250,
+  });
 
-  console.log('\n🎉 Test completed!');
+  // Business Event Logging
+  await makeRequest('POST', `${BASE_URL}/logs/business-event`, {
+    eventType: 'payment_processed',
+    eventData: {
+      amount: 99.99,
+      currency: 'USD',
+      customerId: 'cust_789',
+      paymentMethod: 'credit_card',
+      processingTime: 1500,
+    },
+  });
+
+  // Security Event Logging
+  await makeRequest('POST', `${BASE_URL}/logs/security-event`, {
+    event: 'failed_login_attempt',
+    userId: 'user-suspicious',
+    ipAddress: '10.0.0.1',
+  });
+
+  // Exception Logging
+  await makeRequest('POST', `${BASE_URL}/logs/exception`, {
+    error: 'Database connection failed',
+    context: {
+      database: 'postgresql',
+      host: 'localhost',
+      port: 5432,
+      connectionPool: 'main',
+      retryAttempt: 3,
+    },
+  });
+
+  // ==== CONTEXT MANAGEMENT DEMONSTRATIONS ====
+  console.log('\n🔗 CONTEXT MANAGEMENT DEMONSTRATIONS');
+
+  // Context Persistence Demo
+  await makeRequest('GET', `${BASE_URL}/logs/demo/context-persistence`);
+
+  // Context Updates Demo
+  await makeRequest('GET', `${BASE_URL}/logs/demo/context-updates`);
+
+  // Comprehensive Logging Demo
+  await makeRequest('GET', `${BASE_URL}/logs/demo/comprehensive`);
+
+  // ==== ERROR TESTING ====
+  console.log('\n❌ ERROR TESTING');
+  await makeRequest('GET', `${BASE_URL}/error-test`);
+
+  console.log('\n✅ All endpoints tested!');
+  console.log('\n📊 Check your logs to see the enhanced structured logging output!');
+  console.log('\n💡 Tips:');
+  console.log('  - Set NODE_ENV=production to see JSON structured logs');
+  console.log('  - Set NODE_ENV=development to see pretty formatted logs');
+  console.log('  - Check OpenTelemetry traces if tracing is enabled');
+  console.log('  - Visit /metrics endpoint for Prometheus metrics');
 }
 
-runTests().catch(console.error);
+// Run the tests
+testAllEndpoints().catch(console.error);

@@ -15,227 +15,119 @@ interface LogContext extends Record<string, unknown> {
  */
 @Injectable({ scope: Scope.TRANSIENT })
 export class LoggerService extends ConsoleLogger {
-  private readonly useStructuredLogging: boolean;
+  private readonly persistentContext: LogContext = {};
 
   constructor(private readonly config: ObservabilityConfig) {
-    // Initialize with proper log levels and format
     super('LoggerService', {
       logLevels: LoggerService.getLogLevels(config.logging.level),
-      timestamp: true,
     });
-
-    this.useStructuredLogging = config.logging.structuredLogging;
   }
 
-  /**
-   * Get log levels based on the configured level
-   */
   private static getLogLevels(level: string): LogLevel[] {
-    const allLevels: LogLevel[] = ['verbose', 'debug', 'log', 'warn', 'error', 'fatal'];
-    const levelIndex = allLevels.indexOf(level as LogLevel);
-    return levelIndex === -1 ? ['log', 'warn', 'error', 'fatal'] : allLevels.slice(levelIndex);
+    const levels: Record<string, LogLevel[]> = {
+      debug: ['debug', 'verbose', 'log', 'warn', 'error', 'fatal'],
+      error: ['error', 'fatal'],
+      fatal: ['fatal'],
+      log: ['log', 'warn', 'error', 'fatal'],
+      verbose: ['verbose', 'log', 'warn', 'error', 'fatal'],
+      warn: ['warn', 'error', 'fatal'],
+    };
+    return levels[level] ?? levels['log'];
   }
 
   /**
-   * Create a child logger with additional persistent context
+   * Add context that persists across log calls
+   */
+  addContext(context: LogContext): void {
+    Object.assign(this.persistentContext, context);
+  }
+
+  /**
+   * Clear all persistent context
+   */
+  clearContext(): void {
+    Object.keys(this.persistentContext).forEach((key) => {
+      // eslint-disable-next-line @typescript-eslint/no-dynamic-delete
+      delete this.persistentContext[key];
+    });
+  }
+
+  /**
+   * Create a child logger with additional context
    */
   createChildLogger(context: string, additionalContext?: LogContext): LoggerService {
-    const childLogger = new LoggerService(this.config);
-    childLogger.setContext(context);
+    const child = new LoggerService(this.config);
+    child.setContext(context);
 
-    // If we have additional context, create a wrapper logger
     if (additionalContext) {
-      const originalLog = childLogger.log.bind(childLogger);
-      const originalError = childLogger.error.bind(childLogger);
-      const originalWarn = childLogger.warn.bind(childLogger);
-      const originalDebug = childLogger.debug.bind(childLogger);
-      const originalVerbose = childLogger.verbose.bind(childLogger);
-
-      // Override logging methods to include persistent context
-      childLogger.log = (message: unknown, ctx?: string) => {
-        originalLog(this.mergeContext(message, additionalContext), ctx);
-      };
-      childLogger.error = (message: unknown, stack?: string, ctx?: string) => {
-        originalError(this.mergeContext(message, additionalContext), stack, ctx);
-      };
-      childLogger.warn = (message: unknown, ctx?: string) => {
-        originalWarn(this.mergeContext(message, additionalContext), ctx);
-      };
-      childLogger.debug = (message: unknown, ctx?: string) => {
-        originalDebug(this.mergeContext(message, additionalContext), ctx);
-      };
-      childLogger.verbose = (message: unknown, ctx?: string) => {
-        originalVerbose(this.mergeContext(message, additionalContext), ctx);
-      };
+      child.addContext(additionalContext);
     }
 
-    return childLogger;
+    // Copy persistent context from parent
+    child.addContext(this.persistentContext);
+
+    return child;
   }
 
   /**
-   * Enhanced debug method
+   * Enhanced debug method with context merging
    */
   override debug(message: unknown, context?: string): void {
-    if (this.config.logging.consoleOutput) {
-      super.debug(message, context);
-    }
+    this.writeLog('debug', message, context);
   }
 
   /**
-   * Enhanced error method with better error handling
+   * Enhanced error method with context merging
    */
   override error(message: unknown, stackOrContext?: string, context?: string): void {
-    if (this.config.logging.consoleOutput) {
-      if (message instanceof Error) {
-        const errorContext = stackOrContext ?? context ?? 'ErrorHandler';
-        const errorLog = {
-          error: {
-            message: message.message,
-            name: message.name,
-            stack: message.stack,
-          },
-          message: message.message,
-        };
-        super.error(errorLog, message.stack, errorContext);
-      } else {
-        super.error(message, stackOrContext, context);
-      }
+    // Handle both overloads of error method
+    if (typeof stackOrContext === 'string' && !context) {
+      // error(message, context)
+      this.writeLog('error', message, stackOrContext);
+    } else {
+      // error(message, stack, context)
+      this.writeLog('error', message, context, stackOrContext);
     }
   }
 
   /**
-   * Enhanced fatal method (maps to error with fatal level)
+   * Enhanced fatal method with context merging
    */
   override fatal(message: unknown, context?: string): void {
-    if (this.config.logging.consoleOutput) {
-      const fatalMessage = this.useStructuredLogging
-        ? { level: 'fatal', message: this.extractMessage(message) }
-        : `[FATAL] ${this.extractMessage(message)}`;
-      super.error(fatalMessage, undefined, context);
-    }
+    this.writeLog('fatal', message, context);
   }
 
   /**
-   * Enhanced log method with context support
+   * Enhanced log method with context merging
    */
   override log(message: unknown, context?: string): void {
-    if (this.config.logging.consoleOutput) {
-      super.log(message, context);
-    }
+    this.writeLog('log', message, context);
   }
 
   /**
-   * Log with additional context data
-   */
-  logWithContext(level: LogLevel, message: string, context: LogContext, contextName?: string): void {
-    const logData = { message, ...context };
-
-    switch (level) {
-      case 'debug':
-        this.debug(logData, contextName);
-        break;
-      case 'error':
-        this.error(logData, contextName);
-        break;
-      case 'fatal':
-        this.fatal(logData, contextName);
-        break;
-      case 'verbose':
-        this.verbose(logData, contextName);
-        break;
-      case 'warn':
-        this.warn(logData, contextName);
-        break;
-      default:
-        this.log(logData, contextName);
-    }
-  }
-
-  /**
-   * Enhanced verbose method
+   * Enhanced verbose method with context merging
    */
   override verbose(message: unknown, context?: string): void {
-    if (this.config.logging.consoleOutput) {
-      super.verbose(message, context);
-    }
+    this.writeLog('verbose', message, context);
   }
 
   /**
-   * Enhanced warn method
+   * Enhanced warn method with context merging
    */
   override warn(message: unknown, context?: string): void {
-    if (this.config.logging.consoleOutput) {
-      super.warn(message, context);
-    }
+    this.writeLog('warn', message, context);
   }
 
   /**
-   * Colorize text for development mode
+   * Format message as structured JSON
    */
-  protected override colorize(color: string, text: string): string {
-    if (this.useStructuredLogging) return text;
-    const colors: Record<string, string> = {
-      reset: '\x1b[0m',
-      yellow: '\x1b[33m',
-    };
-    return `${colors[color] ?? ''}${text}${colors['reset']}`;
-  }
-
-  /**
-   * Override formatMessage to add trace context and structured logging
-   */
-  protected override formatMessage(
-    logLevel: LogLevel,
-    message: unknown,
-    pidMessage: string,
-    formattedLogLevel: string,
-    contextMessage: string,
-    timestampDiff = ''
-  ): string {
-    if (this.useStructuredLogging) {
-      return this.formatStructuredMessage(logLevel, message, contextMessage);
-    }
-
-    // For development, use pretty formatting with trace context
-    const traceInfo = this.getTraceContext();
-    const enhancedMessage = traceInfo
-      ? `${this.stringifyMessage(message)} ${this.colorize('yellow', `[trace: ${traceInfo.traceId.slice(-8)}]`)}`
-      : this.stringifyMessage(message);
-
-    return super.formatMessage(logLevel, enhancedMessage, pidMessage, formattedLogLevel, contextMessage, timestampDiff);
-  }
-
-  /**
-   * Utility method to stringify message objects consistently
-   */
-  protected override stringifyMessage(message: unknown): string {
-    return this.extractMessage(message);
-  }
-
-  /**
-   * Extract message string from various input types
-   */
-  private extractMessage(message: unknown): string {
-    if (typeof message === 'string') return message;
-    if (typeof message === 'object' && message !== null) {
-      const obj = message as Record<string, unknown>;
-
-      if (obj['message'] ?? obj['msg']) return String(obj['message'] ?? obj['msg']);
-      return JSON.stringify(message);
-    }
-    return String(message);
-  }
-
-  /**
-   * Format message as structured JSON with observability data
-   */
-  private formatStructuredMessage(level: LogLevel, message: unknown, context?: string): string {
+  private formatAsJSON(level: LogLevel, message: unknown, context?: string, stack?: string): string {
     const logEntry: Record<string, unknown> = {
       environment: this.config.environment,
       level,
-      message: this.extractMessage(message),
       pid: process.pid,
-      service: this.config.serviceName,
+      serviceName: this.config.serviceName,
+      serviceVersion: this.config.serviceVersion,
       timestamp: new Date().toISOString(),
     };
 
@@ -243,22 +135,42 @@ export class LoggerService extends ConsoleLogger {
       logEntry['context'] = context;
     }
 
-    // Add trace context if available
+    // Add stack trace for errors
+    if (stack) {
+      logEntry['stack'] = stack;
+    }
+
+    // Add trace context
     const traceContext = this.getTraceContext();
     if (traceContext) {
       logEntry['traceId'] = traceContext.traceId;
       logEntry['spanId'] = traceContext.spanId;
     }
 
-    // Merge additional context if message is an object
-    if (typeof message === 'object' && message !== null && !Array.isArray(message)) {
+    // Handle message extraction and object context merging
+    if (typeof message === 'string') {
+      logEntry['message'] = message;
+    } else if (typeof message === 'object' && message !== null && !Array.isArray(message)) {
       const messageObj = message as LogContext;
       const { message: msg, msg: msgAlias, ...additionalContext } = messageObj;
+
+      // Extract message from object
       if (msg ?? msgAlias) {
         logEntry['message'] = String(msg ?? msgAlias);
+      } else if (message instanceof Error) {
+        logEntry['message'] = message.message;
+      } else {
+        logEntry['message'] = JSON.stringify(message);
       }
+
+      // Merge additional context from object
       Object.assign(logEntry, additionalContext);
+    } else {
+      logEntry['message'] = String(message);
     }
+
+    // Merge persistent context
+    Object.assign(logEntry, this.persistentContext);
 
     return JSON.stringify(logEntry);
   }
@@ -283,12 +195,54 @@ export class LoggerService extends ConsoleLogger {
   }
 
   /**
-   * Merge additional context with message
+   * Core method that handles all logging with console output check
    */
-  private mergeContext(message: unknown, additionalContext: LogContext): unknown {
-    if (typeof message === 'object' && message !== null) {
-      return { ...additionalContext, ...message };
+  private writeLog(level: LogLevel, message: unknown, context?: string, stack?: string): void {
+    if (!this.config.logging.consoleOutput) {
+      return;
     }
-    return { ...additionalContext, message: String(message) };
+
+    const isProduction = this.config.environment !== 'development';
+
+    if (isProduction) {
+      // In production, output structured JSON directly to console
+      const formattedMessage = this.formatAsJSON(level, message, context, stack);
+      console.log(formattedMessage);
+    } else {
+      // In development, use the parent ConsoleLogger for pretty printing
+      // Merge persistent context and trace context with the message
+      const traceContext = this.getTraceContext();
+      const baseContext = {
+        ...this.persistentContext,
+        ...(traceContext && {
+          spanId: traceContext.spanId,
+          traceId: traceContext.traceId,
+        }),
+      };
+
+      let processedMessage = message;
+      if (Object.keys(baseContext).length > 0) {
+        if (typeof message === 'object' && message !== null) {
+          processedMessage = { ...baseContext, ...message };
+        } else {
+          processedMessage = { ...baseContext, message: String(message) };
+        }
+      }
+
+      // Handle error method's different signature, all others are the same
+      if (level === 'error') {
+        super.error(processedMessage, stack, context);
+      } else if (level === 'debug') {
+        super.debug(processedMessage, context);
+      } else if (level === 'fatal') {
+        super.fatal(processedMessage, context);
+      } else if (level === 'verbose') {
+        super.verbose(processedMessage, context);
+      } else if (level === 'warn') {
+        super.warn(processedMessage, context);
+      } else {
+        super.log(processedMessage, context);
+      }
+    }
   }
 }

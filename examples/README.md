@@ -1,219 +1,293 @@
-# Examples
+# NestJS Observability Examples
 
-This directory contains comprehensive examples showing how to use the `nestjs-observability` library in various scenarios.
+This directory contains comprehensive examples demonstrating the features of the NestJS Observability module.
 
-## Quick Start
+## Examples
 
-### 1. Basic Setup
+### [Basic App](./basic-app/)
 
-- [basic-app/](./basic-app/) - Minimal NestJS application with observability
-- [configuration/](./configuration/) - Different configuration patterns
+A complete example application showcasing all observability features:
 
-### 2. Real-World Usage
+#### **🔧 Core Features**
 
-- [e-commerce-api/](./e-commerce-api/) - Complete REST API with observability
-- [microservice/](./microservice/) - Microservice with distributed tracing
-- [grpc-service/](./grpc-service/) - gRPC service with observability
+- **Structured Logging**: JSON format for production, pretty format for development
+- **Context Management**: Persistent context across log calls and child loggers
+- **OpenTelemetry Integration**: Automatic trace ID inclusion in logs
+- **Auto-instrumentation**: Automatic tracing of controllers and services
+- **Performance Monitoring**: Built-in metrics and HTTP request tracing
+- **Error Handling**: Enhanced error logging with stack traces
 
-### 3. Advanced Features
+#### **📝 Enhanced Logging Capabilities**
 
-- [custom-metrics/](./custom-metrics/) - Creating custom Prometheus metrics
-- [structured-logging/](./structured-logging/) - Advanced logging patterns
-- [tracing-correlation/](./tracing-correlation/) - Request correlation across services
+- **Basic Logging**: Standard log levels (info, error, debug, warn, fatal)
+- **Structured Logging**: Rich object-based logging with metadata
+- **Context Persistence**: Maintain context across multiple log calls
+- **Child Loggers**: Isolated logging contexts for different components
+- **Business Event Logging**: Track domain-specific events
+- **Security Event Logging**: Monitor authentication and security events
+- **Performance Metrics**: Log operation timing and performance data
+- **Exception Handling**: Comprehensive error logging with context
 
-### 4. Production Setups
+#### **🚀 Key Components**
 
-- [docker-compose/](./docker-compose/) - Local development with monitoring stack
-- [kubernetes/](./kubernetes/) - Kubernetes deployment with observability
-- [production-config/](./production-config/) - Production-ready configurations
+##### **LoggingService**
 
-## Environment Variables
+```typescript
+// Comprehensive logging service with all features
+class LoggingService {
+  // Basic logging methods
+  logInfo(message: string): Promise<void>;
+  logError(error: string, context?: string): Promise<void>;
 
-All examples support these environment variables:
+  // Structured logging methods
+  logUserAction(action: string, userId: string, metadata?: Record<string, any>): Promise<void>;
+  logPerformanceMetrics(operation: string, duration: number): Promise<void>;
+  logBusinessEvent(eventType: string, eventData: Record<string, any>): Promise<void>;
+  logSecurityEvent(event: string, userId: string, ipAddress: string): Promise<void>;
 
-```bash
-# Service Configuration
-SERVICE_NAME=example-service
-SERVICE_VERSION=1.0.0
-NODE_ENV=development
-
-# Logging
-LOG_LEVEL=info
-STRUCTURED_LOGGING=false
-
-# Metrics
-METRICS_ENABLED=true
-METRICS_ENDPOINT=/metrics
-
-# Tracing
-TRACING_ENABLED=true
-OTLP_TRACES_ENDPOINT=http://localhost:4318/v1/traces
-OTLP_HEADERS={}
-
-# Example with external providers
-# OTLP_TRACES_ENDPOINT=https://api.honeycomb.io/v1/traces
-# OTLP_HEADERS={"x-honeycomb-team":"your-api-key"}
+  // Context management demonstrations
+  demonstrateContextPersistence(): Promise<void>;
+  demonstrateContextUpdates(): Promise<void>;
+  demonstrateComprehensiveLogging(): Promise<void>;
+}
 ```
 
-## Running Examples
+##### **API Endpoints**
 
-Each example includes:
+```typescript
+// Basic logging endpoints
+POST / logs / info; // Log info messages
+POST / logs / error; // Log error messages
+POST / logs / debug; // Log debug messages
+POST / logs / warning; // Log warning messages
+POST / logs / activity; // Log user activities
 
-- `README.md` - Specific setup instructions
-- `package.json` - Dependencies and scripts
-- `docker-compose.yml` - Local monitoring stack (where applicable)
-- `.env.example` - Environment variable template
+// Enhanced logging endpoints
+POST / logs / user - action; // Log user actions with metadata
+POST / logs / performance; // Log performance metrics
+POST / logs / business - event; // Log business events
+POST / logs / security - event; // Log security events
+POST / logs / exception; // Log exceptions with context
 
-### General Steps
+// Context management demonstrations
+GET / logs / demo / context - persistence; // Demonstrate context persistence
+GET / logs / demo / context - updates; // Demonstrate context management
+GET / logs / demo / comprehensive; // Comprehensive logging example
+```
 
-1. **Navigate to example directory**:
+#### **📊 Usage Examples**
+
+##### **Basic Logging**
+
+```bash
+# Log info message
+curl -X POST http://localhost:3000/logs/info \
+  -H "Content-Type: application/json" \
+  -d '{"message": "Application started successfully"}'
+
+# Log error with context
+curl -X POST http://localhost:3000/logs/error \
+  -H "Content-Type: application/json" \
+  -d '{"error": "Database connection failed", "context": "DatabaseService"}'
+```
+
+##### **Structured Logging**
+
+```bash
+# Log user action with metadata
+curl -X POST http://localhost:3000/logs/user-action \
+  -H "Content-Type: application/json" \
+  -d '{
+    "action": "login",
+    "userId": "user-123",
+    "metadata": {
+      "ipAddress": "192.168.1.100",
+      "userAgent": "Mozilla/5.0...",
+      "attempt": 1
+    }
+  }'
+
+# Log performance metrics
+curl -X POST http://localhost:3000/logs/performance \
+  -H "Content-Type: application/json" \
+  -d '{
+    "operation": "database_query",
+    "duration": 250
+  }'
+```
+
+##### **Business Event Logging**
+
+```bash
+# Log business event
+curl -X POST http://localhost:3000/logs/business-event \
+  -H "Content-Type: application/json" \
+  -d '{
+    "eventType": "payment_processed",
+    "eventData": {
+      "amount": 99.99,
+      "currency": "USD",
+      "customerId": "cust-123",
+      "paymentMethod": "credit_card"
+    }
+  }'
+
+# Log security event
+curl -X POST http://localhost:3000/logs/security-event \
+  -H "Content-Type: application/json" \
+  -d '{
+    "event": "failed_login_attempt",
+    "userId": "user-suspicious",
+    "ipAddress": "10.0.0.1"
+  }'
+```
+
+##### **Context Management**
+
+```bash
+# Demonstrate context persistence
+curl -X GET http://localhost:3000/logs/demo/context-persistence
+
+# Demonstrate context updates
+curl -X GET http://localhost:3000/logs/demo/context-updates
+
+# Comprehensive logging demonstration
+curl -X GET http://localhost:3000/logs/demo/comprehensive
+```
+
+#### **🔍 Log Output Examples**
+
+##### **Development Mode (Pretty Formatted)**
+
+```
+[Nest] 12345  - 01/15/2024, 10:30:00 AM     LOG [RequestHandler] Processing user request
+[Nest] 12345  - 01/15/2024, 10:30:00 AM     LOG [RequestHandler] {
+  requestId: 'req-456',
+  userId: 'user-123',
+  sessionId: 'session-789',
+  message: 'Validation completed'
+}
+```
+
+##### **Production Mode (JSON Structured)**
+
+```json
+{
+  "timestamp": "2024-01-15T10:30:00.000Z",
+  "level": "log",
+  "message": "User action performed",
+  "context": "UserActions",
+  "serviceName": "basic-example",
+  "serviceVersion": "1.0.0",
+  "environment": "production",
+  "pid": 12345,
+  "action": "login",
+  "userId": "user-123",
+  "sessionId": "session-456",
+  "traceId": "1234567890abcdef",
+  "spanId": "abcdef1234567890"
+}
+```
+
+#### **⚙️ Configuration**
+
+```env
+# Basic Configuration
+NODE_ENV=production              # Enables JSON structured logging
+LOG_LEVEL=info                   # Set logging level
+SERVICE_NAME=basic-example       # Service name in logs
+SERVICE_VERSION=1.0.0           # Service version in logs
+
+# OpenTelemetry Configuration
+TRACING_ENABLED=true            # Enable distributed tracing
+OTLP_TRACES_ENDPOINT=http://localhost:4318/v1/traces
+
+# Metrics Configuration
+METRICS_ENABLED=true            # Enable Prometheus metrics
+METRICS_ENDPOINT=/metrics       # Metrics endpoint path
+```
+
+## Getting Started
+
+1. **Navigate to the example directory:**
 
    ```bash
    cd examples/basic-app
    ```
 
-2. **Install dependencies**:
+2. **Install dependencies:**
 
    ```bash
-   pnpm install
+   npm install
    ```
 
-3. **Copy environment file**:
+3. **Copy environment file:**
 
    ```bash
-   cp .env.example .env
+   cp env.example .env
    ```
 
-4. **Start monitoring stack** (if included):
+4. **Start the application:**
 
    ```bash
-   docker-compose up -d
+   npm start
    ```
 
-5. **Run the application**:
-
+5. **Test the logging features:**
    ```bash
-   pnpm start:dev
+   node test-endpoints.js
    ```
 
-6. **Test observability endpoints**:
+## Key Learning Points
 
-   ```bash
-   # Application health
-   curl http://localhost:3000/health
+### **📝 Logging Best Practices**
 
-   # Metrics endpoint
-   curl http://localhost:3000/metrics
+1. **Use structured logging** for better searchability and analysis
+2. **Leverage context management** for correlated logs across operations
+3. **Include trace IDs** for distributed tracing correlation
+4. **Use appropriate log levels** for different types of information
+5. **Monitor performance** by logging operation timing and metrics
 
-   # Generate some traffic
-   curl http://localhost:3000/api/users
-   ```
+### **🔧 Observability Features**
 
-## Monitoring Stack
+1. **Automatic tracing** of controllers and services
+2. **Context persistence** across log calls
+3. **OpenTelemetry integration** for distributed tracing
+4. **Metrics collection** for performance monitoring
+5. **Error handling** with comprehensive stack traces
 
-Some examples include a complete monitoring stack:
+### **🚀 Advanced Features**
 
-- **Prometheus** - Metrics collection and alerting
-- **Grafana** - Metrics visualization and dashboards
-- **Jaeger** - Distributed tracing visualization
-- **OpenTelemetry Collector** - Telemetry data processing
+1. **Child loggers** for isolated logging contexts
+2. **Business event tracking** for domain-specific monitoring
+3. **Security event logging** for authentication and authorization
+4. **Performance metrics** for operation timing and throughput
+5. **Exception handling** with rich contextual information
 
-Access the monitoring tools:
+## Integration with Observability Tools
 
-- **Grafana**: http://localhost:3001 (admin/admin)
-- **Prometheus**: http://localhost:9090
-- **Jaeger**: http://localhost:16686
+### **OpenTelemetry**
 
-## Best Practices Demonstrated
+- Logs automatically include trace IDs when spans are active
+- Distributed tracing correlates logs across services
+- Automatic instrumentation of HTTP requests and database calls
 
-### Logging
+### **Prometheus Metrics**
 
-- Structured vs. pretty logging for different environments
-- Adding context to log messages
-- Creating child loggers for request scoping
-- Error logging with proper stack traces
+- Built-in HTTP request metrics
+- Custom business metrics
+- Performance monitoring dashboards
 
-### Metrics
+### **Log Aggregation**
 
-- Creating custom business metrics
-- Using labels effectively
-- Instrumenting critical code paths
-- Avoiding high cardinality labels
+- Structured JSON logs work seamlessly with ELK stack
+- Fluentd/Fluent Bit integration
+- CloudWatch, Datadog, and other log platforms
 
-### Tracing
+## Additional Resources
 
-- Setting up distributed tracing
-- Adding custom spans for business operations
-- Correlating logs with traces
-- Propagating trace context across services
-
-### Configuration
-
-- Environment-specific configurations
-- Secure handling of credentials
-- Dynamic configuration with ConfigService
-- Validation of configuration at startup
-
-## Troubleshooting
-
-### Common Issues
-
-1. **OpenTelemetry not connecting**:
-
-   - Check OTLP endpoint URL
-   - Verify network connectivity
-   - Check authentication headers
-
-2. **Metrics not appearing**:
-
-   - Verify `/metrics` endpoint is accessible
-   - Check Prometheus configuration
-   - Ensure metrics are being created
-
-3. **Logs missing trace context**:
-   - Ensure tracing is enabled
-   - Verify OpenTelemetry initialization
-   - Check for async context loss
-
-### Debug Mode
-
-Enable debug logging:
-
-```bash
-LOG_LEVEL=debug
-```
-
-### Health Checks
-
-Most examples include health check endpoints:
-
-```bash
-curl http://localhost:3000/health
-```
-
-## Contributing Examples
-
-When adding new examples:
-
-1. **Follow the structure**:
-
-   - Include comprehensive README
-   - Provide working docker-compose setup
-   - Add .env.example with all variables
-
-2. **Document the use case**:
-
-   - Explain what the example demonstrates
-   - Include setup and running instructions
-   - Add troubleshooting section
-
-3. **Test thoroughly**:
-
-   - Verify all observability features work
-   - Test in different environments
-   - Ensure examples are self-contained
-
-4. **Keep examples updated**:
-   - Use latest library version
-   - Update dependencies regularly
-   - Maintain compatibility with monitoring tools
+- [NestJS Observability Documentation](../README.md)
+- [Basic App Example](./basic-app/README.md)
+- [OpenTelemetry Documentation](https://opentelemetry.io/docs/)
+- [Prometheus Documentation](https://prometheus.io/docs/)
+- [Structured Logging Best Practices](https://docs.microsoft.com/en-us/azure/azure-monitor/logs/structured-logs)

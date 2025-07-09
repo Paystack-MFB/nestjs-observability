@@ -257,11 +257,285 @@ ObservabilityModule.forRoot({
 - Use `@TraceMethod` for custom span names that better describe business operations
 - Keep span names consistent across your application
 
-### 4. Logging Format
+### 4. Logging
 
-- The logger automatically uses **structured logging** (JSON format) for all environments except `development`
-- In `development` environment, it uses **pretty formatting** for better readability
-- No manual configuration needed - this is handled automatically based on `NODE_ENV`
+The observability library provides enhanced logging with OpenTelemetry integration and context support.
+
+#### Automatic Logging Features
+
+- **Structured Logging**: JSON format for production environments
+- **Pretty Logging**: Human-readable format for development
+- **Trace Linking**: All logs automatically include trace and span IDs
+- **Context Persistence**: Maintains context across async operations
+- **Proper Error Handling**: Special handling for Error objects
+
+#### Basic Usage
+
+```typescript
+import { Injectable } from '@nestjs/common';
+import { LoggerService } from 'nestjs-observability';
+
+@Injectable()
+export class UserService {
+  constructor(private readonly logger: LoggerService) {
+    // Set context for this service
+    this.logger.setContext('UserService');
+  }
+
+  async createUser(userData: CreateUserDto): Promise<User> {
+    // Basic logging methods
+    this.logger.log('Creating new user');
+    this.logger.debug('User data validation started');
+
+    try {
+      const user = await this.userRepository.create(userData);
+      this.logger.log(`User created successfully: ${user.id}`);
+      return user;
+    } catch (error) {
+      this.logger.error('Failed to create user', error.stack);
+      throw error;
+    }
+  }
+}
+```
+
+#### Structured Logging with Context
+
+```typescript
+@Injectable()
+export class OrderService {
+  constructor(private readonly logger: LoggerService) {
+    this.logger.setContext('OrderService');
+  }
+
+  async processOrder(orderData: OrderDto): Promise<Order> {
+    // Structured logging with additional context
+    this.logger.log({
+      message: 'Processing order',
+      orderId: orderData.id,
+      userId: orderData.userId,
+      amount: orderData.total,
+      currency: orderData.currency,
+    });
+
+    try {
+      const order = await this.orderRepository.create(orderData);
+
+      this.logger.log({
+        message: 'Order processed successfully',
+        orderId: order.id,
+        status: order.status,
+        processingTime: Date.now() - startTime,
+      });
+
+      return order;
+    } catch (error) {
+      this.logger.error({
+        message: 'Order processing failed',
+        orderId: orderData.id,
+        error: error.message,
+        stack: error.stack,
+      });
+      throw error;
+    }
+  }
+}
+```
+
+#### Context Persistence
+
+```typescript
+@Injectable()
+export class PaymentService {
+  constructor(private readonly logger: LoggerService) {
+    this.logger.setContext('PaymentService');
+  }
+
+  async processPayment(paymentData: PaymentDto): Promise<Payment> {
+    // Add persistent context that will be included in all subsequent logs
+    this.logger.addContext({
+      paymentId: paymentData.id,
+      userId: paymentData.userId,
+      amount: paymentData.amount,
+    });
+
+    this.logger.log('Starting payment processing');
+
+    await this.validatePayment(paymentData);
+    await this.chargeCard(paymentData);
+    await this.updateInventory(paymentData);
+
+    this.logger.log('Payment processing completed');
+
+    // Clear context when done
+    this.logger.clearContext();
+  }
+
+  private async validatePayment(paymentData: PaymentDto): Promise<void> {
+    // This log will automatically include the persistent context
+    this.logger.debug('Validating payment data');
+
+    if (!paymentData.cardNumber) {
+      this.logger.warn('Payment validation failed: missing card number');
+      throw new BadRequestException('Card number is required');
+    }
+  }
+}
+```
+
+#### Child Loggers
+
+```typescript
+@Injectable()
+export class UserService {
+  constructor(private readonly logger: LoggerService) {
+    this.logger.setContext('UserService');
+  }
+
+  async handleUserRequest(userId: string): Promise<void> {
+    // Create a child logger with additional context
+    const childLogger = this.logger.createChildLogger('UserRequest', {
+      userId,
+      requestId: generateRequestId(),
+      timestamp: new Date().toISOString(),
+    });
+
+    childLogger.log('Processing user request');
+
+    await this.processUserData(childLogger, userId);
+    await this.updateUserProfile(childLogger, userId);
+
+    childLogger.log('User request completed');
+  }
+
+  private async processUserData(logger: LoggerService, userId: string): Promise<void> {
+    // Child logger maintains the original context
+    logger.debug('Processing user data');
+    // ... processing logic
+  }
+}
+```
+
+#### Error Handling
+
+```typescript
+@Injectable()
+export class UserService {
+  constructor(private readonly logger: LoggerService) {
+    this.logger.setContext('UserService');
+  }
+
+  async findUser(id: string): Promise<User> {
+    try {
+      const user = await this.userRepository.findById(id);
+      if (!user) {
+        this.logger.warn(`User not found: ${id}`);
+        throw new NotFoundException('User not found');
+      }
+      return user;
+    } catch (error) {
+      // Error objects are automatically formatted with proper structure
+      this.logger.error(error); // Automatically includes stack trace and error details
+      throw error;
+    }
+  }
+
+  async deleteUser(id: string): Promise<void> {
+    try {
+      await this.userRepository.delete(id);
+      this.logger.log(`User deleted: ${id}`);
+    } catch (error) {
+      // Custom error logging with additional context
+      this.logger.error({
+        message: 'Failed to delete user',
+        userId: id,
+        error: error.message,
+        stack: error.stack,
+        timestamp: new Date().toISOString(),
+      });
+      throw error;
+    }
+  }
+}
+```
+
+#### Log Levels
+
+```typescript
+@Injectable()
+export class DebugService {
+  constructor(private readonly logger: LoggerService) {
+    this.logger.setContext('DebugService');
+  }
+
+  async complexOperation(): Promise<void> {
+    // Different log levels for different purposes
+    this.logger.verbose('Starting complex operation'); // Very detailed info
+    this.logger.debug('Debug information for developers'); // Debug info
+    this.logger.log('General information'); // General info
+    this.logger.warn('Warning message'); // Warnings
+    this.logger.error('Error occurred'); // Errors
+    this.logger.fatal('Critical system error'); // Critical errors
+  }
+}
+```
+
+#### Logging Configuration
+
+```typescript
+// In your module configuration
+ObservabilityModule.forRoot({
+  logging: {
+    level: process.env.LOG_LEVEL || 'info', // debug, info, warn, error
+    consoleOutput: true, // Enable/disable console output
+    otlpExport: {
+      enabled: process.env.OTLP_LOGS_ENABLED === 'true',
+      endpoint: process.env.OTLP_LOGS_ENDPOINT || 'http://localhost:4318/v1/logs',
+    },
+  },
+});
+```
+
+#### Environment-Specific Logging
+
+```env
+# Development
+NODE_ENV=development
+LOG_LEVEL=debug
+
+# Production
+NODE_ENV=production
+LOG_LEVEL=info
+OTLP_LOGS_ENABLED=true
+OTLP_LOGS_ENDPOINT=https://your-otlp-endpoint.com/v1/logs
+```
+
+#### Output Examples
+
+**Development (Pretty Format):**
+
+```
+[2024-01-15 10:30:45] [LOG] [UserService] Creating new user [trace: a1b2c3d4]
+[2024-01-15 10:30:45] [DEBUG] [UserService] User data validation started [trace: a1b2c3d4]
+```
+
+**Production (Structured JSON):**
+
+```json
+{
+  "timestamp": "2024-01-15T10:30:45.123Z",
+  "level": "info",
+  "service": "my-service",
+  "environment": "production",
+  "pid": 12345,
+  "context": "UserService",
+  "message": "Creating new user",
+  "traceId": "a1b2c3d4e5f6g7h8i9j0k1l2m3n4o5p6",
+  "spanId": "q1r2s3t4u5v6w7x8",
+  "userId": "user-123",
+  "requestId": "req-456"
+}
+```
 
 ### 5. Error Handling
 

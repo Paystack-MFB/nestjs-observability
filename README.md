@@ -247,7 +247,7 @@ export class UserService {
 }
 ```
 
-### Child Loggers with Persistent Context
+### Context Persistence
 
 ```typescript
 @Injectable()
@@ -257,33 +257,69 @@ export class PaymentService {
   }
 
   async processPayment(paymentData: any) {
-    // Create a child logger with persistent context for this operation
-    const paymentLogger = this.logger.createChildLogger('PaymentProcessor', {
+    // Add persistent context that will be included in all subsequent logs
+    this.logger.addContext({
       paymentId: paymentData.id,
       sessionId: paymentData.sessionId,
       correlationId: `corr_${Date.now()}`,
     });
 
-    // All logs from this child logger will include the persistent context
-    paymentLogger.log('Payment processing started');
+    // All logs will now include the persistent context
+    this.logger.log('Payment processing started');
 
     try {
-      paymentLogger.log('Validating payment data');
+      this.logger.log('Validating payment data');
       await this.validatePayment(paymentData);
 
-      paymentLogger.log('Authorizing payment');
+      this.logger.log('Authorizing payment');
       const authResult = await this.authorizePayment(paymentData);
 
-      paymentLogger.log('Payment authorized successfully', { authCode: authResult.code });
+      this.logger.log('Payment authorized successfully', { authCode: authResult.code });
       return authResult;
     } catch (error) {
-      paymentLogger.error({
+      this.logger.error({
         message: 'Payment processing failed',
         error: error.message,
         step: 'authorization',
       });
       throw error;
+    } finally {
+      // Clear context when done
+      this.logger.clearContext();
     }
+  }
+}
+```
+
+### Child Loggers
+
+```typescript
+@Injectable()
+export class UserService {
+  constructor(private readonly logger: LoggerService) {
+    this.logger.setContext('UserService');
+  }
+
+  async handleUserRequest(userId: string) {
+    // Create a child logger with additional context
+    const childLogger = this.logger.createChildLogger('UserRequest', {
+      userId,
+      requestId: generateRequestId(),
+      timestamp: new Date().toISOString(),
+    });
+
+    childLogger.log('Processing user request');
+
+    await this.processUserData(childLogger, userId);
+    await this.updateUserProfile(childLogger, userId);
+
+    childLogger.log('User request completed');
+  }
+
+  private async processUserData(logger: LoggerService, userId: string) {
+    // Child logger maintains the original context
+    logger.debug('Processing user data');
+    // ... processing logic
   }
 }
 ```

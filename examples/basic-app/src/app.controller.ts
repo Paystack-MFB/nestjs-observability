@@ -80,6 +80,8 @@ export class AppController {
     return this.paymentService.processSensitiveData(data);
   }
 
+  // ==== BASIC LOGGING ENDPOINTS ====
+
   @Post('logs/info')
   async logInfo(@Body() body: { message: string }): Promise<void> {
     return this.loggingService.logInfo(body.message);
@@ -104,6 +106,56 @@ export class AppController {
   async logActivity(@Body() body: { activity: string; userId?: string }): Promise<void> {
     return this.loggingService.logActivity(body.activity, body.userId);
   }
+
+  // ==== ENHANCED LOGGING ENDPOINTS ====
+
+  @Post('logs/user-action')
+  async logUserAction(@Body() body: { action: string; userId: string; metadata?: Record<string, any> }): Promise<void> {
+    return this.loggingService.logUserAction(body.action, body.userId, body.metadata);
+  }
+
+  @Post('logs/performance')
+  async logPerformanceMetrics(@Body() body: { operation: string; duration: number }): Promise<void> {
+    return this.loggingService.logPerformanceMetrics(body.operation, body.duration);
+  }
+
+  @Post('logs/business-event')
+  async logBusinessEvent(@Body() body: { eventType: string; eventData: Record<string, any> }): Promise<void> {
+    return this.loggingService.logBusinessEvent(body.eventType, body.eventData);
+  }
+
+  @Post('logs/security-event')
+  async logSecurityEvent(@Body() body: { event: string; userId: string; ipAddress: string }): Promise<void> {
+    return this.loggingService.logSecurityEvent(body.event, body.userId, body.ipAddress);
+  }
+
+  @Post('logs/exception')
+  async logException(@Body() body: { error: string; context: Record<string, any> }): Promise<void> {
+    const error = new Error(body.error);
+    return this.loggingService.logExceptionWithContext(error, body.context);
+  }
+
+  // ==== CONTEXT MANAGEMENT DEMONSTRATION ENDPOINTS ====
+
+  @Get('logs/demo/context-persistence')
+  async demonstrateContextPersistence(): Promise<{ message: string }> {
+    await this.loggingService.demonstrateContextPersistence();
+    return { message: 'Context persistence demonstration completed. Check logs for structured output.' };
+  }
+
+  @Get('logs/demo/context-updates')
+  async demonstrateContextUpdates(): Promise<{ message: string }> {
+    await this.loggingService.demonstrateContextUpdates();
+    return { message: 'Context updates demonstration completed. Check logs for context management.' };
+  }
+
+  @Get('logs/demo/comprehensive')
+  async demonstrateComprehensiveLogging(): Promise<{ message: string }> {
+    await this.loggingService.demonstrateComprehensiveLogging();
+    return { message: 'Comprehensive logging demonstration completed. Check logs for full transaction flow.' };
+  }
+
+  // ==== ORIGINAL ENDPOINTS ====
 
   @Get('error-test')
   async errorTest(): Promise<any> {
