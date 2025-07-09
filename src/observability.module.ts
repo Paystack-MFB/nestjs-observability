@@ -1,6 +1,6 @@
 import { DynamicModule, Global, Module, Provider, Type } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
-import { APP_INTERCEPTOR } from '@nestjs/core';
+import { APP_INTERCEPTOR, DiscoveryService } from '@nestjs/core';
 
 import { defaultObservabilityConfig, ObservabilityConfig } from './config/observability.config';
 import { MetricsController } from './controllers/metrics.controller';
@@ -8,6 +8,7 @@ import { ControllerMethodTraceInterceptor } from './interceptors/controller-meth
 import { HttpTraceInterceptor } from './interceptors/http-trace.interceptor';
 import { LoggerService } from './logger/logger.service';
 import { MetricsService } from './metrics/metrics.service';
+import { AutoInstrumentationService } from './services/auto-instrumentation.service';
 import { TracingService } from './tracing/tracing.service';
 
 @Global()
@@ -67,6 +68,14 @@ export class ObservabilityModule {
           return new TracingService(config, logger);
         },
       },
+      // Add the auto-instrumentation service
+      {
+        inject: [DiscoveryService, LoggerService, 'OBSERVABILITY_CONFIG'],
+        provide: AutoInstrumentationService,
+        useFactory: (discoveryService: DiscoveryService, logger: LoggerService, config: ObservabilityConfig) => {
+          return new AutoInstrumentationService(discoveryService, logger, config);
+        },
+      },
       {
         inject: [MetricsService, LoggerService],
         provide: APP_INTERCEPTOR,
@@ -89,7 +98,7 @@ export class ObservabilityModule {
 
     return {
       controllers,
-      exports: [LoggerService, MetricsService, TracingService],
+      exports: [LoggerService, MetricsService, TracingService, AutoInstrumentationService],
       global: true, // Make this module global to ensure services are available everywhere
       imports: [ConfigModule],
       module: ObservabilityModule,

@@ -19,4 +19,6 @@ export * from './metrics/metrics.service';
 
 // Module
 export * from './observability.module';
+
+export * from './services/auto-instrumentation.service';
 export * from './tracing/tracing.service';
