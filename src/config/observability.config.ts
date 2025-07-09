@@ -22,19 +22,12 @@ export interface ObservabilityConfig {
   serviceName: string;
   serviceVersion: string;
   tracing: {
-    // Auto-instrumentation settings for classes and methods
+    // Simplified auto-instrumentation settings
     autoInstrumentation: {
-      // Whether to capture method arguments
+      // Whether to capture method arguments in traces
       captureArguments: boolean;
+      // Whether to enable the auto-tracing system
       enabled: boolean;
-      // Classes to exclude
-      excludeClasses: string[];
-      // Methods to exclude from tracing
-      excludeMethods: string[];
-      // Classes to include (empty array means all classes)
-      includeClasses: string[];
-      // Whether to trace private methods
-      tracePrivateMethods: boolean;
     };
     enabled: boolean;
     exporter: {
@@ -80,20 +73,12 @@ function createTracingExporter(): ObservabilityConfig['tracing']['exporter'] {
 }
 
 /**
- * Helper function to get auto-instrumentation configuration
+ * Helper function to get simplified auto-instrumentation configuration
  */
 function getAutoInstrumentationConfig(): ObservabilityConfig['tracing']['autoInstrumentation'] {
   return {
-    captureArguments: process.env['TRACING_CAPTURE_ARGUMENTS'] !== 'false',
-    enabled: process.env['TRACING_AUTO_INSTRUMENT_CLASSES'] !== 'false',
-    excludeClasses: process.env['TRACING_EXCLUDE_CLASSES']
-      ? process.env['TRACING_EXCLUDE_CLASSES'].split(',')
-      : ['LoggerService', 'MetricsService', 'TracingService', 'AutoInstrumentationService'],
-    excludeMethods: process.env['TRACING_EXCLUDE_METHODS']
-      ? process.env['TRACING_EXCLUDE_METHODS'].split(',')
-      : ['constructor', 'onModuleInit', 'onModuleDestroy', 'onApplicationBootstrap', 'onApplicationShutdown'],
-    includeClasses: process.env['TRACING_INCLUDE_CLASSES'] ? process.env['TRACING_INCLUDE_CLASSES'].split(',') : [],
-    tracePrivateMethods: process.env['TRACING_TRACE_PRIVATE_METHODS'] === 'true',
+    captureArguments: process.env['CAPTURE_ARGUMENTS'] !== 'false',
+    enabled: process.env['AUTO_INSTRUMENTATION_ENABLED'] !== 'false',
   };
 }
 

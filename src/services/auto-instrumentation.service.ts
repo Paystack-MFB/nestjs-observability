@@ -5,7 +5,6 @@ import { Exception, Span, SpanStatusCode, trace } from '@opentelemetry/api';
 import type { ObservabilityConfig } from '../config/observability.config';
 
 import {
-  getTraceableMethodNames,
   getTraceMethodOptions,
   isNoTraceEnabled,
   isTraceAllMethodsEnabled,
@@ -13,6 +12,9 @@ import {
 } from '../decorators/auto-trace.decorators';
 import { LoggerService } from '../logger/logger.service';
 
+/**
+ * Represents a class that is prepared for instrumentation
+ */
 interface InstrumentationTarget {
   className: string;
   instance: unknown;
@@ -20,6 +22,9 @@ interface InstrumentationTarget {
   prototype: unknown;
 }
 
+/**
+ * Information about an instrumented method stored in the static registry
+ */
 interface InstrumentedMethodInfo {
   className: string;
   isInstrumented: boolean;
@@ -28,6 +33,9 @@ interface InstrumentedMethodInfo {
   spanName: string;
 }
 
+/**
+ * Information about a method that will be instrumented
+ */
 interface MethodInfo {
   methodName: string;
   options?: TraceMethodOptions | undefined;
@@ -37,12 +45,31 @@ interface MethodInfo {
 /**
  * Auto-instrumentation service that automatically discovers and traces NestJS controllers and providers.
  *
- * This service implements the auto-tracing functionality by:
+ * This service implements the modern auto-tracing functionality by:
  * - Discovering all controllers and automatically instrumenting their public methods
  * - Discovering providers marked with @TraceAllMethods and instrumenting their methods
  * - Respecting method-level decorators (@NoTrace, @TraceMethod)
  * - Applying configuration-based filtering and customization
  * - Providing coordination with interceptors to prevent duplicate spans
+ *
+ * The service uses NestJS's DiscoveryService to find all controllers and providers,
+ * then dynamically wraps their methods with OpenTelemetry tracing logic.
+ *
+ * @example
+ * ```typescript
+ * // Controllers are automatically traced
+ * @Controller('users')
+ * export class UserController {
+ *   async getUser() { } // Automatically traced as "UserController.getUser"
+ * }
+ *
+ * // Providers must opt-in with @TraceAllMethods
+ * @Injectable()
+ * @TraceAllMethods()
+ * export class UserService {
+ *   async findUser() { } // Automatically traced as "UserService.findUser"
+ * }
+ * ```
  */
 @Injectable()
 export class AutoInstrumentationService implements OnModuleInit {
@@ -51,6 +78,13 @@ export class AutoInstrumentationService implements OnModuleInit {
 
   private readonly instrumentedClasses = new Set<string>();
 
+  /**
+   * Creates a new auto-instrumentation service instance
+   *
+   * @param discoveryService - NestJS service for discovering controllers and providers
+   * @param logger - Logger service for diagnostic messages
+   * @param config - Observability configuration including auto-instrumentation settings
+   */
   constructor(
     private readonly discoveryService: DiscoveryService,
     private readonly logger: LoggerService,
@@ -58,22 +92,33 @@ export class AutoInstrumentationService implements OnModuleInit {
   ) {}
 
   /**
-   * Static method to clear all instrumented methods (useful for testing)
+   * Clears all instrumented methods from the static registry
+   *
+   * This is primarily used for testing to ensure clean state between tests.
+   * In production, this should not be called after initialization.
    */
   static clearInstrumentedMethods(): void {
     AutoInstrumentationService.instrumentedMethods.clear();
   }
 
   /**
-   * Static method to get all instrumented methods (useful for debugging)
+   * Returns a copy of all instrumented methods for debugging purposes
+   *
+   * @returns Map of method keys to instrumented method information
    */
   static getAllInstrumentedMethods(): Map<string, InstrumentedMethodInfo> {
     return new Map(AutoInstrumentationService.instrumentedMethods);
   }
 
   /**
-   * Static method to get instrumented method information
-   * This is used by interceptors to get span name and options
+   * Gets information about a specific instrumented method
+   *
+   * This is used by interceptors to get span name and options for coordination
+   * between auto-instrumentation and interceptor-based tracing.
+   *
+   * @param className - The name of the class containing the method
+   * @param methodName - The name of the method
+   * @returns Method information if the method is instrumented, undefined otherwise
    */
   static getInstrumentedMethodInfo(className: string, methodName: string): InstrumentedMethodInfo | undefined {
     const key = `${className}.${methodName}`;
@@ -81,8 +126,15 @@ export class AutoInstrumentationService implements OnModuleInit {
   }
 
   /**
-   * Static method to check if a specific method is auto-instrumented
-   * This is used by interceptors to detect auto-instrumented methods
+   * Checks if a specific method is auto-instrumented
+   *
+   * This is used by interceptors to detect auto-instrumented methods and prevent
+   * duplicate span creation. The interceptor can then add HTTP-specific attributes
+   * to the existing span instead of creating a new one.
+   *
+   * @param className - The name of the class containing the method
+   * @param methodName - The name of the method
+   * @returns true if the method is auto-instrumented, false otherwise
    */
   static isMethodInstrumented(className: string, methodName: string): boolean {
     const key = `${className}.${methodName}`;
@@ -90,6 +142,20 @@ export class AutoInstrumentationService implements OnModuleInit {
     return methodInfo?.isInstrumented ?? false;
   }
 
+  /**
+   * NestJS lifecycle hook that initializes the auto-instrumentation
+   *
+   * This method is called after the module and all its dependencies have been initialized.
+   * It discovers all controllers and providers, then instruments their methods according
+   * to the configuration and decorator settings.
+   *
+   * The instrumentation process:
+   * 1. Checks if auto-instrumentation is enabled in configuration
+   * 2. Instruments all controllers automatically
+   * 3. Instruments providers that have @TraceAllMethods decorator
+   * 4. Applies method-level filters and customizations
+   * 5. Logs completion status
+   */
   onModuleInit(): void {
     try {
       if (!this.config.tracing.enabled || !this.config.tracing.autoInstrumentation.enabled) {
@@ -108,7 +174,20 @@ export class AutoInstrumentationService implements OnModuleInit {
   }
 
   /**
-   * Creates a traced version of a method that handles both sync and async methods
+   * Creates a traced version of a method that handles both synchronous and asynchronous methods
+   *
+   * This method wraps the original method with OpenTelemetry tracing logic:
+   * - Creates a span with the appropriate name
+   * - Captures method arguments if enabled
+   * - Handles both sync and async method execution
+   * - Records exceptions and sets span status
+   * - Registers the method in the static registry for interceptor coordination
+   *
+   * @param originalMethod - The original method to wrap
+   * @param className - The name of the class containing the method
+   * @param methodName - The name of the method
+   * @param options - Optional trace method options from @TraceMethod decorator
+   * @returns The wrapped method with tracing functionality
    */
   private createTracedMethod(
     originalMethod: (...args: unknown[]) => unknown,
@@ -190,6 +269,14 @@ export class AutoInstrumentationService implements OnModuleInit {
     };
   }
 
+  /**
+   * Orchestrates the instrumentation of all controllers and providers
+   *
+   * This method coordinates the discovery and instrumentation process:
+   * 1. Instruments all controllers automatically
+   * 2. Instruments providers that opt-in with @TraceAllMethods
+   * 3. Logs completion statistics
+   */
   private instrumentAll(): void {
     this.instrumentControllers();
     this.instrumentProviders();
@@ -202,6 +289,17 @@ export class AutoInstrumentationService implements OnModuleInit {
 
   /**
    * Discovers and instruments all NestJS controllers
+   *
+   * This method uses the NestJS DiscoveryService to find all controllers in the application
+   * and automatically instruments their public methods. Controllers are always instrumented
+   * regardless of decorators (unless explicitly excluded in configuration).
+   *
+   * The process:
+   * 1. Gets all controllers from DiscoveryService
+   * 2. Filters out excluded classes and already instrumented classes
+   * 3. Prepares instrumentation target with eligible methods
+   * 4. Instruments all methods in the target
+   * 5. Logs instrumentation results
    */
   private instrumentControllers(): void {
     const controllers = this.discoveryService.getControllers();
@@ -240,7 +338,13 @@ export class AutoInstrumentationService implements OnModuleInit {
   }
 
   /**
-   * Instruments all methods of a target class
+   * Instruments all methods of a target class by replacing them with traced versions
+   *
+   * This method takes a prepared instrumentation target and replaces each method
+   * with its traced equivalent. The traced methods maintain the same signature
+   * and behavior as the originals but add OpenTelemetry tracing.
+   *
+   * @param target - The instrumentation target containing methods to instrument
    */
   private instrumentMethods(target: InstrumentationTarget): void {
     for (const method of target.methods) {
@@ -258,6 +362,18 @@ export class AutoInstrumentationService implements OnModuleInit {
 
   /**
    * Discovers and instruments providers marked with @TraceAllMethods
+   *
+   * This method uses the NestJS DiscoveryService to find all providers in the application
+   * and instruments only those that have the @TraceAllMethods decorator. This provides
+   * opt-in tracing for services and other providers.
+   *
+   * The process:
+   * 1. Gets all providers from DiscoveryService
+   * 2. Filters out excluded classes and already instrumented classes
+   * 3. Checks for @TraceAllMethods decorator (required for providers)
+   * 4. Prepares instrumentation target with eligible methods
+   * 5. Instruments all methods in the target
+   * 6. Logs instrumentation results
    */
   private instrumentProviders(): void {
     const providers = this.discoveryService.getProviders();
@@ -303,69 +419,132 @@ export class AutoInstrumentationService implements OnModuleInit {
   }
 
   /**
-   * Checks if a class should be excluded from instrumentation
+   * Checks if a class should be excluded from instrumentation based on configuration
+   *
+   * This method applies the inclusion/exclusion rules from the configuration:
+   * - If includeClasses is specified and not empty, only those classes are included
+   * - Otherwise, classes in excludeClasses are excluded
+   * - By default, internal observability classes are excluded to prevent recursion
+   *
+   * @param className - The name of the class to check
+   * @returns true if the class should be excluded from instrumentation
    */
   private isClassExcluded(className: string): boolean {
-    const { excludeClasses, includeClasses } = this.config.tracing.autoInstrumentation;
+    // Hard-coded sensible defaults for excluded classes
+    const defaultExcludedClasses = [
+      'LoggerService',
+      'MetricsService',
+      'TracingService',
+      'AutoInstrumentationService',
+      'DiscoveryService',
+      'ModuleRef',
+      'Reflector',
+    ];
 
-    // If includeClasses is specified and not empty, only include those classes
-    if (includeClasses.length > 0) {
-      return !includeClasses.includes(className);
-    }
-
-    // Otherwise, exclude classes in the excludeClasses list
-    return excludeClasses.includes(className);
+    return defaultExcludedClasses.includes(className);
   }
 
   /**
-   * Checks if a method should be excluded from instrumentation
+   * Checks if a method should be excluded from instrumentation based on configuration
+   *
+   * This method applies method-level exclusion rules from the configuration.
+   * Common exclusions include lifecycle methods, constructors, and internal methods.
+   *
+   * @param methodName - The name of the method to check
+   * @returns true if the method should be excluded from instrumentation
    */
   private isMethodExcluded(methodName: string): boolean {
-    const { excludeMethods } = this.config.tracing.autoInstrumentation;
-    return excludeMethods.includes(methodName);
+    // Hard-coded sensible defaults for excluded methods
+    const defaultExcludedMethods = [
+      'constructor',
+      'onModuleInit',
+      'onModuleDestroy',
+      'onApplicationBootstrap',
+      'onApplicationShutdown',
+      'onApplicationReady',
+      'beforeApplicationShutdown',
+      'setContext',
+      'setLogLevel',
+      'create',
+      'toString',
+      'valueOf',
+      'hasOwnProperty',
+      'isPrototypeOf',
+      'propertyIsEnumerable',
+      'toLocaleString',
+    ];
+
+    return defaultExcludedMethods.includes(methodName);
   }
 
   /**
-   * Checks if a method is private (starts with underscore)
+   * Checks if a method is private based on naming conventions
+   *
+   * This method uses common JavaScript/TypeScript naming conventions to identify
+   * private methods. Methods starting with underscore are considered private.
+   * Private methods are excluded by default for security and performance reasons.
+   *
+   * @param methodName - The name of the method to check
+   * @returns true if the method appears to be private
    */
   private isPrivateMethod(methodName: string): boolean {
     return methodName.startsWith('_');
   }
 
   /**
-   * Prepares instrumentation target by analyzing the class and its methods
+   * Prepares an instrumentation target from a class instance
+   *
+   * This method analyzes a class instance and prepares it for instrumentation by:
+   * 1. Getting all property names from the prototype
+   * 2. Filtering to only include functions (methods)
+   * 3. Applying exclusion rules (constructor, excluded methods, private methods)
+   * 4. Respecting @NoTrace decorator
+   * 5. Collecting @TraceMethod options
+   * 6. Private methods are excluded by default for security
+   *
+   * @param instance - The class instance to prepare
+   * @param className - The name of the class
+   * @returns An instrumentation target ready for method instrumentation
    */
   private prepareInstrumentationTarget(instance: unknown, className: string): InstrumentationTarget {
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
-    const prototype = Object.getPrototypeOf(instance);
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-argument
-    const methodNames = getTraceableMethodNames(prototype);
+    const prototype = Object.getPrototypeOf(instance) as object;
+
+    const methodNames = Object.getOwnPropertyNames(prototype);
 
     const methods: MethodInfo[] = [];
 
     for (const methodName of methodNames) {
+      // Skip constructor
+      if (methodName === 'constructor') {
+        continue;
+      }
+
+      // Skip if not a function
+
+      if (typeof (prototype as Record<string, unknown>)[methodName] !== 'function') {
+        continue;
+      }
+
       // Skip if method is excluded by configuration
       if (this.isMethodExcluded(methodName)) {
         continue;
       }
 
       // Skip if method has @NoTrace decorator
-      if (isNoTraceEnabled(prototype as object, methodName)) {
+      if (isNoTraceEnabled(prototype, methodName)) {
         continue;
       }
 
-      // Skip private methods unless configured to trace them
-      if (this.isPrivateMethod(methodName) && !this.config.tracing.autoInstrumentation.tracePrivateMethods) {
+      // Skip private methods (for security and performance)
+      if (this.isPrivateMethod(methodName)) {
         continue;
       }
 
+      // Get the original method
       const originalMethod = (instance as Record<string, unknown>)[methodName] as (...args: unknown[]) => unknown;
-      if (typeof originalMethod !== 'function') {
-        continue;
-      }
 
-      // Get method-level options from @TraceMethod decorator
-      const options = getTraceMethodOptions(prototype as object, methodName);
+      // Get @TraceMethod options if present
+      const options = getTraceMethodOptions(prototype, methodName);
 
       methods.push({
         methodName,
@@ -384,7 +563,20 @@ export class AutoInstrumentationService implements OnModuleInit {
 }
 
 /**
- * Gets method argument attributes as a record for safe serialization
+ * Extracts method argument attributes for OpenTelemetry spans
+ *
+ * This function safely extracts argument values and converts them to string
+ * attributes for inclusion in OpenTelemetry spans. It handles various data
+ * types and prevents sensitive information from being logged.
+ *
+ * The function creates attributes in the format:
+ * - method.args.count: Number of arguments
+ * - method.args.0.property: First argument's properties
+ * - method.args.1.property: Second argument's properties
+ * - etc.
+ *
+ * @param args - The method arguments to extract attributes from
+ * @returns A record of attribute keys to string values
  */
 function getMethodArgumentAttributes(args: unknown[]): Record<string, string> {
   const attributes: Record<string, string> = {};

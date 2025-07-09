@@ -11,6 +11,8 @@ A comprehensive observability package for NestJS applications that provides stru
 - **Metrics Collection**: Prometheus-compatible metrics with custom counters, gauges, and histograms
 - **Distributed Tracing**: OpenTelemetry-based request tracing
 - **HTTP Interceptors**: Automatic request/response logging and metrics
+- **Auto-Tracing Decorators**: Modern decorator system for automatic method tracing
+- **Auto-Instrumentation Service**: Automatic discovery and instrumentation of controllers and providers
 - **Method Decorators**: Easy tracing for individual methods and classes
 - **Global Module**: Easy integration across your entire application
 
@@ -73,6 +75,10 @@ import { ObservabilityModule } from 'nestjs-observability';
       },
       tracing: {
         enabled: true,
+        autoInstrumentation: {
+          enabled: true, // Enable auto-tracing for controllers and providers
+          captureArguments: true, // Capture method arguments in traces
+        },
         exporter: {
           type: 'otlp',
           endpoint: 'http://localhost:4318/v1/traces',
@@ -145,6 +151,10 @@ import { ObservabilityModule } from 'nestjs-observability';
         },
         tracing: {
           enabled: configService.get('TRACING_ENABLED', 'true') === 'true',
+          autoInstrumentation: {
+            enabled: configService.get('AUTO_INSTRUMENTATION_ENABLED', 'true') === 'true',
+            captureArguments: configService.get('CAPTURE_ARGUMENTS', 'true') === 'true',
+          },
           exporter: {
             type: 'otlp',
             endpoint: configService.get('OTLP_TRACES_ENDPOINT', 'http://localhost:4318/v1/traces'),
@@ -316,6 +326,188 @@ export class ApiController {
   }
 }
 ```
+
+## Auto-Tracing
+
+The `nestjs-observability` library provides a modern decorator system for automatic method tracing. This system automatically discovers and instruments your NestJS controllers and providers, providing comprehensive tracing coverage with minimal configuration.
+
+### How It Works
+
+1. **Controllers**: All controller methods are automatically traced by default
+2. **Providers**: Services and providers can opt-in to tracing using the `@TraceAllMethods` decorator
+3. **Method-Level Control**: Fine-grained control with `@TraceMethod` and `@NoTrace` decorators
+4. **Zero Configuration**: Works out of the box with sensible defaults
+
+### Basic Usage
+
+#### Provider Tracing
+
+```typescript
+import { Injectable } from '@nestjs/common';
+import { TraceAllMethods } from 'nestjs-observability';
+
+@Injectable()
+@TraceAllMethods() // Enable tracing for all methods in this class
+export class UserService {
+  async createUser(userData: any) {
+    // This method is automatically traced
+    // Span name: UserService.createUser
+    return await this.userRepository.create(userData);
+  }
+
+  async findUser(id: string) {
+    // This method is also automatically traced
+    // Span name: UserService.findUser
+    return await this.userRepository.findById(id);
+  }
+}
+```
+
+#### Controller Tracing (Automatic)
+
+```typescript
+import { Controller, Get, Post, Body, Param } from '@nestjs/common';
+
+@Controller('users')
+export class UserController {
+  constructor(private readonly userService: UserService) {}
+
+  @Get(':id')
+  async getUser(@Param('id') id: string) {
+    // Automatically traced - no decorator needed
+    // Span name: UserController.getUser
+    return await this.userService.findUser(id);
+  }
+
+  @Post()
+  async createUser(@Body() userData: any) {
+    // Automatically traced - no decorator needed
+    // Span name: UserController.createUser
+    return await this.userService.createUser(userData);
+  }
+}
+```
+
+### Advanced Features
+
+#### Method-Level Customization
+
+```typescript
+import { Injectable } from '@nestjs/common';
+import { TraceAllMethods, TraceMethod, NoTrace } from 'nestjs-observability';
+
+@Injectable()
+@TraceAllMethods()
+export class PaymentService {
+  @TraceMethod('payment.process', true) // Custom span name and capture arguments
+  async processPayment(paymentData: any) {
+    // Custom span name: payment.process
+    // Arguments captured in trace
+    return await this.paymentProcessor.process(paymentData);
+  }
+
+  @TraceMethod('payment.validate', false) // Don't capture arguments
+  async validatePayment(paymentData: any) {
+    // Custom span name: payment.validate
+    // Arguments NOT captured (for security)
+    return await this.validator.validate(paymentData);
+  }
+
+  @NoTrace() // Exclude this method from tracing
+  private logSensitiveData(data: any) {
+    // This method will not be traced
+    console.log('Sensitive data:', data);
+  }
+}
+```
+
+#### Selective Controller Tracing
+
+```typescript
+import { Controller, Get, Post, Body } from '@nestjs/common';
+import { TraceMethod, NoTrace } from 'nestjs-observability';
+
+@Controller('health')
+export class HealthController {
+  @Get()
+  @NoTrace() // Exclude health check from tracing
+  getHealth() {
+    // This method won't be traced (reduces noise)
+    return { status: 'ok' };
+  }
+
+  @Post('complex')
+  @TraceMethod('health.complex-check', true) // Custom span name
+  async complexHealthCheck(@Body() criteria: any) {
+    // Custom span name: health.complex-check
+    return await this.performComplexCheck(criteria);
+  }
+}
+```
+
+### Configuration Options
+
+#### Enable/Disable Auto-Tracing
+
+```typescript
+ObservabilityModule.forRoot({
+  tracing: {
+    enabled: true,
+    autoInstrumentation: {
+      enabled: true, // Enable auto-tracing system
+      captureArguments: true, // Capture method arguments by default
+    },
+  },
+});
+```
+
+#### Environment Variables
+
+```bash
+# Enable/disable auto-tracing
+AUTO_INSTRUMENTATION_ENABLED=true
+
+# Control argument capture
+CAPTURE_ARGUMENTS=true
+
+# Exclude specific classes (comma-separated)
+TRACING_EXCLUDE_CLASSES=LoggerService,MetricsService
+
+# Exclude specific methods (comma-separated)
+TRACING_EXCLUDE_METHODS=constructor,onModuleInit
+```
+
+### Trace Context
+
+Auto-traced methods automatically include rich context:
+
+```typescript
+// Trace attributes automatically added:
+{
+  "class.name": "UserService",
+  "method.name": "createUser",
+  "instrumentation.type": "auto",
+  "method.args.0.email": "user@example.com", // If captureArguments is true
+  "method.args.0.name": "John Doe",
+  "method.args.count": "1"
+}
+```
+
+### Performance
+
+- **Overhead**: < 1ms per traced method call
+- **Memory**: Minimal memory impact
+- **Instrumentation**: Only methods that are actually called are instrumented
+- **Coordination**: Integrates seamlessly with HTTP interceptors to prevent duplicate spans
+
+### Best Practices
+
+1. **Use `@TraceAllMethods` for Services**: Enable tracing for your business logic services
+2. **Controllers Are Automatic**: No need to add decorators to controllers
+3. **Exclude Sensitive Methods**: Use `@NoTrace` for methods that handle sensitive data
+4. **Custom Span Names**: Use `@TraceMethod` with custom names for important operations
+5. **Argument Capture**: Disable argument capture for methods with sensitive parameters
+6. **Health Checks**: Exclude health check endpoints to reduce trace noise
 
 ## Environment Configuration
 

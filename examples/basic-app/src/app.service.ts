@@ -1,28 +1,64 @@
 import { Injectable, Logger } from '@nestjs/common';
+import { Trace } from 'nestjs-observability';
 
 @Injectable()
 export class AppService {
   private readonly logger = new Logger(AppService.name);
 
-  getHello(): string {
-    this.logger.log('Generating hello message');
+  @Trace()
+  async getHello(): Promise<string> {
+    this.logger.log('Getting hello message');
 
-    // Simulate some business logic
-    const messages = ['Hello World!', 'Welcome to NestJS Observability!', 'Monitoring is working!'];
+    // Simulate some async work
+    await this.delay(10);
 
-    const randomMessage = messages[Math.floor(Math.random() * messages.length)];
-
-    this.logger.log(`Generated hello response: ${randomMessage} (${messages.length} options)`);
-
-    return randomMessage;
+    return 'Hello World!';
   }
 
-  async doAsyncWork(): Promise<void> {
-    this.logger.log('Starting async work');
+  @Trace()
+  async getStatus(): Promise<any> {
+    this.logger.log('Getting application status');
 
-    // Simulate async operation
-    await new Promise((resolve) => setTimeout(resolve, 100));
+    // Simulate status check
+    await this.delay(20);
 
-    this.logger.log('Async work completed');
+    return {
+      status: 'ok',
+      timestamp: new Date().toISOString(),
+      uptime: process.uptime(),
+    };
+  }
+
+  async getHealth(): Promise<any> {
+    this.logger.log('Getting health check');
+
+    // Simulate health check
+    await this.delay(5);
+
+    return {
+      healthy: true,
+      services: {
+        database: 'connected',
+        cache: 'connected',
+      },
+    };
+  }
+
+  @Trace()
+  async performComplexOperation(): Promise<any> {
+    this.logger.log('Performing complex operation');
+
+    // Simulate complex processing
+    await this.delay(100);
+
+    return {
+      result: 'Complex operation completed',
+      processedAt: new Date().toISOString(),
+      duration: '100ms',
+    };
+  }
+
+  private async delay(ms: number): Promise<void> {
+    return new Promise((resolve) => setTimeout(resolve, ms));
   }
 }

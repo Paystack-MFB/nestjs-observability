@@ -1,16 +1,22 @@
-# First Steps
+# First Steps with NestJS Observability
 
-## Getting Started
+## Overview
 
-This guide will help you get started with the NestJS Observability module.
+This guide helps you get started with the NestJS Observability library. The library provides automatic tracing, metrics, and structured logging for your NestJS applications.
 
 ## Installation
 
 ```bash
 npm install nestjs-observability
+# or
+yarn add nestjs-observability
+# or
+pnpm add nestjs-observability
 ```
 
 ## Basic Setup
+
+### 1. Import the Module
 
 ```typescript
 import { Module } from '@nestjs/common';
@@ -19,13 +25,14 @@ import { ObservabilityModule } from 'nestjs-observability';
 @Module({
   imports: [
     ObservabilityModule.forRoot({
-      serviceName: 'my-app',
+      serviceName: 'my-service',
       serviceVersion: '1.0.0',
+      environment: process.env.NODE_ENV || 'development',
       tracing: {
         enabled: true,
-        exporter: {
-          endpoint: 'http://localhost:4318/v1/traces',
-          type: 'otlp',
+        autoInstrumentation: {
+          enabled: true,
+          captureArguments: true,
         },
       },
     }),
@@ -34,197 +41,262 @@ import { ObservabilityModule } from 'nestjs-observability';
 export class AppModule {}
 ```
 
-## Instrumentation Configuration
+### 2. Basic Configuration
 
-The module uses a modern approach to instrumentation configuration that provides maximum coverage out of the box while allowing fine-grained control when needed.
+Create a `.env` file with basic configuration:
 
-### Default Behavior (Recommended)
+```env
+SERVICE_NAME=my-service
+SERVICE_VERSION=1.0.0
+NODE_ENV=development
+TRACING_ENABLED=true
+AUTO_INSTRUMENTATION_ENABLED=true
+CAPTURE_ARGUMENTS=true
+OTLP_TRACES_ENDPOINT=http://localhost:4318/v1/traces
+```
 
-By default, **all available auto-instrumentations are enabled**. This includes:
+## Auto-Tracing with Decorators
 
-- **HTTP/Express/NestJS**: Web framework instrumentations
-- **Database**: PostgreSQL, MySQL, MongoDB, Redis, etc.
-- **Message Queues**: AWS SQS, RabbitMQ, Kafka, etc.
-- **Logging**: Winston, Pino, Bunyan, etc.
-- **File System**: FS operations
-- **Network**: DNS, Net, HTTP client requests
-- **And many more...**
+The observability library provides automatic tracing for your application with minimal configuration.
 
-This means you get comprehensive tracing for your entire application without any additional configuration.
+### Controller Tracing
+
+Controllers are automatically traced by default. Every controller method creates a span automatically:
+
+```typescript
+@Controller('users')
+export class UserController {
+  constructor(private readonly userService: UserService) {}
+
+  @Get(':id')
+  async getUser(@Param('id') id: string) {
+    // This method is automatically traced as "UserController.getUser"
+    // HTTP attributes (method, path, status code) are automatically included
+    return this.userService.findUser(id);
+  }
+
+  @Post()
+  async createUser(@Body() userData: CreateUserDto) {
+    // This method is automatically traced as "UserController.createUser"
+    return this.userService.createUser(userData);
+  }
+}
+```
+
+### Service Tracing with @TraceAllMethods
+
+For services and providers, use the `@TraceAllMethods` decorator to enable automatic tracing:
+
+```typescript
+import { Injectable } from '@nestjs/common';
+import { TraceAllMethods } from 'nestjs-observability';
+
+@Injectable()
+@TraceAllMethods() // Enable automatic tracing for all methods
+export class UserService {
+  async findUser(id: string): Promise<User> {
+    // This method is automatically traced as "UserService.findUser"
+    return this.userRepository.findById(id);
+  }
+
+  async createUser(userData: CreateUserDto): Promise<User> {
+    // This method is automatically traced as "UserService.createUser"
+    return this.userRepository.create(userData);
+  }
+}
+```
+
+### Excluding Methods with @NoTrace
+
+Use the `@NoTrace` decorator to exclude specific methods from tracing:
+
+```typescript
+@Injectable()
+@TraceAllMethods()
+export class PaymentService {
+  async processPayment(paymentData: PaymentDto): Promise<Payment> {
+    // This method is automatically traced
+    return this.paymentProcessor.process(paymentData);
+  }
+
+  @NoTrace() // Exclude this method from tracing
+  private async logSensitiveData(data: any): Promise<void> {
+    // This method will not be traced (sensitive data)
+    console.log('Processing sensitive payment data');
+  }
+}
+```
+
+### Custom Span Names with @TraceMethod
+
+Use the `@TraceMethod` decorator to customize span names or individual method tracing:
+
+```typescript
+@Injectable()
+@TraceAllMethods()
+export class OrderService {
+  @TraceMethod('order.process-complex') // Custom span name
+  async processComplexOrder(orderData: OrderDto): Promise<Order> {
+    // This method is traced as "order.process-complex"
+    return this.processOrder(orderData);
+  }
+
+  @TraceMethod('order.validate', false) // Custom name, don't capture arguments
+  async validateOrder(order: Order): Promise<boolean> {
+    // This method is traced as "order.validate" without argument capture
+    return this.validator.validate(order);
+  }
+}
+```
+
+## Configuration Options
+
+### Basic Configuration
+
+```typescript
+ObservabilityModule.forRoot({
+  serviceName: 'my-service',
+  serviceVersion: '1.0.0',
+  environment: 'production',
+  tracing: {
+    enabled: true,
+    autoInstrumentation: {
+      enabled: true,
+      captureArguments: true,
+    },
+  },
+});
+```
 
 ### Environment Variables
 
-```bash
-# Enable/disable all auto-instrumentations (default: true)
-TRACING_AUTO_INSTRUMENTATIONS=true
+```env
+# Basic Configuration
+SERVICE_NAME=my-service
+SERVICE_VERSION=1.0.0
+NODE_ENV=production
 
-# Disable specific instrumentations (comma-separated list)
-TRACING_DISABLED_INSTRUMENTATIONS="@opentelemetry/instrumentation-fs,@opentelemetry/instrumentation-dns"
+# Tracing Configuration
+TRACING_ENABLED=true
+AUTO_INSTRUMENTATION_ENABLED=true
+CAPTURE_ARGUMENTS=true
 
-# Override specific instrumentation configurations (JSON format)
-TRACING_INSTRUMENTATION_OVERRIDES='{"@opentelemetry/instrumentation-http": {"requestHook": "custom"}, "@opentelemetry/instrumentation-express": {"requestHook": "custom"}}'
+# OpenTelemetry Configuration
+OTLP_TRACES_ENDPOINT=http://localhost:4318/v1/traces
 ```
 
-### Configuration Examples
-
-#### Example 1: Basic Setup (All instrumentations enabled)
+### Full Configuration Example
 
 ```typescript
-// This enables ALL available instrumentations automatically
 ObservabilityModule.forRoot({
-  serviceName: 'my-app',
+  serviceName: process.env.SERVICE_NAME || 'my-service',
+  serviceVersion: process.env.SERVICE_VERSION || '1.0.0',
+  environment: process.env.NODE_ENV || 'development',
+
+  // Logging Configuration
+  logging: {
+    level: process.env.LOG_LEVEL || 'info',
+    structuredLogging: process.env.NODE_ENV === 'production',
+    consoleOutput: true,
+    otlpExport: {
+      enabled: process.env.OTLP_LOGS_ENABLED === 'true',
+      endpoint: process.env.OTLP_LOGS_ENDPOINT || 'http://localhost:4318/v1/logs',
+    },
+  },
+
+  // Metrics Configuration
+  metrics: {
+    enabled: process.env.METRICS_ENABLED !== 'false',
+    endpoint: process.env.METRICS_ENDPOINT || '/metrics',
+    defaultMetrics: true,
+    defaultLabels: {
+      service: process.env.SERVICE_NAME || 'my-service',
+      version: process.env.SERVICE_VERSION || '1.0.0',
+    },
+  },
+
+  // Tracing Configuration
   tracing: {
-    enabled: true,
-    instrumentations: {
-      autoInstrumentations: true, // Default: true
-      disabled: [],
-      overrides: {},
+    enabled: process.env.TRACING_ENABLED !== 'false',
+    autoInstrumentation: {
+      enabled: process.env.AUTO_INSTRUMENTATION_ENABLED !== 'false',
+      captureArguments: process.env.CAPTURE_ARGUMENTS !== 'false',
+    },
+    sampler: {
+      type: 'always_on',
+      ratio: 1.0,
+    },
+    exporter: {
+      type: 'otlp',
+      endpoint: process.env.OTLP_TRACES_ENDPOINT || 'http://localhost:4318/v1/traces',
     },
   },
 });
 ```
 
-#### Example 2: Disable problematic instrumentations
+## Best Practices
+
+### 1. Service Organization
+
+- Use `@TraceAllMethods` for business logic services
+- Avoid tracing utility services (logging, caching) unless needed
+- Use `@NoTrace` for sensitive operations
+
+### 2. Performance Considerations
+
+- The auto-tracing system has minimal overhead (< 1ms per method)
+- Use `captureArguments: false` for methods with large payloads
+- Exclude utility methods that don't provide business value
+
+### 3. Span Naming
+
+- Default span names follow the pattern: `ClassName.methodName`
+- Use `@TraceMethod` for custom span names that better describe business operations
+- Keep span names consistent across your application
+
+### 4. Error Handling
+
+The auto-tracing system automatically captures errors and marks spans as failed. Your error handling remains unchanged:
 
 ```typescript
-// Disable file system and DNS instrumentations if they're too noisy
-ObservabilityModule.forRoot({
-  serviceName: 'my-app',
-  tracing: {
-    enabled: true,
-    instrumentations: {
-      autoInstrumentations: true,
-      disabled: ['@opentelemetry/instrumentation-fs', '@opentelemetry/instrumentation-dns'],
-      overrides: {},
-    },
-  },
-});
-```
-
-#### Example 3: Custom configuration for specific instrumentations
-
-```typescript
-// Fine-tune specific instrumentations
-ObservabilityModule.forRoot({
-  serviceName: 'my-app',
-  tracing: {
-    enabled: true,
-    instrumentations: {
-      autoInstrumentations: true,
-      disabled: [],
-      overrides: {
-        '@opentelemetry/instrumentation-http': {
-          requestHook: (span, request) => {
-            // Custom request hook
-          },
-        },
-        '@opentelemetry/instrumentation-pg': {
-          addSqlCommenterCommentToQueries: true,
-        },
-      },
-    },
-  },
-});
-```
-
-#### Example 4: Production-optimized configuration
-
-```typescript
-// Disable noisy instrumentations in production
-ObservabilityModule.forRoot({
-  serviceName: 'my-app',
-  tracing: {
-    enabled: true,
-    instrumentations: {
-      autoInstrumentations: true,
-      disabled: [
-        '@opentelemetry/instrumentation-fs',
-        '@opentelemetry/instrumentation-dns',
-        '@opentelemetry/instrumentation-net',
-      ],
-      overrides: {
-        '@opentelemetry/instrumentation-http': {
-          ignoreOutgoingRequestHook: (req) => {
-            // Ignore health checks and metrics endpoints
-            return req.path === '/health' || req.path === '/metrics';
-          },
-        },
-      },
-    },
-  },
-});
-```
-
-### Supported Technologies
-
-With auto-instrumentations enabled, you automatically get tracing for:
-
-**Web Frameworks:**
-
-- Express.js
-- NestJS
-- Fastify
-- Koa
-
-**Databases:**
-
-- PostgreSQL
-- MySQL/MySQL2
-- MongoDB
-- Redis
-- Cassandra
-- DynamoDB
-
-**Message Queues:**
-
-- AWS SQS
-- RabbitMQ/AMQP
-- Kafka
-- Google Pub/Sub
-
-**Logging:**
-
-- Winston
-- Pino
-- Bunyan
-
-**Cloud Services:**
-
-- AWS SDK
-- Google Cloud
-- Azure
-
-**And many more...**
-
-### Best Practices
-
-1. **Start with defaults**: Enable all auto-instrumentations and only disable specific ones that cause issues
-2. **Use environment variables**: Configure instrumentations via environment variables for different environments
-3. **Monitor performance**: Some instrumentations can be noisy in high-traffic applications
-4. **Test thoroughly**: Validate that your specific technology stack works well with the enabled instrumentations
-
-### Migration from Previous Versions
-
-If you're upgrading from an older version that used the `http`, `nestJs`, and `winston` flags:
-
-```typescript
-// Old approach (deprecated)
-tracing: {
-  instrumentations: {
-    http: true,
-    nestJs: true,
-    winston: true,
-  },
-}
-
-// New approach (recommended)
-tracing: {
-  instrumentations: {
-    autoInstrumentations: true, // Enables ALL instrumentations including the above
-    disabled: [], // Disable specific ones if needed
-    overrides: {}, // Fine-tune specific ones if needed
-  },
+@Injectable()
+@TraceAllMethods()
+export class UserService {
+  async findUser(id: string): Promise<User> {
+    const user = await this.userRepository.findById(id);
+    if (!user) {
+      throw new NotFoundException(`User ${id} not found`);
+    }
+    return user;
+  }
 }
 ```
 
-The new approach provides much more comprehensive coverage and is future-proof for new technologies.
+## Manual Tracing
+
+For cases where you need more control, you can still use manual tracing:
+
+```typescript
+import { Injectable } from '@nestjs/common';
+import { Trace } from 'nestjs-observability';
+
+@Injectable()
+export class LegacyService {
+  @Trace('legacy.process')
+  async processLegacyData(data: any): Promise<any> {
+    // Manual tracing for specific methods
+    return this.processData(data);
+  }
+}
+```
+
+## Next Steps
+
+1. **Set up your observability backend** (Jaeger, Zipkin, or compatible OTLP collector)
+2. **Configure your endpoints** for traces, metrics, and logs
+3. **Add decorators to your services** to enable automatic tracing
+4. **Monitor your application** and tune the configuration as needed
+
+For advanced configuration and production deployment, see the [Configuration Guide](./configuration.md).
+
+For information about different tracing patterns and use cases, see the [Tracing Guide](./tracing.md).

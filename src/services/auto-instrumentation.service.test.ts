@@ -138,10 +138,6 @@ describe('AutoInstrumentationService', () => {
       autoInstrumentation: {
         captureArguments: true,
         enabled: true,
-        excludeClasses: [],
-        excludeMethods: [],
-        includeClasses: [],
-        tracePrivateMethods: false,
       },
       enabled: true,
       exporter: {
