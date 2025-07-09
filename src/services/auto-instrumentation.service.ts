@@ -20,6 +20,14 @@ interface InstrumentationTarget {
   prototype: unknown;
 }
 
+interface InstrumentedMethodInfo {
+  className: string;
+  isInstrumented: boolean;
+  methodName: string;
+  options?: TraceMethodOptions | undefined;
+  spanName: string;
+}
+
 interface MethodInfo {
   methodName: string;
   options?: TraceMethodOptions | undefined;
@@ -34,9 +42,13 @@ interface MethodInfo {
  * - Discovering providers marked with @TraceAllMethods and instrumenting their methods
  * - Respecting method-level decorators (@NoTrace, @TraceMethod)
  * - Applying configuration-based filtering and customization
+ * - Providing coordination with interceptors to prevent duplicate spans
  */
 @Injectable()
 export class AutoInstrumentationService implements OnModuleInit {
+  // Static registry to track instrumented methods across all instances
+  private static readonly instrumentedMethods = new Map<string, InstrumentedMethodInfo>();
+
   private readonly instrumentedClasses = new Set<string>();
 
   constructor(
@@ -44,6 +56,39 @@ export class AutoInstrumentationService implements OnModuleInit {
     private readonly logger: LoggerService,
     @Inject('OBSERVABILITY_CONFIG') private readonly config: ObservabilityConfig
   ) {}
+
+  /**
+   * Static method to clear all instrumented methods (useful for testing)
+   */
+  static clearInstrumentedMethods(): void {
+    AutoInstrumentationService.instrumentedMethods.clear();
+  }
+
+  /**
+   * Static method to get all instrumented methods (useful for debugging)
+   */
+  static getAllInstrumentedMethods(): Map<string, InstrumentedMethodInfo> {
+    return new Map(AutoInstrumentationService.instrumentedMethods);
+  }
+
+  /**
+   * Static method to get instrumented method information
+   * This is used by interceptors to get span name and options
+   */
+  static getInstrumentedMethodInfo(className: string, methodName: string): InstrumentedMethodInfo | undefined {
+    const key = `${className}.${methodName}`;
+    return AutoInstrumentationService.instrumentedMethods.get(key);
+  }
+
+  /**
+   * Static method to check if a specific method is auto-instrumented
+   * This is used by interceptors to detect auto-instrumented methods
+   */
+  static isMethodInstrumented(className: string, methodName: string): boolean {
+    const key = `${className}.${methodName}`;
+    const methodInfo = AutoInstrumentationService.instrumentedMethods.get(key);
+    return methodInfo?.isInstrumented ?? false;
+  }
 
   onModuleInit(): void {
     try {
@@ -73,6 +118,16 @@ export class AutoInstrumentationService implements OnModuleInit {
   ): (...args: unknown[]) => unknown {
     const spanName = options?.spanName ?? `${className}.${methodName}`;
     const captureArgs = options?.captureArgs ?? this.config.tracing.autoInstrumentation.captureArguments;
+
+    // Register this method as instrumented
+    const key = `${className}.${methodName}`;
+    AutoInstrumentationService.instrumentedMethods.set(key, {
+      className,
+      isInstrumented: true,
+      methodName,
+      options,
+      spanName,
+    });
 
     return function (this: unknown, ...args: unknown[]) {
       const tracer = trace.getTracer('auto-instrumentation');
