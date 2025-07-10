@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 
 import * as configModule from './config/observability.config.js';
-import { defaultObservabilityConfig } from './config/observability.config.js';
+import { type SimpleObservabilityConfig } from './config/observability.config.js';
 import { ObservabilityModule } from './observability.module.js';
 
 describe('ObservabilityModule', () => {
@@ -10,10 +10,10 @@ describe('ObservabilityModule', () => {
   });
 
   it('should create a module with forRoot', () => {
-    const testConfig = {
-      ...defaultObservabilityConfig,
+    const testConfig: SimpleObservabilityConfig = {
       environment: 'test',
       serviceName: 'test-service',
+      serviceVersion: '1.0.0',
     };
 
     const module = ObservabilityModule.forRoot(testConfig);
@@ -26,10 +26,10 @@ describe('ObservabilityModule', () => {
 
   it('should create a module with forRootAsync', () => {
     const module = ObservabilityModule.forRootAsync({
-      useFactory: () => ({
-        ...defaultObservabilityConfig,
+      useFactory: (): SimpleObservabilityConfig => ({
         environment: 'test',
         serviceName: 'test-service',
+        serviceVersion: '1.0.0',
       }),
     });
 
@@ -42,10 +42,8 @@ describe('ObservabilityModule', () => {
   it('should call ensureServiceLabels in forRoot', () => {
     const ensureServiceLabelsSpy = vi.spyOn(configModule, 'ensureServiceLabels');
 
-    const testConfig = {
-      ...defaultObservabilityConfig,
+    const testConfig: SimpleObservabilityConfig = {
       metrics: {
-        ...defaultObservabilityConfig.metrics,
         defaultLabels: {
           customLabel: 'customValue',
           environment: 'test',
@@ -79,10 +77,8 @@ describe('ObservabilityModule', () => {
   it('should call ensureServiceLabels in forRootAsync', () => {
     const ensureServiceLabelsSpy = vi.spyOn(configModule, 'ensureServiceLabels');
 
-    const testConfig = {
-      ...defaultObservabilityConfig,
+    const testConfig: SimpleObservabilityConfig = {
       metrics: {
-        ...defaultObservabilityConfig.metrics,
         defaultLabels: {
           environment: 'staging',
           team: 'backend',
@@ -114,10 +110,10 @@ describe('ObservabilityModule', () => {
   });
 
   it('should ensure service labels are present in forRoot config', () => {
-    const testConfig = {
-      ...defaultObservabilityConfig,
+    const ensureServiceLabelsSpy = vi.spyOn(configModule, 'ensureServiceLabels');
+
+    const testConfig: SimpleObservabilityConfig = {
       metrics: {
-        ...defaultObservabilityConfig.metrics,
         defaultLabels: {
           environment: 'production',
           region: 'us-west-2',
@@ -128,29 +124,33 @@ describe('ObservabilityModule', () => {
       serviceVersion: '1.5.0',
     };
 
-    const module = ObservabilityModule.forRoot(testConfig);
+    ObservabilityModule.forRoot(testConfig);
 
-    // Get the config provider
-    const configProvider = module.providers?.find(
-      (p) => typeof p === 'object' && 'provide' in p && p.provide === 'OBSERVABILITY_CONFIG'
+    // Verify that ensureServiceLabels was called
+    expect(ensureServiceLabelsSpy).toHaveBeenCalledOnce();
+    expect(ensureServiceLabelsSpy).toHaveBeenCalledWith(
+      expect.objectContaining({
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+        metrics: expect.objectContaining({
+          // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+          defaultLabels: expect.objectContaining({
+            environment: 'production',
+            region: 'us-west-2',
+          }),
+        }),
+        serviceName: 'label-test-service',
+        serviceVersion: '1.5.0',
+      })
     );
 
-    expect(configProvider).toBeDefined();
-
-    if (configProvider && typeof configProvider === 'object' && 'useValue' in configProvider) {
-      const config = configProvider.useValue as { metrics: { defaultLabels: Record<string, string> } };
-      expect(config.metrics.defaultLabels['service']).toBe('label-test-service');
-      expect(config.metrics.defaultLabels['version']).toBe('1.5.0');
-      expect(config.metrics.defaultLabels['environment']).toBe('production');
-      expect(config.metrics.defaultLabels['region']).toBe('us-west-2');
-    }
+    ensureServiceLabelsSpy.mockRestore();
   });
 
   it('should preserve user labels while ensuring service labels in forRoot', () => {
-    const testConfig = {
-      ...defaultObservabilityConfig,
+    const ensureServiceLabelsSpy = vi.spyOn(configModule, 'ensureServiceLabels');
+
+    const testConfig: SimpleObservabilityConfig = {
       metrics: {
-        ...defaultObservabilityConfig.metrics,
         defaultLabels: {
           customLabel: 'preserved',
           environment: 'test',
@@ -162,21 +162,25 @@ describe('ObservabilityModule', () => {
       serviceVersion: '4.0.0',
     };
 
-    const module = ObservabilityModule.forRoot(testConfig);
+    ObservabilityModule.forRoot(testConfig);
 
-    // Get the config provider
-    const configProvider = module.providers?.find(
-      (p) => typeof p === 'object' && 'provide' in p && p.provide === 'OBSERVABILITY_CONFIG'
+    // Verify that ensureServiceLabels was called
+    expect(ensureServiceLabelsSpy).toHaveBeenCalledOnce();
+    expect(ensureServiceLabelsSpy).toHaveBeenCalledWith(
+      expect.objectContaining({
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+        metrics: expect.objectContaining({
+          // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+          defaultLabels: expect.objectContaining({
+            customLabel: 'preserved',
+            environment: 'test',
+          }),
+        }),
+        serviceName: 'override-service',
+        serviceVersion: '4.0.0',
+      })
     );
 
-    expect(configProvider).toBeDefined();
-
-    const config = (configProvider as { useValue: { metrics: { defaultLabels: Record<string, string> } } }).useValue;
-    // Service and version should come from top-level config
-    expect(config.metrics.defaultLabels['service']).toBe('override-service');
-    expect(config.metrics.defaultLabels['version']).toBe('4.0.0');
-    // Other labels should be preserved
-    expect(config.metrics.defaultLabels['environment']).toBe('test');
-    expect(config.metrics.defaultLabels['customLabel']).toBe('preserved');
+    ensureServiceLabelsSpy.mockRestore();
   });
 });

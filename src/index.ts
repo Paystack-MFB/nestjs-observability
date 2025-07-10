@@ -1,6 +1,10 @@
 // Configuration
-export { defaultObservabilityConfig } from './config/observability.config';
-export type { AttributeSanitizationConfig, ObservabilityConfig } from './config/observability.config';
+export { createObservabilityConfig, ensureServiceLabels } from './config/observability.config';
+export type {
+  AttributeSanitizationConfig,
+  ObservabilityConfig,
+  SimpleObservabilityConfig,
+} from './config/observability.config';
 // Controllers
 export { MetricsController } from './controllers/metrics.controller';
 // Decorators

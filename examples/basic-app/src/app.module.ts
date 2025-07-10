@@ -1,5 +1,5 @@
 import { Module } from '@nestjs/common';
-import { ConfigModule } from '@nestjs/config';
+import { ConfigModule, ConfigService } from '@nestjs/config';
 import { LoggerService, ObservabilityModule } from '@paystackhq/nestjs-observability';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
@@ -12,49 +12,19 @@ import { UserService } from './user.service';
   imports: [
     ConfigModule.forRoot({
       isGlobal: true,
+      envFilePath: '.env',
     }),
-    ObservabilityModule.forRoot({
-      serviceName: process.env.SERVICE_NAME || 'basic-example',
-      serviceVersion: process.env.SERVICE_VERSION || '1.0.0',
-      environment: process.env.NODE_ENV || 'development',
-      logging: {
-        level: process.env.LOG_LEVEL || 'info',
-        consoleOutput: true,
-        otlpExport: {
-          enabled: process.env.OTLP_LOGS_ENABLED === 'true',
-          endpoint: process.env.OTLP_LOGS_ENDPOINT || 'http://localhost:4318/v1/logs',
-        },
-      },
-      metrics: {
-        enabled: process.env.METRICS_ENABLED !== 'false',
-        endpoint: process.env.METRICS_ENDPOINT || '/metrics',
-        defaultMetrics: true,
-        defaultLabels: {
-          service: process.env.SERVICE_NAME || 'basic-example',
-          version: process.env.SERVICE_VERSION || '1.0.0',
-          environment: process.env.NODE_ENV || 'development',
-        },
-      },
-      tracing: {
-        attributeSanitization: {
-          additionalSensitivePatterns: [/custom-secret/i],
-          enabled: true,
-          redactedPlaceholder: '[REDACTED]',
-        },
-        enabled: true,
-        exporter: {
-          endpoint: process.env['OTEL_EXPORTER_OTLP_ENDPOINT'] || 'http://localhost:4317',
-          type: 'otlp',
-        },
-        instrumentations: {
-          autoInstrumentations: true,
-          disabled: [],
-          overrides: {},
-        },
-        sampler: {
-          type: 'always_on',
-        },
-      },
+    // Use factory pattern for proper dependency injection
+    ObservabilityModule.forRootAsync({
+      imports: [ConfigModule],
+      inject: [ConfigService],
+      useFactory: (configService: ConfigService) => ({
+        serviceName: configService.get('SERVICE_NAME', 'basic-example'),
+        serviceVersion: configService.get('SERVICE_VERSION', '1.0.0'),
+        environment: configService.get('NODE_ENV', 'development'),
+        // All environment variables like OTLP_TRACES_ENDPOINT, OTLP_HEADERS,
+        // TRACING_ENABLED, METRICS_ENABLED, etc. are automatically loaded
+      }),
     }),
   ],
   controllers: [AppController, HealthController],

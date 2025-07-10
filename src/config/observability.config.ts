@@ -24,6 +24,13 @@ export interface AttributeSanitizationConfig {
   redactedPlaceholder: string;
 }
 
+/**
+ * ConfigService interface to avoid importing @nestjs/config in this file
+ */
+export interface ConfigServiceInterface {
+  get<T = string>(key: string, defaultValue?: T): T;
+}
+
 export interface ObservabilityConfig {
   environment: string;
   logging: {
@@ -69,6 +76,169 @@ export interface ObservabilityConfig {
 }
 
 /**
+ * Simple configuration interface for users - all optional except service name and version
+ */
+export interface SimpleObservabilityConfig {
+  environment?: string;
+  logging?: {
+    consoleOutput?: boolean;
+    level?: string;
+    otlpExport?: {
+      enabled?: boolean;
+      endpoint?: string;
+    };
+  };
+  metrics?: {
+    defaultLabels?: Record<string, string>;
+    defaultMetrics?: boolean;
+    enabled?: boolean;
+    endpoint?: string;
+  };
+  serviceName: string;
+  serviceVersion: string;
+  tracing?: {
+    attributeSanitization?: {
+      additionalSensitivePatterns?: RegExp[];
+      enabled?: boolean;
+      redactedPlaceholder?: string;
+    };
+    enabled?: boolean;
+    exporter?: {
+      endpoint?: string;
+      headers?: Record<string, string>;
+      type?: 'otlp';
+    };
+    instrumentations?: {
+      autoInstrumentations?: boolean;
+      disabled?: string[];
+      overrides?: Record<string, Record<string, unknown>>;
+    };
+    sampler?: {
+      ratio?: number;
+      type?: 'always_off' | 'always_on' | 'trace_id_ratio';
+    };
+  };
+}
+
+/**
+ * Single function to create complete observability configuration
+ * Merges user configuration with environment variables and sensible defaults
+ */
+export function createObservabilityConfig(
+  userConfig: Partial<SimpleObservabilityConfig> = {},
+  configService: ConfigServiceInterface
+): ObservabilityConfig {
+  const serviceName = userConfig.serviceName ?? configService.get('SERVICE_NAME', 'nestjs-service');
+  const serviceVersion = userConfig.serviceVersion ?? configService.get('SERVICE_VERSION', '1.0.0');
+  const environment = userConfig.environment ?? configService.get('NODE_ENV', 'development');
+
+  // Create headers from environment if present
+  const createHeaders = (): Record<string, string> | undefined => {
+    if (userConfig.tracing?.exporter?.headers) {
+      return userConfig.tracing.exporter.headers;
+    }
+
+    const envHeaders = configService.get('OTLP_HEADERS');
+    if (envHeaders) {
+      try {
+        return JSON.parse(envHeaders) as Record<string, string>;
+      } catch {
+        // Invalid JSON, ignore headers
+      }
+    }
+
+    return undefined;
+  };
+
+  const config: ObservabilityConfig = {
+    environment,
+    logging: {
+      consoleOutput: userConfig.logging?.consoleOutput ?? getBooleanFromEnv(configService, 'LOG_CONSOLE_OUTPUT', true),
+      level: userConfig.logging?.level ?? configService.get('LOG_LEVEL', 'info'),
+      otlpExport: {
+        enabled:
+          userConfig.logging?.otlpExport?.enabled ?? getBooleanFromEnv(configService, 'OTLP_LOGS_ENABLED', false),
+        endpoint:
+          userConfig.logging?.otlpExport?.endpoint ??
+          configService.get('OTLP_LOGS_ENDPOINT', 'http://localhost:4318/v1/logs'),
+      },
+    },
+    metrics: {
+      defaultLabels: {
+        environment,
+        service: serviceName,
+        version: serviceVersion,
+        ...userConfig.metrics?.defaultLabels,
+      },
+      defaultMetrics:
+        userConfig.metrics?.defaultMetrics ?? getBooleanFromEnv(configService, 'METRICS_DEFAULT_ENABLED', true),
+      enabled: userConfig.metrics?.enabled ?? getBooleanFromEnv(configService, 'METRICS_ENABLED', true),
+      endpoint: userConfig.metrics?.endpoint ?? configService.get('METRICS_ENDPOINT', '/metrics'),
+    },
+
+    serviceName,
+
+    serviceVersion,
+
+    tracing: {
+      attributeSanitization: {
+        additionalSensitivePatterns: userConfig.tracing?.attributeSanitization?.additionalSensitivePatterns ?? [],
+        enabled:
+          userConfig.tracing?.attributeSanitization?.enabled ??
+          getBooleanFromEnv(configService, 'TRACING_SANITIZATION_ENABLED', true),
+        redactedPlaceholder:
+          userConfig.tracing?.attributeSanitization?.redactedPlaceholder ??
+          configService.get('TRACING_REDACTED_PLACEHOLDER', '[REDACTED]'),
+      },
+      enabled: userConfig.tracing?.enabled ?? getBooleanFromEnv(configService, 'TRACING_ENABLED', true),
+      exporter: {
+        endpoint:
+          userConfig.tracing?.exporter?.endpoint ??
+          configService.get('OTLP_TRACES_ENDPOINT', 'http://localhost:4318/v1/traces'),
+        type: userConfig.tracing?.exporter?.type ?? 'otlp',
+        ...(() => {
+          const headers = createHeaders();
+          return headers ? { headers } : {};
+        })(),
+      },
+      instrumentations: {
+        autoInstrumentations:
+          userConfig.tracing?.instrumentations?.autoInstrumentations ??
+          getBooleanFromEnv(configService, 'TRACING_AUTO_INSTRUMENTATIONS', true),
+        disabled: [
+          ...getDisabledInstrumentations(configService),
+          ...(userConfig.tracing?.instrumentations?.disabled ?? []),
+        ],
+        overrides: {
+          ...getInstrumentationOverrides(configService),
+          ...userConfig.tracing?.instrumentations?.overrides,
+        },
+      },
+      sampler: {
+        type: userConfig.tracing?.sampler?.type ?? getSamplerType(configService),
+        ...(() => {
+          const userRatio = userConfig.tracing?.sampler?.ratio;
+          const envRatio = configService.get('TRACING_SAMPLER_RATIO');
+
+          if (userRatio !== undefined) {
+            return { ratio: userRatio };
+          }
+
+          if (envRatio) {
+            return { ratio: parseFloat(envRatio) };
+          }
+
+          // Default ratio based on environment
+          return { ratio: environment === 'production' ? 0.1 : 1.0 };
+        })(),
+      },
+    },
+  };
+
+  return config;
+}
+
+/**
  * Helper function to ensure service and version are always included in metrics labels
  * This function processes the configuration to guarantee that service and version labels
  * are present, even when users provide their own defaultLabels configuration
@@ -90,40 +260,28 @@ export function ensureServiceLabels(config: ObservabilityConfig): ObservabilityC
 }
 
 /**
- * Helper function to create tracing exporter configuration
+ * Helper function to parse boolean from environment variables
  */
-function createTracingExporter(): ObservabilityConfig['tracing']['exporter'] {
-  const endpoint = process.env['OTLP_TRACES_ENDPOINT'] ?? 'http://localhost:4318/v1/traces';
-
-  const config: ObservabilityConfig['tracing']['exporter'] = {
-    endpoint,
-    type: 'otlp',
-  };
-
-  if (process.env['OTLP_HEADERS']) {
-    try {
-      config.headers = JSON.parse(process.env['OTLP_HEADERS']) as Record<string, string>;
-    } catch {
-      // Invalid JSON, ignore headers
-    }
-  }
-
-  return config;
+function getBooleanFromEnv(configService: ConfigServiceInterface, key: string, defaultValue: boolean): boolean {
+  const value = configService.get(key);
+  if (value === 'true') return true;
+  if (value === 'false') return false;
+  return defaultValue;
 }
 
 /**
  * Helper function to get disabled instrumentations from environment
  */
-function getDisabledInstrumentations(): string[] {
-  const disabled = process.env['TRACING_DISABLED_INSTRUMENTATIONS'];
+function getDisabledInstrumentations(configService: ConfigServiceInterface): string[] {
+  const disabled = configService.get('TRACING_DISABLED_INSTRUMENTATIONS');
   return disabled ? disabled.split(',').map((s) => s.trim()) : [];
 }
 
 /**
  * Helper function to get instrumentation overrides from environment
  */
-function getInstrumentationOverrides(): Record<string, Record<string, unknown>> {
-  const overrides = process.env['TRACING_INSTRUMENTATION_OVERRIDES'];
+function getInstrumentationOverrides(configService: ConfigServiceInterface): Record<string, Record<string, unknown>> {
+  const overrides = configService.get('TRACING_INSTRUMENTATION_OVERRIDES');
   if (!overrides) return {};
 
   try {
@@ -136,60 +294,13 @@ function getInstrumentationOverrides(): Record<string, Record<string, unknown>> 
 /**
  * Helper function to get sampler type from environment
  */
-function getSamplerType(): 'always_off' | 'always_on' | 'trace_id_ratio' {
-  const type = process.env['TRACING_SAMPLER_TYPE'];
+function getSamplerType(configService: ConfigServiceInterface): 'always_off' | 'always_on' | 'trace_id_ratio' {
+  const type = configService.get('TRACING_SAMPLER_TYPE');
 
   if (type === 'always_off' || type === 'always_on' || type === 'trace_id_ratio') {
     return type;
   }
 
   // Default to always_on for development, trace_id_ratio for production
-  return process.env['NODE_ENV'] === 'production' ? 'trace_id_ratio' : 'always_on';
+  return configService.get('NODE_ENV') === 'production' ? 'trace_id_ratio' : 'always_on';
 }
-
-/**
- * Default configuration for the ObservabilityModule
- */
-export const defaultObservabilityConfig: ObservabilityConfig = {
-  environment: process.env['NODE_ENV'] ?? 'development',
-  logging: {
-    consoleOutput: true,
-    level: process.env['LOG_LEVEL'] ?? 'info',
-    otlpExport: {
-      enabled: process.env['OTLP_LOGS_ENABLED'] === 'true',
-      endpoint: process.env['OTLP_LOGS_ENDPOINT'] ?? 'http://localhost:4318/v1/logs',
-    },
-  },
-  metrics: {
-    defaultLabels: {
-      environment: process.env['NODE_ENV'] ?? 'development',
-      service: process.env['SERVICE_NAME'] ?? 'nestjs-service',
-      version: process.env['SERVICE_VERSION'] ?? '1.0.0',
-    },
-    defaultMetrics: true,
-    enabled: process.env['METRICS_ENABLED'] !== 'false',
-    endpoint: process.env['METRICS_ENDPOINT'] ?? '/metrics',
-  },
-
-  serviceName: process.env['SERVICE_NAME'] ?? 'nestjs-service',
-  serviceVersion: process.env['SERVICE_VERSION'] ?? '1.0.0',
-
-  tracing: {
-    attributeSanitization: {
-      additionalSensitivePatterns: [],
-      enabled: true,
-      redactedPlaceholder: '[REDACTED]',
-    },
-    enabled: process.env['TRACING_ENABLED'] !== 'false',
-    exporter: createTracingExporter(),
-    instrumentations: {
-      autoInstrumentations: true,
-      disabled: getDisabledInstrumentations(),
-      overrides: getInstrumentationOverrides(),
-    },
-    sampler: {
-      ratio: process.env['TRACING_SAMPLER_RATIO'] ? parseFloat(process.env['TRACING_SAMPLER_RATIO']) : 1.0,
-      type: getSamplerType(),
-    },
-  },
-};
