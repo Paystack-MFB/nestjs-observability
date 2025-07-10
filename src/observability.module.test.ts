@@ -4,6 +4,31 @@ import * as configModule from './config/observability.config.js';
 import { type SimpleObservabilityConfig } from './config/observability.config.js';
 import { ObservabilityModule } from './observability.module.js';
 
+// Mock ConfigService
+const mockConfigService = {
+  get: vi.fn((key: string, defaultValue?: unknown) => {
+    // Return default values for common environment variables
+    switch (key) {
+      case 'LOG_LEVEL':
+        return 'info';
+      case 'METRICS_ENDPOINT':
+        return '/metrics';
+      case 'NODE_ENV':
+        return 'test';
+      case 'OTLP_LOGS_ENDPOINT':
+        return 'http://localhost:4318/v1/logs';
+      case 'OTLP_TRACES_ENDPOINT':
+        return 'http://localhost:4318/v1/traces';
+      case 'SERVICE_NAME':
+        return 'test-service';
+      case 'SERVICE_VERSION':
+        return '1.0.0';
+      default:
+        return defaultValue;
+    }
+  }),
+};
+
 describe('ObservabilityModule', () => {
   it('should be defined', () => {
     expect(ObservabilityModule).toBeDefined();
@@ -53,7 +78,19 @@ describe('ObservabilityModule', () => {
       serviceVersion: '2.0.0',
     };
 
-    ObservabilityModule.forRoot(testConfig);
+    const module = ObservabilityModule.forRoot(testConfig);
+
+    // Get the config provider and execute its useFactory
+    const configProvider = module.providers?.find(
+      (p) => typeof p === 'object' && 'provide' in p && p.provide === 'OBSERVABILITY_CONFIG'
+    );
+
+    expect(configProvider).toBeDefined();
+
+    // Execute the useFactory to trigger ensureServiceLabels
+    if (configProvider && typeof configProvider === 'object' && 'useFactory' in configProvider) {
+      (configProvider.useFactory as (...args: unknown[]) => unknown)(mockConfigService);
+    }
 
     expect(ensureServiceLabelsSpy).toHaveBeenCalledOnce();
     expect(ensureServiceLabelsSpy).toHaveBeenCalledWith(
@@ -103,7 +140,7 @@ describe('ObservabilityModule', () => {
 
     // Call the useFactory to trigger ensureServiceLabels
     if (configProvider && typeof configProvider === 'object' && 'useFactory' in configProvider) {
-      (configProvider.useFactory as (...args: unknown[]) => unknown)();
+      (configProvider.useFactory as (...args: unknown[]) => unknown)(mockConfigService);
     }
 
     ensureServiceLabelsSpy.mockRestore();
@@ -124,7 +161,19 @@ describe('ObservabilityModule', () => {
       serviceVersion: '1.5.0',
     };
 
-    ObservabilityModule.forRoot(testConfig);
+    const module = ObservabilityModule.forRoot(testConfig);
+
+    // Get the config provider and execute its useFactory
+    const configProvider = module.providers?.find(
+      (p) => typeof p === 'object' && 'provide' in p && p.provide === 'OBSERVABILITY_CONFIG'
+    );
+
+    expect(configProvider).toBeDefined();
+
+    // Execute the useFactory to trigger ensureServiceLabels
+    if (configProvider && typeof configProvider === 'object' && 'useFactory' in configProvider) {
+      (configProvider.useFactory as (...args: unknown[]) => unknown)(mockConfigService);
+    }
 
     // Verify that ensureServiceLabels was called
     expect(ensureServiceLabelsSpy).toHaveBeenCalledOnce();
@@ -162,7 +211,19 @@ describe('ObservabilityModule', () => {
       serviceVersion: '4.0.0',
     };
 
-    ObservabilityModule.forRoot(testConfig);
+    const module = ObservabilityModule.forRoot(testConfig);
+
+    // Get the config provider and execute its useFactory
+    const configProvider = module.providers?.find(
+      (p) => typeof p === 'object' && 'provide' in p && p.provide === 'OBSERVABILITY_CONFIG'
+    );
+
+    expect(configProvider).toBeDefined();
+
+    // Execute the useFactory to trigger ensureServiceLabels
+    if (configProvider && typeof configProvider === 'object' && 'useFactory' in configProvider) {
+      (configProvider.useFactory as (...args: unknown[]) => unknown)(mockConfigService);
+    }
 
     // Verify that ensureServiceLabels was called
     expect(ensureServiceLabelsSpy).toHaveBeenCalledOnce();

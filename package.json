@@ -69,6 +69,9 @@
     "url": "https://github.com/paystackhq/nestjs-observability/issues"
   },
   "homepage": "https://github.com/paystackhq/nestjs-observability#readme",
+  "publishConfig": {
+    "registry": "https://npm.pkg.github.com"
+  },
   "engines": {
     "node": ">=18.0.0",
     "pnpm": ">=8.0.0"

@@ -17,22 +17,36 @@ jobs:
         with:
           # We need to fetch history to run changesets correctly
           fetch-depth: 0
-          token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Setup pnpm
         uses: pnpm/action-setup@v4
-        with:
-          version: 10
 
       - name: Setup Node.js 22
         uses: actions/setup-node@v4
         with:
           node-version: 22
           cache: 'pnpm'
-          registry-url: 'https://registry.npmjs.org'
+          # Registry configuration is handled by .npmrc file
+
+      - name: Create .npmrc file
+        run: |
+          cat << EOF > ${HOME}/.npmrc
+          # Default registry for unscoped packages (npm)
+          registry=https://registry.npmjs.org/
+
+          # GitHub registry for scoped packages (for organizations using GitHub packages)
+          @paystackhq:registry=https://npm.pkg.github.com
+
+          # Authentication placeholder (will be set by CI/CD)
+          //npm.pkg.github.com/:_authToken=${NODE_AUTH_TOKEN}
+          EOF
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Install dependencies
         run: pnpm install
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Check for Changeset files
         id: changesets
@@ -62,11 +76,11 @@ jobs:
           echo "Pushing changes to repository..."
           git push origin main
 
-          echo "Publishing to npm..."
+          echo "Publishing to GitHub npm registry..."
           pnpm changeset publish
 
           echo "Pushing tags to repository..."
           git push --tags
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+          NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
