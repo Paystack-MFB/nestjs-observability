@@ -229,19 +229,53 @@ export class LoggerService extends ConsoleLogger {
         }
       }
 
-      // Handle error method's different signature, all others are the same
-      if (level === 'error') {
-        super.error(processedMessage, stack, context);
-      } else if (level === 'debug') {
-        super.debug(processedMessage, context);
-      } else if (level === 'fatal') {
-        super.fatal(processedMessage, context);
-      } else if (level === 'verbose') {
-        super.verbose(processedMessage, context);
-      } else if (level === 'warn') {
-        super.warn(processedMessage, context);
-      } else {
-        super.log(processedMessage, context);
+      // Call parent logger methods with clean arguments
+      switch (level) {
+        case 'debug':
+          if (context) {
+            super.debug(processedMessage, context);
+          } else {
+            super.debug(processedMessage);
+          }
+          break;
+        case 'error':
+          if (stack && context) {
+            super.error(processedMessage, stack, context);
+          } else if (stack) {
+            super.error(processedMessage, stack);
+          } else if (context) {
+            super.error(processedMessage, context);
+          } else {
+            super.error(processedMessage);
+          }
+          break;
+        case 'fatal':
+          if (context) {
+            super.fatal(processedMessage, context);
+          } else {
+            super.fatal(processedMessage);
+          }
+          break;
+        case 'verbose':
+          if (context) {
+            super.verbose(processedMessage, context);
+          } else {
+            super.verbose(processedMessage);
+          }
+          break;
+        case 'warn':
+          if (context) {
+            super.warn(processedMessage, context);
+          } else {
+            super.warn(processedMessage);
+          }
+          break;
+        default:
+          if (context) {
+            super.log(processedMessage, context);
+          } else {
+            super.log(processedMessage);
+          }
       }
     }
   }
