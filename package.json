@@ -1,17 +1,25 @@
 {
-  "name": "nestjs-observability",
+  "name": "@paystackhq/nestjs-observability",
   "version": "0.1.0",
   "description": "A comprehensive observability package for NestJS applications that provides structured logging, metrics collection, and distributed tracing capabilities.",
-  "main": "./dist/index.js",
-  "module": "./dist/index.js",
-  "types": "./dist/index.d.ts",
+  "type": "commonjs",
+  "main": "./dist/cjs/index.js",
+  "module": "./dist/esm/index.js",
+  "types": "./dist/cjs/index.d.ts",
   "exports": {
     ".": {
-      "types": "./dist/index.d.ts",
-      "import": "./dist/index.js",
-      "require": "./dist/index.js",
-      "default": "./dist/index.js"
-    }
+      "types": "./dist/cjs/index.d.ts",
+      "import": {
+        "types": "./dist/esm/index.d.ts",
+        "default": "./dist/esm/index.js"
+      },
+      "require": {
+        "types": "./dist/cjs/index.d.ts",
+        "default": "./dist/cjs/index.js"
+      },
+      "default": "./dist/cjs/index.js"
+    },
+    "./package.json": "./package.json"
   },
   "files": [
     "dist",
@@ -19,7 +27,12 @@
     "LICENSE"
   ],
   "scripts": {
-    "build": "tsc",
+    "build": "pnpm run clean && pnpm run build:cjs && pnpm run build:esm && pnpm run validate-build",
+    "build:cjs": "tsc -p tsconfig.build.cjs.json",
+    "build:esm": "tsc -p tsconfig.build.esm.json && pnpm run fix-esm-imports",
+    "build:info": "node scripts/build-info.js",
+    "fix-esm-imports": "node scripts/fix-esm-imports.js",
+    "validate-build": "node scripts/validate-build.js",
     "dev": "tsx --watch src/index.ts",
     "type-check": "tsc --noEmit",
     "lint": "eslint .",
@@ -29,7 +42,7 @@
     "test": "vitest run",
     "test:coverage": "vitest run --coverage",
     "clean": "rm -rf dist",
-    "prepublishOnly": "pnpm run clean && pnpm run build && pnpm run test:run",
+    "prepublishOnly": "pnpm run clean && pnpm run build && pnpm run test",
     "release": "pnpm run clean && pnpm run build && changeset publish",
     "changeset": "changeset",
     "changeset:version": "changeset version",
@@ -100,6 +113,7 @@
     "husky": "^9.1.7",
     "lint-staged": "^15.2.11",
     "prettier": "^3.4.2",
+    "tslib": "^2.8.1",
     "tsx": "^4.19.2",
     "typescript": "^5.7.2",
     "typescript-eslint": "^8.19.0",

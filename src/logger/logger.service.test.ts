@@ -47,11 +47,9 @@ describe('LoggerService', () => {
     serviceName: 'test-service',
     serviceVersion: '1.0.0',
     tracing: {
-      argumentSanitization: {
+      attributeSanitization: {
         additionalSensitivePatterns: [],
         enabled: true,
-        identifierFields: ['id', 'userId', 'name', 'email', 'type', 'status'],
-        maxStringLength: 100,
         redactedPlaceholder: '[REDACTED]',
       },
       enabled: true,

@@ -1,5 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { Trace } from 'nestjs-observability';
+import { Trace } from '@paystackhq/nestjs-observability';
 
 @Injectable()
 export class AppService {

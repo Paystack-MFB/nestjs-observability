@@ -1,6 +1,6 @@
 # NestJS Observability - Basic Example App
 
-This example application demonstrates the complete functionality of the `nestjs-observability` library, showcasing structured logging, metrics collection, and distributed tracing with automatic controller and service instrumentation.
+This example application demonstrates the complete functionality of the `@paystackhq/nestjs-observability` library, showcasing structured logging, metrics collection, and distributed tracing with automatic controller and service instrumentation.
 
 ## 🚀 Features Demonstrated
 
@@ -12,7 +12,7 @@ This example application demonstrates the complete functionality of the `nestjs-
 
 ### 2. **Service Method Tracing**
 
-- `UserService` and `PaymentService` use `@TraceAllMethods()` decorator
+- `UserService` and `PaymentService` use `@TraceClass()` decorator
 - Automatic tracing of all public methods
 - Nested service calls create proper parent-child trace relationships
 
@@ -362,7 +362,7 @@ async customMethod() {
 }
 
 // Or trace entire class
-@TraceAllMethods()
+@TraceClass()
 class MyService {
   // All public methods will be traced
 }
@@ -383,7 +383,7 @@ someMethod() {
 
 ## 📝 Notes
 
-- The example uses the `@TraceAllMethods()` decorator for services to demonstrate automatic tracing
+- The example uses the `@TraceClass()` decorator for services to demonstrate automatic tracing
 - Controllers are automatically traced by the `AutoTraceInterceptor`
 - All configuration is environment-variable driven for easy deployment
 - The `/payments/sensitive` endpoint specifically demonstrates argument sanitization

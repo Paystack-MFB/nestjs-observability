@@ -1,6 +1,6 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
-import { LoggerService, ObservabilityModule } from 'nestjs-observability';
+import { LoggerService, ObservabilityModule } from '@paystackhq/nestjs-observability';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { HealthController } from './health.controller';
@@ -36,40 +36,23 @@ import { UserService } from './user.service';
         },
       },
       tracing: {
-        enabled: process.env.TRACING_ENABLED !== 'false',
-        sampler: {
-          type: 'always_on' as const,
-          ratio: 1.0,
+        attributeSanitization: {
+          additionalSensitivePatterns: [/custom-secret/i],
+          enabled: true,
+          redactedPlaceholder: '[REDACTED]',
         },
+        enabled: true,
         exporter: {
-          type: 'otlp' as const,
-          endpoint: process.env.OTLP_TRACES_ENDPOINT || 'http://localhost:4318/v1/traces',
-          headers: process.env.OTLP_HEADERS ? JSON.parse(process.env.OTLP_HEADERS) : undefined,
+          endpoint: process.env['OTEL_EXPORTER_OTLP_ENDPOINT'] || 'http://localhost:4317',
+          type: 'otlp',
         },
         instrumentations: {
-          autoInstrumentations: process.env.TRACING_AUTO_INSTRUMENTATIONS !== 'false',
-          disabled: process.env.TRACING_DISABLED_INSTRUMENTATIONS
-            ? process.env.TRACING_DISABLED_INSTRUMENTATIONS.split(',').map((s) => s.trim())
-            : [],
-          overrides: process.env.TRACING_INSTRUMENTATION_OVERRIDES
-            ? JSON.parse(process.env.TRACING_INSTRUMENTATION_OVERRIDES)
-            : {},
+          autoInstrumentations: true,
+          disabled: [],
+          overrides: {},
         },
-        // New argument sanitization configuration
-        argumentSanitization: {
-          enabled: process.env.ARGUMENT_SANITIZATION_ENABLED !== 'false',
-          maxStringLength: process.env.ARGUMENT_SANITIZATION_MAX_LENGTH
-            ? parseInt(process.env.ARGUMENT_SANITIZATION_MAX_LENGTH, 10)
-            : 100,
-          redactedPlaceholder: process.env.ARGUMENT_SANITIZATION_PLACEHOLDER || '[REDACTED]',
-          identifierFields: process.env.ARGUMENT_SANITIZATION_IDENTIFIER_FIELDS
-            ? process.env.ARGUMENT_SANITIZATION_IDENTIFIER_FIELDS.split(',').map((s) => s.trim())
-            : ['id', 'userId', 'name', 'email', 'type', 'status'],
-          additionalSensitivePatterns: process.env.ARGUMENT_SANITIZATION_ADDITIONAL_PATTERNS
-            ? process.env.ARGUMENT_SANITIZATION_ADDITIONAL_PATTERNS.split(',').map(
-                (pattern) => new RegExp(pattern.trim(), 'i')
-              )
-            : [/api[_-]?key/i, /secret/i, /token/i, /password/i],
+        sampler: {
+          type: 'always_on',
         },
       },
     }),

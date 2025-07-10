@@ -7,11 +7,11 @@ This guide helps you get started with the NestJS Observability library. The libr
 ## Installation
 
 ```bash
-npm install nestjs-observability
+npm install @paystackhq/nestjs-observability
 # or
-yarn add nestjs-observability
+yarn add @paystackhq/nestjs-observability
 # or
-pnpm add nestjs-observability
+pnpm add @paystackhq/nestjs-observability
 ```
 
 ## Basic Setup
@@ -20,7 +20,7 @@ pnpm add nestjs-observability
 
 ```typescript
 import { Module } from '@nestjs/common';
-import { ObservabilityModule } from 'nestjs-observability';
+import { ObservabilityModule } from '@paystackhq/nestjs-observability';
 
 @Module({
   imports: [
@@ -83,16 +83,16 @@ export class UserController {
 }
 ```
 
-### Service Tracing with @TraceAllMethods
+### Service Tracing with @TraceClass
 
-For services and providers, use the `@TraceAllMethods` decorator to enable automatic tracing:
+For services and providers, use the `@TraceClass` decorator to enable automatic tracing:
 
 ```typescript
 import { Injectable } from '@nestjs/common';
-import { TraceAllMethods } from 'nestjs-observability';
+import { TraceClass } from '@paystackhq/nestjs-observability';
 
 @Injectable()
-@TraceAllMethods() // Enable automatic tracing for all methods
+@TraceClass() // Enable automatic tracing for all methods
 export class UserService {
   async findUser(id: string): Promise<User> {
     // This method is automatically traced as "UserService.findUser"
@@ -112,7 +112,7 @@ Use the `@NoTrace` decorator to exclude specific methods from tracing:
 
 ```typescript
 @Injectable()
-@TraceAllMethods()
+@TraceClass()
 export class PaymentService {
   async processPayment(paymentData: PaymentDto): Promise<Payment> {
     // This method is automatically traced
@@ -127,21 +127,21 @@ export class PaymentService {
 }
 ```
 
-### Custom Span Names with @TraceMethod
+### Custom Span Names with @Trace
 
-Use the `@TraceMethod` decorator to customize span names or individual method tracing:
+Use the `@Trace` decorator to customize span names or individual method tracing:
 
 ```typescript
 @Injectable()
-@TraceAllMethods()
+@TraceClass()
 export class OrderService {
-  @TraceMethod('order.process-complex') // Custom span name
+  @Trace('order.process-complex') // Custom span name
   async processComplexOrder(orderData: OrderDto): Promise<Order> {
     // This method is traced as "order.process-complex"
     return this.processOrder(orderData);
   }
 
-  @TraceMethod('order.validate', false) // Custom name, don't capture arguments
+  @Trace('order.validate', false) // Custom name, don't capture arguments
   async validateOrder(order: Order): Promise<boolean> {
     // This method is traced as "order.validate" without argument capture
     return this.validator.validate(order);
@@ -241,7 +241,7 @@ ObservabilityModule.forRoot({
 
 ### 1. Service Organization
 
-- Use `@TraceAllMethods` for business logic services
+- Use `@TraceClass` for business logic services
 - Avoid tracing utility services (logging, caching) unless needed
 - Use `@NoTrace` for sensitive operations
 
@@ -254,7 +254,7 @@ ObservabilityModule.forRoot({
 ### 3. Span Naming
 
 - Default span names follow the pattern: `ClassName.methodName`
-- Use `@TraceMethod` for custom span names that better describe business operations
+- Use `@Trace` for custom span names that better describe business operations
 - Keep span names consistent across your application
 
 ### 4. Logging
@@ -273,7 +273,7 @@ The observability library provides enhanced logging with OpenTelemetry integrati
 
 ```typescript
 import { Injectable } from '@nestjs/common';
-import { LoggerService } from 'nestjs-observability';
+import { LoggerService } from '@paystackhq/nestjs-observability';
 
 @Injectable()
 export class UserService {
@@ -543,7 +543,7 @@ The auto-tracing system automatically captures errors and marks spans as failed.
 
 ```typescript
 @Injectable()
-@TraceAllMethods()
+@TraceClass()
 export class UserService {
   async findUser(id: string): Promise<User> {
     const user = await this.userRepository.findById(id);
@@ -561,7 +561,7 @@ For cases where you need more control, you can still use manual tracing:
 
 ```typescript
 import { Injectable } from '@nestjs/common';
-import { Trace } from 'nestjs-observability';
+import { Trace } from '@paystackhq/nestjs-observability';
 
 @Injectable()
 export class LegacyService {

@@ -3,31 +3,19 @@
  * This file contains all the configuration options for the observability components
  */
 
-export interface ArgumentSanitizationConfig {
+export interface AttributeSanitizationConfig {
   /**
-   * Additional regex patterns to identify sensitive values
+   * Additional regex patterns to identify sensitive attribute names
    * These will be combined with the default patterns
    * @default []
    */
   additionalSensitivePatterns: RegExp[];
 
   /**
-   * Whether to capture arguments at all
+   * Whether to enable attribute sanitization
    * @default true
    */
   enabled: boolean;
-
-  /**
-   * Object field names to extract as identifiers
-   * @default ['id', 'userId', 'name', 'email', 'type', 'status']
-   */
-  identifierFields: string[];
-
-  /**
-   * Maximum string length before truncation
-   * @default 100
-   */
-  maxStringLength: number;
 
   /**
    * Custom replacement text for redacted values
@@ -56,9 +44,9 @@ export interface ObservabilityConfig {
   serviceVersion: string;
   tracing: {
     /**
-     * Configuration for argument sanitization in traces
+     * Configuration for attribute sanitization in traces
      */
-    argumentSanitization: ArgumentSanitizationConfig;
+    attributeSanitization: AttributeSanitizationConfig;
     enabled: boolean;
     exporter: {
       endpoint: string;
@@ -187,11 +175,9 @@ export const defaultObservabilityConfig: ObservabilityConfig = {
   serviceVersion: process.env['SERVICE_VERSION'] ?? '1.0.0',
 
   tracing: {
-    argumentSanitization: {
+    attributeSanitization: {
       additionalSensitivePatterns: [],
       enabled: true,
-      identifierFields: ['id', 'userId', 'name', 'email', 'type', 'status'],
-      maxStringLength: 100,
       redactedPlaceholder: '[REDACTED]',
     },
     enabled: process.env['TRACING_ENABLED'] !== 'false',

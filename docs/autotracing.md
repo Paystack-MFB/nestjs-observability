@@ -9,7 +9,7 @@ Implement automatic tracing for NestJS applications with decorator-based customi
 ### 1. Default Behavior
 
 - **Controllers**: Auto-traced by default (no decorator required)
-- **Providers/Services**: Opt-in via `@TraceAllMethods()` decorator
+- **Providers/Services**: Opt-in via `@TraceClass()` decorator
 - **Methods**: All public methods traced unless excluded
 
 ### 2. Decorator-Based Control
@@ -22,11 +22,11 @@ Implement automatic tracing for NestJS applications with decorator-based customi
 
 ### Phase 1: Core Decorators
 
-#### `@TraceAllMethods()` - Enable tracing for all methods in a provider
+#### `@TraceClass()` - Enable tracing for all methods in a provider
 
 ```typescript
 @Injectable()
-@TraceAllMethods()
+@TraceClass()
 export class UserService {
   // All public methods automatically traced
   async getUserById(id: string) { ... }
@@ -35,17 +35,17 @@ export class UserService {
 }
 ```
 
-#### `@TraceMethod()` - Customize method tracing
+#### `@Trace()` - Customize method tracing
 
 ```typescript
 @Controller('users')
 export class UserController {
   // Custom span name
-  @TraceMethod('fetch-user-profile')
+  @Trace('fetch-user-profile')
   async getUserById(id: string) { ... }
 
   // Disable argument capture for sensitive data
-  @TraceMethod(undefined, false)
+  @Trace(undefined, false)
   async updatePassword(userId: string, password: string) { ... }
 }
 ```
@@ -75,7 +75,7 @@ export class AutoInstrumentationService implements OnModuleInit {
     // Discover all controllers
     // Automatically instrument public methods
     // Respect @NoTrace() exclusions
-    // Apply @TraceMethod() customizations
+    // Apply @Trace() customizations
   }
 }
 ```
@@ -83,7 +83,7 @@ export class AutoInstrumentationService implements OnModuleInit {
 #### Provider Discovery
 
 ```typescript
-// Only instrument providers marked with @TraceAllMethods()
+// Only instrument providers marked with @TraceClass()
 // Respect method-level decorators for customization
 ```
 
@@ -110,13 +110,13 @@ export class UserController {
 
 ```typescript
 @Injectable()
-@TraceAllMethods()
+@TraceClass()
 export class UserService {
   // ✅ Auto-traced as "UserService.findById"
   async findById(id: string) { ... }
 
   // ✅ Custom span name "user-creation"
-  @TraceMethod('user-creation')
+  @Trace('user-creation')
   async createUser(data: CreateUserDto) { ... }
 
   // ❌ Not traced (explicitly excluded)
@@ -143,8 +143,8 @@ export class PaymentService {
 
 ### 1. Decorator Hierarchy
 
-- `@TraceAllMethods()` - Class-level enablement
-- `@TraceMethod()` - Method-level customization
+- `@TraceClass()` - Class-level enablement
+- `@Trace()` - Method-level customization
 - `@NoTrace()` - Method-level exclusion
 - `@Trace()` - Manual method tracing (existing)
 
@@ -158,7 +158,7 @@ export class PaymentService {
 ### 3. Argument Capture
 
 - Enabled by default for non-sensitive methods
-- Disabled for methods with `@TraceMethod(undefined, false)`
+- Disabled for methods with `@Trace(undefined, false)`
 - Smart filtering of sensitive data (passwords, tokens)
 - Capture common identifiers (id, name, etc.)
 
@@ -173,7 +173,7 @@ export class PaymentService {
 
 ### Phase 1: Core Infrastructure
 
-1. Create new decorators (`@TraceAllMethods`, `@TraceMethod`, `@NoTrace`)
+1. Create new decorators (`@TraceClass`, `@Trace`, `@NoTrace`)
 2. Build auto-instrumentation service
 3. Integrate with existing observability module
 
@@ -187,7 +187,7 @@ export class PaymentService {
 ### Phase 3: Provider Opt-in
 
 1. Implement provider discovery
-2. Process `@TraceAllMethods` decorator
+2. Process `@TraceClass` decorator
 3. Apply method-level customizations
 4. Ensure compatibility with manual `@Trace`
 
@@ -228,7 +228,7 @@ export class OrderController {
 
 // Opt-in for service tracing
 @Injectable()
-@TraceAllMethods()
+@TraceClass()
 export class OrderService {
   async processOrder(order: Order) { ... }
 }
@@ -239,10 +239,10 @@ export class OrderService {
 ```typescript
 @Controller('payments')
 export class PaymentController {
-  @TraceMethod('payment-processing')
+  @Trace('payment-processing')
   async processPayment(data: PaymentDto) { ... }
 
-  @TraceMethod('sensitive-operation', false) // No args
+  @Trace('sensitive-operation', false) // No args
   async updatePaymentMethod(userId: string, method: PaymentMethod) { ... }
 
   @NoTrace()
@@ -264,7 +264,7 @@ export class UserService {
 }
 
 @Injectable()
-@TraceAllMethods()
+@TraceClass()
 export class NotificationService {
   // All methods auto-traced
   async sendEmail(to: string, subject: string) { ... }

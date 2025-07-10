@@ -19,11 +19,11 @@ A comprehensive observability package for NestJS applications that provides stru
 ## Installation
 
 ```bash
-npm install nestjs-observability
+npm install @paystackhq/nestjs-observability
 # or
-pnpm add nestjs-observability
+pnpm add @paystackhq/nestjs-observability
 # or
-yarn add nestjs-observability
+yarn add @paystackhq/nestjs-observability
 ```
 
 ### Peer Dependencies
@@ -50,7 +50,7 @@ In your `app.module.ts`:
 
 ```typescript
 import { Module } from '@nestjs/common';
-import { ObservabilityModule } from 'nestjs-observability';
+import { ObservabilityModule } from '@paystackhq/nestjs-observability';
 
 @Module({
   imports: [
@@ -101,7 +101,7 @@ In your `main.ts`:
 ```typescript
 import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module';
-import { LoggerFactory } from 'nestjs-observability';
+import { LoggerFactory } from '@paystackhq/nestjs-observability';
 
 async function bootstrap() {
   // Configure the global logger to replace NestJS's default logger
@@ -136,7 +136,7 @@ For dynamic configuration using ConfigService:
 ```typescript
 import { Module } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
-import { ObservabilityModule } from 'nestjs-observability';
+import { ObservabilityModule } from '@paystackhq/nestjs-observability';
 
 @Module({
   imports: [
@@ -183,7 +183,7 @@ export class AppModule {}
 
 ```typescript
 import { Injectable } from '@nestjs/common';
-import { LoggerService } from 'nestjs-observability';
+import { LoggerService } from '@paystackhq/nestjs-observability';
 
 @Injectable()
 export class MyService {
@@ -379,8 +379,8 @@ The `nestjs-observability` library provides a modern decorator system for automa
 ### How It Works
 
 1. **Controllers**: All controller methods are automatically traced by default
-2. **Providers**: Services and providers can opt-in to tracing using the `@TraceAllMethods` decorator
-3. **Method-Level Control**: Fine-grained control with `@TraceMethod` and `@NoTrace` decorators
+2. **Providers**: Services and providers can opt-in to tracing using the `@TraceClass` decorator
+3. **Method-Level Control**: Fine-grained control with `@Trace` and `@NoTrace` decorators
 4. **Zero Configuration**: Works out of the box with sensible defaults
 
 ### Basic Usage
@@ -389,10 +389,10 @@ The `nestjs-observability` library provides a modern decorator system for automa
 
 ```typescript
 import { Injectable } from '@nestjs/common';
-import { TraceAllMethods } from 'nestjs-observability';
+import { TraceClass } from '@paystackhq/nestjs-observability';
 
 @Injectable()
-@TraceAllMethods() // Enable tracing for all methods in this class
+@TraceClass() // Enable tracing for all methods in this class
 export class UserService {
   async createUser(userData: any) {
     // This method is automatically traced
@@ -439,19 +439,19 @@ export class UserController {
 
 ```typescript
 import { Injectable } from '@nestjs/common';
-import { TraceAllMethods, TraceMethod, NoTrace } from 'nestjs-observability';
+import { TraceClass, Trace, NoTrace } from '@paystackhq/nestjs-observability';
 
 @Injectable()
-@TraceAllMethods()
+@TraceClass()
 export class PaymentService {
-  @TraceMethod('payment.process', true) // Custom span name and capture arguments
+  @Trace('payment.process', true) // Custom span name and capture arguments
   async processPayment(paymentData: any) {
     // Custom span name: payment.process
     // Arguments captured in trace
     return await this.paymentProcessor.process(paymentData);
   }
 
-  @TraceMethod('payment.validate', false) // Don't capture arguments
+  @Trace('payment.validate', false) // Don't capture arguments
   async validatePayment(paymentData: any) {
     // Custom span name: payment.validate
     // Arguments NOT captured (for security)
@@ -470,7 +470,7 @@ export class PaymentService {
 
 ```typescript
 import { Controller, Get, Post, Body } from '@nestjs/common';
-import { TraceMethod, NoTrace } from 'nestjs-observability';
+import { Trace, NoTrace } from '@paystackhq/nestjs-observability';
 
 @Controller('health')
 export class HealthController {
@@ -482,7 +482,7 @@ export class HealthController {
   }
 
   @Post('complex')
-  @TraceMethod('health.complex-check', true) // Custom span name
+  @Trace('health.complex-check', true) // Custom span name
   async complexHealthCheck(@Body() criteria: any) {
     // Custom span name: health.complex-check
     return await this.performComplexCheck(criteria);
@@ -547,10 +547,10 @@ Auto-traced methods automatically include rich context:
 
 ### Best Practices
 
-1. **Use `@TraceAllMethods` for Services**: Enable tracing for your business logic services
+1. **Use `@TraceClass` for Services**: Enable tracing for your business logic services
 2. **Controllers Are Automatic**: No need to add decorators to controllers
 3. **Exclude Sensitive Methods**: Use `@NoTrace` for methods that handle sensitive data
-4. **Custom Span Names**: Use `@TraceMethod` with custom names for important operations
+4. **Custom Span Names**: Use `@Trace` with custom names for important operations
 5. **Argument Capture**: Disable argument capture for methods with sensitive parameters
 6. **Health Checks**: Exclude health check endpoints to reduce trace noise
 

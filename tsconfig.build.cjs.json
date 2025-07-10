@@ -1,0 +1,10 @@
+{
+  "extends": "./tsconfig.build.json",
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "CommonJS",
+    "moduleResolution": "Node",
+    "outDir": "./dist/cjs",
+    "tsBuildInfoFile": "./dist/cjs/.tsbuildinfo"
+  }
+}

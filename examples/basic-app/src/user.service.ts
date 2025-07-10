@@ -1,109 +1,71 @@
-import { Injectable, Logger } from '@nestjs/common';
-import { NoTrace, TraceAllMethods } from 'nestjs-observability';
+import { Injectable } from '@nestjs/common';
+import { addSpanAttribute, addSpanAttributes, getCurrentSpan, TraceClass } from '@paystackhq/nestjs-observability';
 
 @Injectable()
-@TraceAllMethods()
+@TraceClass()
 export class UserService {
-  private readonly logger = new Logger(UserService.name);
-  private readonly users: Map<string, any> = new Map();
+  async findUser(id: string): Promise<{ id: string; name: string; email: string }> {
+    // Example: Manually add span attributes for tracking
+    addSpanAttribute('user.id', id);
+    addSpanAttribute('operation.type', 'user-lookup');
 
-  constructor() {
-    // Initialize with some sample data
-    this.users.set('1', {
-      id: '1',
+    // Simulate async operation
+    await new Promise((resolve) => setTimeout(resolve, 100));
+
+    const user = {
+      id,
       name: 'John Doe',
       email: 'john@example.com',
-      profile: { age: 30, department: 'Engineering' },
+    };
+
+    // Example: Add multiple attributes at once
+    addSpanAttributes({
+      'user.found': true,
+      'user.name': user.name,
+      'user.email': user.email, // This will be redacted due to sensitive pattern matching
+      'response.size': JSON.stringify(user).length,
     });
-    this.users.set('2', {
-      id: '2',
-      name: 'Jane Smith',
-      email: 'jane@example.com',
-      profile: { age: 28, department: 'Design' },
-    });
-  }
 
-  async getUserById(id: string): Promise<any> {
-    this.logger.log(`Getting user by ID: ${id}`);
-
-    // Simulate async database call
-    await this.delay(50);
-
-    const user = this.users.get(id);
-    if (!user) {
-      this.logger.warn(`User not found: ${id}`);
-      throw new Error(`User with ID ${id} not found`);
-    }
-
-    this.logger.log(`User found: ${user.name}`);
     return user;
   }
 
-  async createUser(userData: { name: string; email: string }): Promise<any> {
-    this.logger.log(`Creating new user: ${userData.name}`);
+  async updateUser(id: string, data: { name?: string; email?: string }): Promise<void> {
+    // Example: Get current span for advanced operations
+    const span = getCurrentSpan();
+    if (span) {
+      span.setAttribute('user.id', id);
+      span.setAttribute('operation.type', 'user-update');
+    }
 
-    // Simulate async database call
-    await this.delay(100);
+    // Manually add attributes for the fields being updated
+    addSpanAttribute('update.fields', Object.keys(data).join(','));
 
-    const newUser = {
-      id: Date.now().toString(),
-      ...userData,
-      profile: { age: 25, department: 'General' },
-    };
+    // Example: Conditionally add attributes
+    if (data.name) {
+      addSpanAttribute('update.name', data.name);
+    }
 
-    this.users.set(newUser.id, newUser);
-    this.logger.log(`User created with ID: ${newUser.id}`);
+    if (data.email) {
+      addSpanAttribute('update.email', data.email); // This will be redacted
+    }
 
-    return newUser;
+    // Simulate async operation
+    await new Promise((resolve) => setTimeout(resolve, 150));
+
+    addSpanAttribute('operation.success', true);
   }
 
-  async getUserProfile(id: string): Promise<any> {
-    this.logger.log(`Getting profile for user: ${id}`);
+  async deleteUser(id: string): Promise<void> {
+    // Example: Add context about the operation
+    addSpanAttributes({
+      'user.id': id,
+      'operation.type': 'user-delete',
+      'operation.critical': true,
+    });
 
-    const user = await this.getUserById(id);
+    // Simulate async operation
+    await new Promise((resolve) => setTimeout(resolve, 50));
 
-    // Simulate additional processing
-    await this.delay(30);
-
-    return {
-      userId: user.id,
-      profile: user.profile,
-      lastAccessed: new Date().toISOString(),
-    };
-  }
-
-  async validateUser(userData: { email: string; name: string }): Promise<boolean> {
-    this.logger.log(`Validating user: ${userData.email}`);
-
-    // Simulate validation logic
-    await this.delay(25);
-
-    const isValid = userData.email.includes('@') && userData.name.length > 0;
-
-    this.logger.log(`User validation result: ${isValid}`);
-    return isValid;
-  }
-
-  async getAdvancedUserProfile(id: string): Promise<any> {
-    this.logger.log(`Getting advanced profile for user: ${id}`);
-
-    const user = await this.getUserById(id);
-    const profile = await this.getUserProfile(id);
-
-    // Simulate multiple service calls
-    await this.delay(75);
-
-    return {
-      ...user,
-      ...profile,
-      permissions: ['read', 'write'],
-      lastLogin: new Date().toISOString(),
-      sessionCount: Math.floor(Math.random() * 100),
-    };
-  }
-
-  @NoTrace()
-  private async delay(ms: number): Promise<void> {
-    return new Promise((resolve) => setTimeout(resolve, ms));
+    addSpanAttribute('operation.success', true);
   }
 }

@@ -30,7 +30,12 @@
     "isolatedModules": true,
     "verbatimModuleSyntax": false,
     "allowImportingTsExtensions": false,
-    "noEmit": false
+    "noEmit": false,
+    "preserveConstEnums": true,
+    "removeComments": false,
+    "importHelpers": true,
+    "downlevelIteration": true,
+    "newLine": "lf"
   },
   "include": ["src/**/*"],
   "exclude": ["node_modules", "dist"]

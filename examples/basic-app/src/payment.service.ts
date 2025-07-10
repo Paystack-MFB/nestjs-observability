@@ -1,8 +1,8 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { TraceAllMethods } from 'nestjs-observability';
+import { TraceClass } from '@paystackhq/nestjs-observability';
 
 @Injectable()
-@TraceAllMethods()
+@TraceClass()
 export class PaymentService {
   private readonly logger = new Logger(PaymentService.name);
   private readonly payments: Map<string, any> = new Map();

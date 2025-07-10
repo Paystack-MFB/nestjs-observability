@@ -15,8 +15,8 @@ Implement automatic tracing for NestJS applications using interceptors for contr
 
 ### 2. Decorator-Based Service Tracing
 
-- **Explicit opt-in** for services using `@TraceAllMethods()`
-- **Method-level control** with `@TraceMethod()` and `@NoTrace()`
+- **Explicit opt-in** for services using `@TraceClass()`
+- **Method-level control** with `@Trace()` and `@NoTrace()`
 - **Manual tracing** with existing `@Trace()` decorator
 - **No automatic discovery** - developers choose what to trace
 
@@ -44,8 +44,8 @@ export class AutoTraceInterceptor implements NestInterceptor {
       return next.handle();
     }
 
-    // Get custom options from @TraceMethod decorator
-    const options = this.getTraceMethodOptions(context);
+    // Get custom options from @Trace decorator
+    const options = this.getTraceOptions(context);
 
     // Create span with controller-specific attributes
     return this.createControllerSpan(context, next, options);
@@ -60,7 +60,7 @@ Keep the existing decorator approach but simplify it:
 ```typescript
 // Opt-in for service tracing
 @Injectable()
-@TraceAllMethods()
+@TraceClass()
 export class UserService {
   // Auto-traced with decorator-based instrumentation
   async findById(id: string) { ... }
@@ -101,7 +101,7 @@ HTTP Request → AutoTraceInterceptor → Controller Method → Response
 ### Service Flow
 
 ```
-Service Method → @TraceAllMethods/@Trace → Manual Span Creation
+Service Method → @TraceClass/@Trace → Manual Span Creation
                                       ↓
                                  [Method Context]
 ```
@@ -117,7 +117,7 @@ export class UserController {
   async getUsers() { ... }
 
   // ✅ Custom span name via decorator
-  @TraceMethod('fetch-user-profile')
+  @Trace('fetch-user-profile')
   async getUserById(@Param('id') id: string) { ... }
 
   // ❌ Not traced (explicitly excluded)
@@ -129,15 +129,15 @@ export class UserController {
 ### Service Opt-in Tracing
 
 ```typescript
-// Explicit opt-in with @TraceAllMethods
+// Explicit opt-in with @TraceClass
 @Injectable()
-@TraceAllMethods()
+@TraceClass()
 export class UserService {
   // ✅ Traced with decorator-based instrumentation
   async findById(id: string) { ... }
 
   // ✅ Custom span name
-  @TraceMethod('user-creation')
+  @Trace('user-creation')
   async createUser(data: CreateUserDto) { ... }
 
   // ❌ Not traced (explicitly excluded)
@@ -173,8 +173,8 @@ export class AutoTraceInterceptor implements NestInterceptor {
       return next.handle();
     }
 
-    // Get @TraceMethod options if present
-    const traceOptions = this.getTraceMethodOptions(context);
+    // Get @Trace options if present
+    const traceOptions = this.getTraceOptions(context);
     const spanName = traceOptions?.spanName ?? `${className}.${methodName}`;
 
     // Create span with full context
@@ -208,8 +208,8 @@ export class AutoTraceInterceptor implements NestInterceptor {
 Keep the existing decorator system but remove the DiscoveryModule dependency:
 
 ```typescript
-// Enhanced @TraceAllMethods decorator
-export function TraceAllMethods(options?: TraceAllMethodsOptions) {
+// Enhanced @TraceClass decorator
+export function TraceClass(options?: TraceClassOptions) {
   return function <T extends Type>(target: T): T {
     // Use method interception instead of discovery
     const originalMethods = getTraceableMethodNames(target.prototype);
@@ -272,7 +272,7 @@ The AutoTraceInterceptor supports configurable argument sanitization for **contr
 ### Configuration Structure
 
 ```typescript
-import { ObservabilityModule } from 'nestjs-observability';
+import { ObservabilityModule } from '@paystackhq/nestjs-observability';
 
 @Module({
   imports: [
@@ -440,8 +440,8 @@ ObservabilityModule.forRoot({
 
 ### Step 2: Enhance Decorator System
 
-1. Improve @TraceAllMethods to work without discovery
-2. Ensure @TraceMethod and @NoTrace work on controllers
+1. Improve @TraceClass to work without discovery
+2. Ensure @Trace and @NoTrace work on controllers
 3. Keep compatibility with existing @Trace decorator
 4. Test with existing services
 
@@ -477,10 +477,10 @@ export class OrderController {
 ```typescript
 @Controller('payments')
 export class PaymentController {
-  @TraceMethod('payment-processing')
+  @Trace('payment-processing')
   async processPayment(data: PaymentDto) { ... }
 
-  @TraceMethod('sensitive-operation', { captureArgs: false })
+  @Trace('sensitive-operation', { captureArgs: false })
   async updatePaymentMethod(userId: string, method: PaymentMethod) { ... }
 
   @NoTrace()
@@ -492,7 +492,7 @@ export class PaymentController {
 
 ```typescript
 @Injectable()
-@TraceAllMethods()
+@TraceClass()
 export class OrderService {
   async processOrder(order: Order) { ... }
 
@@ -524,7 +524,7 @@ export class EmailService {
 
 - [x] Create new `AutoTraceInterceptor` class
 - [x] Add support for `@NoTrace` decorator detection
-- [x] Add support for `@TraceMethod` decorator options
+- [x] Add support for `@Trace` decorator options
 - [x] Implement HTTP context capture
 - [x] Add argument capture functionality
 - [x] Integrate with ObservabilityModule
@@ -533,8 +533,8 @@ export class EmailService {
 
 #### Phase 2: Enhanced Decorator System
 
-- [x] Modify `@TraceAllMethods` to work without discovery
-- [x] Add `TraceAllMethodsOptions` interface for configuration
+- [x] Modify `@TraceClass` to work without discovery
+- [x] Add `TraceClassOptions` interface for configuration
 - [x] Add `createTracedMethod` utility function
 - [x] Add argument sanitization for security
 - [x] Enhanced `getTraceableMethodNames` with filtering

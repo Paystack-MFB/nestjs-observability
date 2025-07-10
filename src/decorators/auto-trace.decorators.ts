@@ -8,16 +8,14 @@ const TRACE_METHOD_KEY = 'trace:method';
 const NO_TRACE_KEY = 'trace:no-trace';
 const NO_TRACE_CLASS_KEY = 'trace:no-trace-class';
 
-// Interface for TraceAllMethods options
-export interface TraceAllMethodsOptions {
-  captureArgs?: boolean;
+// Interface for TraceClass options
+export interface TraceClassOptions {
   excludePrivate?: boolean;
   spanNamePrefix?: string;
 }
 
-// Interface for TraceMethod options
-export interface TraceMethodOptions {
-  captureArgs?: boolean;
+// Interface for Trace options
+export interface TraceOptions {
   spanName?: string;
 }
 
@@ -28,10 +26,9 @@ export function createTracedMethod(
   originalMethod: (...args: unknown[]) => unknown,
   className: string,
   methodName: string,
-  options?: TraceMethodOptions
+  options?: TraceOptions
 ): (...args: unknown[]) => unknown {
   const spanName = options?.spanName ?? `${className}.${methodName}`;
-  const captureArgs = options?.captureArgs ?? true;
 
   return function (this: unknown, ...args: unknown[]) {
     const tracer = trace.getTracer('auto-trace-decorators');
@@ -43,14 +40,6 @@ export function createTracedMethod(
         'instrumentation.type': 'decorator',
         'method.name': methodName,
       });
-
-      // Capture arguments if enabled
-      if (captureArgs && args.length > 0) {
-        const sanitizedArgs = sanitizeArguments(args);
-        for (const [key, value] of Object.entries(sanitizedArgs)) {
-          span.setAttribute(`method.${key}`, String(value));
-        }
-      }
 
       try {
         // Call the original method
@@ -64,9 +53,10 @@ export function createTracedMethod(
               return value;
             })
             .catch((error: unknown) => {
+              const errorMessage = error instanceof Error ? error.message : 'Unknown error';
               span.setStatus({
                 code: SpanStatusCode.ERROR,
-                message: (error as Error).message,
+                message: errorMessage,
               });
               span.recordException(error as Exception);
               throw error;
@@ -81,9 +71,10 @@ export function createTracedMethod(
         span.end();
         return result;
       } catch (error) {
+        const errorMessage = error instanceof Error ? error.message : 'Unknown error';
         span.setStatus({
           code: SpanStatusCode.ERROR,
-          message: (error as Error).message,
+          message: errorMessage,
         });
         span.recordException(error as Exception);
         span.end();
@@ -101,7 +92,7 @@ export function createTracedMethod(
  * @param options - Options for filtering methods
  * @returns Array of method names that should be traced
  */
-export function getTraceableMethodNames(prototype: object, options: TraceAllMethodsOptions = {}): string[] {
+export function getTraceableMethodNames(prototype: object, options: TraceClassOptions = {}): string[] {
   const { excludePrivate = true } = options;
 
   return Object.getOwnPropertyNames(prototype)
@@ -138,14 +129,14 @@ export function getTraceableMethodNames(prototype: object, options: TraceAllMeth
 }
 
 /**
- * Gets the TraceMethod options for a specific method.
+ * Gets the Trace options for a specific method.
  *
  * @param target - The class prototype or instance
  * @param propertyKey - The method name
- * @returns TraceMethodOptions if the method has @TraceMethod decorator, undefined otherwise
+ * @returns TraceOptions if the method has @Trace decorator, undefined otherwise
  */
-export function getTraceMethodOptions(target: object, propertyKey: string): TraceMethodOptions | undefined {
-  return Reflect.getMetadata(TRACE_METHOD_KEY, target, propertyKey) as TraceMethodOptions | undefined;
+export function getTraceOptions(target: object, propertyKey: string): TraceOptions | undefined {
+  return Reflect.getMetadata(TRACE_METHOD_KEY, target, propertyKey) as TraceOptions | undefined;
 }
 
 /**
@@ -172,22 +163,22 @@ export function isNoTraceEnabled(target: object, propertyKey: string): boolean {
 // Helper functions for metadata reading
 
 /**
- * Checks if a class has the @TraceAllMethods decorator applied.
+ * Checks if a class has the @TraceClass decorator applied.
  *
  * @param target - The class constructor to check
- * @returns true if the class is decorated with @TraceAllMethods
+ * @returns true if the class is decorated with @TraceClass
  */
-export function isTraceAllMethodsEnabled(target: Type): boolean {
+export function isTraceClassEnabled(target: Type): boolean {
   return Reflect.getMetadata(TRACE_ALL_METHODS_KEY, target) === true;
 }
 
 /**
  * Method decorator that excludes a method from tracing.
- * Use this to exclude specific methods from auto-tracing when using @TraceAllMethods.
+ * Use this to exclude specific methods from auto-tracing when using @TraceClass.
  *
  * @example
  * ```typescript
- * @TraceAllMethods()
+ * @TraceClass()
  * @Injectable()
  * class UserService {
  *   findUser(id: string) { ... } // Will be traced
@@ -226,6 +217,33 @@ export function NoTraceClass() {
 }
 
 /**
+ * Method decorator that customizes tracing for individual methods.
+ * Can be used on any method to override default tracing behavior.
+ *
+ * @param spanName - Custom span name for the method. Defaults to "ClassName.methodName"
+ *
+ * @example
+ * ```typescript
+ * class UserService {
+ *   @Trace('user-lookup')
+ *   findUser(id: string) { ... }
+ *
+ *   @Trace('user-update')
+ *   updateUser(id: string, data: any) { ... }
+ * }
+ * ```
+ */
+export function Trace(spanName?: string) {
+  return function (target: object, propertyKey: string, descriptor: PropertyDescriptor) {
+    const options: TraceOptions = {
+      ...(spanName !== undefined && { spanName }),
+    };
+    Reflect.defineMetadata(TRACE_METHOD_KEY, options, target, propertyKey);
+    return descriptor;
+  };
+}
+
+/**
  * Enhanced class decorator that enables tracing for all methods of a class.
  * This version works without DiscoveryModule by directly wrapping methods.
  * Use this decorator on providers/services to opt-in to auto-tracing.
@@ -234,7 +252,7 @@ export function NoTraceClass() {
  *
  * @example
  * ```typescript
- * @TraceAllMethods()
+ * @TraceClass()
  * @Injectable()
  * class UserService {
  *   // All methods will be traced automatically
@@ -245,129 +263,51 @@ export function NoTraceClass() {
  *
  * @example
  * ```typescript
- * @TraceAllMethods({ captureArgs: false, excludePrivate: false })
+ * @TraceClass({ excludePrivate: false })
  * @Injectable()
  * class PaymentService {
- *   processPayment(data: PaymentData) { ... } // Args not captured
+ *   processPayment(data: PaymentData) { ... }
  *   _internalMethod() { ... } // Will be traced (excludePrivate: false)
  * }
  * ```
  */
-export function TraceAllMethods(options: TraceAllMethodsOptions = {}) {
+export function TraceClass(options: TraceClassOptions = {}) {
   return function <T extends Type>(target: T): T {
-    // Set metadata to indicate this class has @TraceAllMethods
+    // Set metadata to indicate this class has @TraceClass
     Reflect.defineMetadata(TRACE_ALL_METHODS_KEY, true, target);
 
     const className = target.name;
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
-    const prototype = target.prototype;
+    const prototype = target.prototype as Record<string, unknown>;
 
     // Get all methods that should be traced
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-argument
     const methodNames = getTraceableMethodNames(prototype, options);
 
     // Wrap each method with tracing
     for (const methodName of methodNames) {
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access
       const originalMethod = prototype[methodName];
 
       if (typeof originalMethod === 'function') {
-        // Check if method has @TraceMethod decorator options
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-argument
-        const traceMethodOptions = getTraceMethodOptions(prototype, methodName);
+        // Check if method has @Trace decorator options
+        const traceOptions = getTraceOptions(prototype, methodName);
 
-        // Merge options, with @TraceMethod taking precedence
-        const effectiveOptions: TraceMethodOptions = {};
+        // Merge options, with @Trace taking precedence
+        const effectiveOptions: TraceOptions = {};
 
-        if (traceMethodOptions?.captureArgs !== undefined) {
-          effectiveOptions.captureArgs = traceMethodOptions.captureArgs;
-        } else if (options.captureArgs !== undefined) {
-          effectiveOptions.captureArgs = options.captureArgs;
-        }
-
-        if (traceMethodOptions?.spanName !== undefined) {
-          effectiveOptions.spanName = traceMethodOptions.spanName;
+        if (traceOptions?.spanName !== undefined) {
+          effectiveOptions.spanName = traceOptions.spanName;
         } else if (options.spanNamePrefix) {
           effectiveOptions.spanName = `${options.spanNamePrefix}.${methodName}`;
         }
 
         // Create the traced method
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-argument
-        const tracedMethod = createTracedMethod(originalMethod, className, methodName, effectiveOptions);
+        const typedOriginalMethod = originalMethod as (...args: unknown[]) => unknown;
+        const tracedMethod = createTracedMethod(typedOriginalMethod, className, methodName, effectiveOptions);
 
         // Replace the original method
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
         prototype[methodName] = tracedMethod;
       }
     }
 
     return target;
   };
-}
-
-/**
- * Method decorator that customizes tracing for individual methods.
- * Can be used on any method to override default tracing behavior.
- *
- * @param spanName - Custom span name for the method. Defaults to "ClassName.methodName"
- * @param captureArgs - Whether to capture method arguments in the span. Defaults to true
- *
- * @example
- * ```typescript
- * class UserService {
- *   @TraceMethod('user-lookup', false)
- *   findUser(id: string) { ... }
- *
- *   @TraceMethod('user-update')
- *   updateUser(id: string, data: any) { ... }
- * }
- * ```
- */
-export function TraceMethod(spanName?: string, captureArgs = true) {
-  return function (target: object, propertyKey: string, descriptor: PropertyDescriptor) {
-    const options: TraceMethodOptions = {
-      captureArgs,
-      ...(spanName !== undefined && { spanName }),
-    };
-    Reflect.defineMetadata(TRACE_METHOD_KEY, options, target, propertyKey);
-    return descriptor;
-  };
-}
-
-/**
- * Sanitizes method arguments to prevent logging sensitive data
- */
-function sanitizeArguments(args: unknown[]): Record<string, unknown> {
-  const sanitizedArgs: Record<string, unknown> = {};
-
-  for (let i = 0; i < Math.min(args.length, 10); i++) {
-    const key = `arg${i.toString()}`;
-    const value = args[i];
-
-    if (value === null || value === undefined) {
-      sanitizedArgs[key] = value;
-    } else if (typeof value === 'object') {
-      // For objects, try to get a meaningful identifier
-      const obj = value as Record<string, unknown>;
-      if ('id' in obj && obj['id'] !== undefined) {
-        sanitizedArgs[key] = `{id: ${String(obj['id'])}}`;
-      } else if ('name' in obj && obj['name'] !== undefined) {
-        sanitizedArgs[key] = `{name: ${String(obj['name'])}}`;
-      } else if ('email' in obj && obj['email'] !== undefined) {
-        sanitizedArgs[key] = `{email: ${String(obj['email'])}}`;
-      } else {
-        sanitizedArgs[key] = `{${Object.keys(obj).join(', ')}}`;
-      }
-    } else if (typeof value === 'string') {
-      // Check for sensitive data patterns
-      const sensitivePatterns = [/password/i, /token/i, /secret/i, /key/i, /auth/i, /bearer/i, /jwt/i];
-
-      const isSensitive = sensitivePatterns.some((pattern) => pattern.test(key));
-      sanitizedArgs[key] = isSensitive ? '[REDACTED]' : value;
-    } else {
-      sanitizedArgs[key] = value;
-    }
-  }
-
-  return sanitizedArgs;
 }

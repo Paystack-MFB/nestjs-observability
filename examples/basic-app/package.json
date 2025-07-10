@@ -1,7 +1,7 @@
 {
-  "name": "nestjs-observability-basic-example",
+  "name": "@paystackhq/nestjs-observability-basic-example",
   "version": "1.0.0",
-  "description": "Basic example of using nestjs-observability library",
+  "description": "Basic example of using @paystackhq/nestjs-observability library",
   "private": true,
   "scripts": {
     "build": "nest build",
@@ -22,7 +22,7 @@
     "@nestjs/config": "^4.0.0",
     "@nestjs/core": "^11.0.0",
     "@nestjs/platform-express": "^11.0.0",
-    "nestjs-observability": "link:../..",
+    "@paystackhq/nestjs-observability": "link:../..",
     "reflect-metadata": "^0.2.0",
     "rxjs": "^7.8.1"
   },

@@ -1,21 +1,32 @@
-// Config
-export * from './config/observability.config';
-
+// Configuration
+export { defaultObservabilityConfig } from './config/observability.config';
+export type { AttributeSanitizationConfig, ObservabilityConfig } from './config/observability.config';
 // Controllers
-export * from './controllers/metrics.controller';
-
-export * from './decorators/auto-trace.decorators';
+export { MetricsController } from './controllers/metrics.controller';
 // Decorators
-export * from './decorators/trace.decorator';
+export {
+  getTraceOptions,
+  isNoTraceClassEnabled,
+  isNoTraceEnabled,
+  isTraceClassEnabled,
+  NoTrace,
+  NoTraceClass,
+  Trace,
+  TraceClass,
+} from './decorators/auto-trace.decorators';
 
-export * from './interceptors/auto-trace.interceptor';
+export type { TraceClassOptions, TraceOptions } from './decorators/auto-trace.decorators';
+// Interceptors
+export { AutoTraceInterceptor } from './interceptors/auto-trace.interceptor';
 
-// Services
-export * from './logger/logger.service';
+export { LoggerService } from './logger/logger.service';
 
-export * from './metrics/metrics.service';
+export { MetricsService } from './metrics/metrics.service';
 
-// Module
-export * from './observability.module';
+// Core module and services
+export { ObservabilityModule } from './observability.module';
 
-export * from './tracing/tracing.service';
+export { TracingService } from './tracing/tracing.service';
+
+// Span attribute utilities
+export { addSpanAttribute, addSpanAttributes, getCurrentSpan } from './utils/span-attributes';

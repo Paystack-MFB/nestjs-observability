@@ -1,5 +1,5 @@
 import { Controller, Get } from '@nestjs/common';
-import { NoTraceClass } from 'nestjs-observability';
+import { NoTraceClass } from '@paystackhq/nestjs-observability';
 
 /**
  * Health check controller that is excluded from auto-tracing

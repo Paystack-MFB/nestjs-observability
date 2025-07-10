@@ -1,6 +1,6 @@
 import { HttpException, HttpStatus } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
-import { LoggerService as NestLoggerService } from 'nestjs-observability';
+import { LoggerService as NestLoggerService } from '@paystackhq/nestjs-observability';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
