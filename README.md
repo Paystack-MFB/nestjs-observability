@@ -1,22 +1,32 @@
 # nestjs-observability
 
-A comprehensive observability package for NestJS applications that provides structured logging, metrics collection, and distributed tracing capabilities.
+A comprehensive observability package for NestJS applications that provides structured logging, metrics collection, and distributed tracing capabilities with OpenTelemetry integration.
 
-## Features
+## 🎯 Features
 
-- **Enhanced Native NestJS Logger**: Extends NestJS's built-in ConsoleLogger with observability features
-- **Environment-Aware Logging**: Structured format for production, pretty format for development
-- **OpenTelemetry Integration**: Automatic trace context inclusion in logs
-- **Structured Logging**: Support for structured log data with additional context
-- **Metrics Collection**: Prometheus-compatible metrics with custom counters, gauges, and histograms
-- **Distributed Tracing**: OpenTelemetry-based request tracing
-- **HTTP Interceptors**: Automatic request/response logging and metrics
-- **Auto-Tracing Decorators**: Modern decorator system for automatic method tracing
-- **Auto-Instrumentation Service**: Automatic discovery and instrumentation of controllers and providers
-- **Method Decorators**: Easy tracing for individual methods and classes
-- **Global Module**: Easy integration across your entire application
+### Core Observability
 
-## Installation
+- **🔍 Distributed Tracing**: OpenTelemetry-based automatic request tracing with span correlation
+- **📊 Metrics Collection**: Prometheus-compatible metrics with custom counters, gauges, and histograms
+- **📝 Structured Logging**: Enhanced NestJS logger with trace context and structured data support
+- **🌍 Environment-Aware**: Automatically adapts configuration based on development/production environments
+
+### Advanced Capabilities
+
+- **🚀 Auto-Tracing Decorators**: Modern decorator system for automatic method tracing
+- **🔒 Attribute Sanitization**: Automatic PII/sensitive data redaction in traces
+- **📈 HTTP Interceptors**: Automatic request/response logging and metrics collection
+- **🎛️ Flexible Configuration**: Support for both sync and async configuration patterns
+- **🔄 Multi-Format Support**: Dual CommonJS/ESM package distribution
+
+### Integration Features
+
+- **🔗 OpenTelemetry Integration**: Full OTLP export support with custom headers
+- **📊 Prometheus Metrics**: Built-in `/metrics` endpoint with default and custom metrics
+- **🏗️ NestJS Native**: Extends built-in NestJS ConsoleLogger for seamless integration
+- **🌐 Auto-Instrumentation**: Automatic discovery and instrumentation of controllers and providers
+
+## 📦 Installation
 
 ```bash
 npm install @paystackhq/nestjs-observability
@@ -36,91 +46,233 @@ npm install @nestjs/common @nestjs/core @nestjs/config reflect-metadata rxjs
 
 ### Optional Dependencies
 
-For OpenTelemetry tracing and Prometheus metrics:
+For full OpenTelemetry tracing and Prometheus metrics:
 
 ```bash
 npm install @opentelemetry/api prom-client
 ```
 
-## Quick Start
+## 🚀 Quick Start
 
-### 1. Import the Module
-
-In your `app.module.ts`:
+### 1. Basic Module Setup
 
 ```typescript
+// app.module.ts
 import { Module } from '@nestjs/common';
 import { ObservabilityModule } from '@paystackhq/nestjs-observability';
 
 @Module({
   imports: [
     // Basic setup with default configuration
-    ObservabilityModule.forRoot(),
-
-    // Or with custom configuration
     ObservabilityModule.forRoot({
       serviceName: 'my-service',
       serviceVersion: '1.0.0',
       environment: process.env.NODE_ENV || 'development',
-      logging: {
-        level: 'info',
-        consoleOutput: true,
-      },
-      metrics: {
-        enabled: true,
-        defaultLabels: {
-          // Note: 'service' and 'version' labels are ALWAYS automatically added from
-          // the top-level serviceName and serviceVersion configuration, even if you
-          // provide your own service and version labels here - they will be overridden
-          environment: 'production',
-          region: 'us-east-1',
-          customLabel: 'your-value',
-        },
-      },
-      tracing: {
-        enabled: true,
-        autoInstrumentation: {
-          enabled: true, // Enable auto-tracing for controllers and providers
-          captureArguments: true, // Capture method arguments in traces
-        },
-        exporter: {
-          type: 'otlp',
-          endpoint: 'http://localhost:4318/v1/traces',
-        },
-      },
     }),
   ],
 })
 export class AppModule {}
 ```
 
-### 2. Configure Global Logger (Optional but Recommended)
-
-In your `main.ts`:
+### 2. Advanced Configuration
 
 ```typescript
+// app.module.ts
+import { Module } from '@nestjs/common';
+import { ConfigModule, ConfigService } from '@nestjs/config';
+import { ObservabilityModule } from '@paystackhq/nestjs-observability';
+
+@Module({
+  imports: [
+    ConfigModule.forRoot({ isGlobal: true }),
+    ObservabilityModule.forRootAsync({
+      imports: [ConfigModule],
+      inject: [ConfigService],
+      useFactory: (configService: ConfigService) => ({
+        serviceName: configService.get('SERVICE_NAME', 'my-service'),
+        serviceVersion: configService.get('SERVICE_VERSION', '1.0.0'),
+        environment: configService.get('NODE_ENV', 'development'),
+
+        // Logging configuration
+        logging: {
+          level: configService.get('LOG_LEVEL', 'info'),
+          consoleOutput: true,
+          otlpExport: {
+            enabled: configService.get('OTLP_LOGS_ENABLED', 'false') === 'true',
+            endpoint: configService.get('OTLP_LOGS_ENDPOINT', 'http://localhost:4318/v1/logs'),
+          },
+        },
+
+        // Metrics configuration
+        metrics: {
+          enabled: configService.get('METRICS_ENABLED', 'true') === 'true',
+          endpoint: configService.get('METRICS_ENDPOINT', '/metrics'),
+          defaultLabels: {
+            environment: configService.get('NODE_ENV', 'development'),
+            region: configService.get('AWS_REGION', 'us-east-1'),
+          },
+          defaultMetrics: true,
+        },
+
+        // Tracing configuration
+        tracing: {
+          enabled: configService.get('TRACING_ENABLED', 'true') === 'true',
+          exporter: {
+            type: 'otlp',
+            endpoint: configService.get('OTLP_TRACES_ENDPOINT', 'http://localhost:4318/v1/traces'),
+            headers: configService.get('OTLP_HEADERS') ? JSON.parse(configService.get('OTLP_HEADERS')!) : undefined,
+          },
+          sampler: {
+            type: 'trace_id_ratio',
+            ratio: parseFloat(configService.get('TRACING_SAMPLE_RATE', '1.0')),
+          },
+          attributeSanitization: {
+            enabled: configService.get('TRACING_SANITIZATION_ENABLED', 'true') === 'true',
+            redactedPlaceholder: '[REDACTED]',
+          },
+        },
+      }),
+    }),
+  ],
+})
+export class AppModule {}
+```
+
+### 3. Factory Pattern Configuration
+
+The `ObservabilityModule.forRootAsync()` method uses a factory pattern that provides powerful dependency injection capabilities. This pattern is essential when you need to:
+
+- Access `ConfigService` for environment-based configuration
+- Perform async operations during module initialization
+- Inject other services into the configuration factory
+
+#### Why Use the Factory Pattern?
+
+```typescript
+// ❌ DON'T: This won't work with ConfigService
+@Module({
+  imports: [
+    ConfigModule.forRoot(),
+    ObservabilityModule.forRoot({
+      serviceName: configService.get('SERVICE_NAME'), // ❌ configService not available
+    }),
+  ],
+})
+export class AppModule {}
+
+// ✅ DO: Use factory pattern for proper dependency injection
+@Module({
+  imports: [
+    ConfigModule.forRoot({ isGlobal: true }), // ⚠️ MUST be loaded first
+    ObservabilityModule.forRootAsync({
+      imports: [ConfigModule], // Explicitly import ConfigModule
+      inject: [ConfigService], // Inject ConfigService
+      useFactory: (configService: ConfigService) => ({
+        serviceName: configService.get('SERVICE_NAME'), // ✅ ConfigService available
+        // ... other config
+      }),
+    }),
+  ],
+})
+export class AppModule {}
+```
+
+#### Module Loading Order
+
+**Critical**: The loading order of modules matters for proper dependency injection:
+
+```typescript
+@Module({
+  imports: [
+    // 1. Load ConfigModule FIRST (with isGlobal: true)
+    ConfigModule.forRoot({
+      isGlobal: true,
+      envFilePath: ['.env.local', '.env'],
+      expandVariables: true,
+    }),
+
+    // 2. Load ObservabilityModule SECOND (depends on ConfigModule)
+    ObservabilityModule.forRootAsync({
+      imports: [ConfigModule], // Redundant but explicit
+      inject: [ConfigService],
+      useFactory: (configService: ConfigService) => ({
+        // Factory function receives ConfigService instance
+        serviceName: configService.get('SERVICE_NAME', 'my-service'),
+        serviceVersion: configService.get('SERVICE_VERSION', '1.0.0'),
+        environment: configService.get('NODE_ENV', 'development'),
+        // All other configuration...
+      }),
+    }),
+
+    // 3. Load other modules that depend on observability
+    DatabaseModule,
+    AuthModule,
+    // ... other modules
+  ],
+})
+export class AppModule {}
+```
+
+#### Advanced Factory Patterns
+
+For complex scenarios like multi-service dependencies, external configuration services, feature flags, and error handling patterns, see the [Advanced Factory Configuration Guide](docs/advanced-factory-configuration.md).
+
+#### Common Factory Pattern Mistakes
+
+```typescript
+// ❌ DON'T: Missing ConfigModule import
+ObservabilityModule.forRootAsync({
+  // Missing: imports: [ConfigModule],
+  inject: [ConfigService],
+  useFactory: (configService: ConfigService) => ({...}),
+})
+
+// ❌ DON'T: Wrong injection token
+ObservabilityModule.forRootAsync({
+  imports: [ConfigModule],
+  inject: ['ConfigService'], // ❌ Should be ConfigService class
+  useFactory: (configService: ConfigService) => ({...}),
+})
+
+// ❌ DON'T: Synchronous factory for async operations
+ObservabilityModule.forRootAsync({
+  imports: [ConfigModule],
+  inject: [ConfigService],
+  useFactory: (configService: ConfigService) => {
+    // ❌ This won't work if getConfig() is async
+    const config = someAsyncService.getConfig();
+    return { serviceName: config.name };
+  },
+})
+
+// ✅ DO: Proper async factory
+ObservabilityModule.forRootAsync({
+  imports: [ConfigModule],
+  inject: [ConfigService],
+  useFactory: async (configService: ConfigService) => {
+    // ✅ Properly await async operations
+    const config = await someAsyncService.getConfig();
+    return { serviceName: config.name };
+  },
+})
+```
+
+### 4. Global Logger Configuration
+
+```typescript
+// main.ts
 import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module';
-import { LoggerFactory } from '@paystackhq/nestjs-observability';
+import { LoggerService } from '@paystackhq/nestjs-observability';
 
 async function bootstrap() {
-  // Configure the global logger to replace NestJS's default logger
-  const config = {
-    serviceName: 'my-service',
-    serviceVersion: '1.0.0',
-    environment: process.env.NODE_ENV || 'development',
-    logging: {
-      level: process.env.LOG_LEVEL || 'info',
-      consoleOutput: true,
-    },
-    // ... other config options
-  };
+  const app = await NestFactory.create(AppModule);
 
-  const logger = LoggerFactory.configureGlobalLogger(config);
+  // Get the logger service from the app context
+  const logger = app.get(LoggerService);
 
-  const app = await NestFactory.create(AppModule, {
-    logger, // Use our enhanced logger for the entire application
-  });
+  // Replace the global logger
+  app.useLogger(logger);
 
   logger.log('Application starting', 'Bootstrap');
   await app.listen(3000);
@@ -129,55 +281,51 @@ async function bootstrap() {
 bootstrap();
 ```
 
-### 3. Async Configuration
+## 🌍 Environment Variables
 
-For dynamic configuration using ConfigService:
+### Core Configuration
 
-```typescript
-import { Module } from '@nestjs/common';
-import { ConfigModule, ConfigService } from '@nestjs/config';
-import { ObservabilityModule } from '@paystackhq/nestjs-observability';
+```bash
+# Service identification
+SERVICE_NAME=my-service
+SERVICE_VERSION=1.0.0
+NODE_ENV=production
 
-@Module({
-  imports: [
-    ConfigModule.forRoot(),
-    ObservabilityModule.forRootAsync({
-      useFactory: (configService: ConfigService) => ({
-        serviceName: configService.get('SERVICE_NAME', 'my-service'),
-        serviceVersion: configService.get('SERVICE_VERSION', '1.0.0'),
-        environment: configService.get('NODE_ENV', 'development'),
-        logging: {
-          level: configService.get('LOG_LEVEL', 'info'),
-          consoleOutput: true,
-        },
-        metrics: {
-          enabled: configService.get('METRICS_ENABLED', 'true') === 'true',
-          defaultLabels: {
-            service: configService.get('SERVICE_NAME', 'my-service'),
-            version: configService.get('SERVICE_VERSION', '1.0.0'),
-            environment: configService.get('NODE_ENV', 'development'),
-          },
-        },
-        tracing: {
-          enabled: configService.get('TRACING_ENABLED', 'true') === 'true',
-          autoInstrumentation: {
-            enabled: configService.get('AUTO_INSTRUMENTATION_ENABLED', 'true') === 'true',
-            captureArguments: configService.get('CAPTURE_ARGUMENTS', 'true') === 'true',
-          },
-          exporter: {
-            type: 'otlp',
-            endpoint: configService.get('OTLP_TRACES_ENDPOINT', 'http://localhost:4318/v1/traces'),
-          },
-        },
-      }),
-      inject: [ConfigService],
-    }),
-  ],
-})
-export class AppModule {}
+# Logging
+LOG_LEVEL=info                    # error, warn, info, debug, verbose
+LOG_CONSOLE_OUTPUT=true           # Enable console output
+OTLP_LOGS_ENABLED=false          # Export logs via OTLP
+OTLP_LOGS_ENDPOINT=http://localhost:4318/v1/logs
+
+# Metrics
+METRICS_ENABLED=true              # Enable metrics collection
+METRICS_ENDPOINT=/metrics         # Metrics endpoint path
+METRICS_DEFAULT_ENABLED=true      # Enable default Node.js metrics
+
+# Tracing
+TRACING_ENABLED=true              # Enable distributed tracing
+TRACING_SAMPLE_RATE=1.0          # Sampling ratio (0.0-1.0)
+TRACING_SANITIZATION_ENABLED=true # Enable attribute sanitization
+TRACING_REDACTED_PLACEHOLDER=[REDACTED]
+
+# OpenTelemetry Export
+OTLP_TRACES_ENDPOINT=http://localhost:4318/v1/traces
+OTLP_HEADERS={"x-api-key":"your-api-key"}
 ```
 
-## Usage
+### Advanced Tracing Configuration
+
+```bash
+# Instrumentation Control
+TRACING_INSTRUMENTATIONS_DISABLED=fs,dns    # Comma-separated list
+TRACING_INSTRUMENTATIONS_ENABLED=http,nestjs # Override auto-detection
+
+# Sampler Configuration
+TRACING_SAMPLER_TYPE=trace_id_ratio         # always_on, always_off, trace_id_ratio
+TRACING_SAMPLER_RATIO=0.1                   # For trace_id_ratio sampler
+```
+
+## 📝 Logging
 
 ### Basic Logging
 
@@ -186,68 +334,24 @@ import { Injectable } from '@nestjs/common';
 import { LoggerService } from '@paystackhq/nestjs-observability';
 
 @Injectable()
-export class MyService {
-  constructor(private readonly logger: LoggerService) {
-    // Set context for this service
-    this.logger.setContext('MyService');
-  }
-
-  async doSomething() {
-    // Basic logging methods
-    this.logger.log('Starting operation');
-    this.logger.debug('Debug information');
-    this.logger.warn('Warning message');
-    this.logger.error('Error occurred');
-    this.logger.verbose('Verbose details');
-    this.logger.fatal('Critical error'); // Maps to error with FATAL prefix
-  }
-}
-```
-
-### Structured Logging
-
-```typescript
-@Injectable()
 export class UserService {
   constructor(private readonly logger: LoggerService) {
     this.logger.setContext('UserService');
   }
 
   async createUser(userData: any) {
-    // Structured logging with additional context
-    this.logger.log({
-      message: 'Creating new user',
-      userId: userData.id,
-      email: userData.email,
-      requestId: 'req_123',
-    });
-
-    try {
-      // Your business logic
-      const user = await this.userRepository.create(userData);
-
-      this.logger.log({
-        message: 'User created successfully',
-        userId: user.id,
-        email: user.email,
-        createdAt: user.createdAt,
-      });
-
-      return user;
-    } catch (error) {
-      this.logger.error({
-        message: 'Failed to create user',
-        error: error.message,
-        stack: error.stack,
-        userData: { email: userData.email }, // Don't log sensitive data
-      });
-      throw error;
-    }
+    // Basic logging
+    this.logger.log('Starting user creation');
+    this.logger.debug('User data received', 'UserService');
+    this.logger.warn('Validation warning');
+    this.logger.error('Creation failed', '', 'UserService');
+    this.logger.verbose('Detailed information');
+    this.logger.fatal('Critical error occurred');
   }
 }
 ```
 
-### Context Persistence
+### Structured Logging
 
 ```typescript
 @Injectable()
@@ -257,114 +361,35 @@ export class PaymentService {
   }
 
   async processPayment(paymentData: any) {
-    // Add persistent context that will be included in all subsequent logs
-    this.logger.addContext({
+    // Structured logging with metadata
+    this.logger.log({
+      message: 'Processing payment',
       paymentId: paymentData.id,
-      sessionId: paymentData.sessionId,
-      correlationId: `corr_${Date.now()}`,
-    });
-
-    // All logs will now include the persistent context
-    this.logger.log('Payment processing started');
-
-    try {
-      this.logger.log('Validating payment data');
-      await this.validatePayment(paymentData);
-
-      this.logger.log('Authorizing payment');
-      const authResult = await this.authorizePayment(paymentData);
-
-      this.logger.log('Payment authorized successfully', { authCode: authResult.code });
-      return authResult;
-    } catch (error) {
-      this.logger.error({
-        message: 'Payment processing failed',
-        error: error.message,
-        step: 'authorization',
-      });
-      throw error;
-    } finally {
-      // Clear context when done
-      this.logger.clearContext();
-    }
-  }
-}
-```
-
-### Child Loggers
-
-```typescript
-@Injectable()
-export class UserService {
-  constructor(private readonly logger: LoggerService) {
-    this.logger.setContext('UserService');
-  }
-
-  async handleUserRequest(userId: string) {
-    // Create a child logger with additional context
-    const childLogger = this.logger.createChildLogger('UserRequest', {
-      userId,
-      requestId: generateRequestId(),
+      amount: paymentData.amount,
+      currency: paymentData.currency,
+      userId: paymentData.userId,
       timestamp: new Date().toISOString(),
     });
 
-    childLogger.log('Processing user request');
-
-    await this.processUserData(childLogger, userId);
-    await this.updateUserProfile(childLogger, userId);
-
-    childLogger.log('User request completed');
-  }
-
-  private async processUserData(logger: LoggerService, userId: string) {
-    // Child logger maintains the original context
-    logger.debug('Processing user data');
-    // ... processing logic
-  }
-}
-```
-
-### Controller Logging with Request Context
-
-```typescript
-@Controller('api')
-export class ApiController {
-  constructor(private readonly logger: LoggerService) {
-    this.logger.setContext('ApiController');
-  }
-
-  @Post('process')
-  async processData(@Body() data: any, @Req() request: any) {
-    const requestId = request.headers['x-request-id'] || `req_${Date.now()}`;
-
-    // Create request-scoped logger
-    const requestLogger = this.logger.createChildLogger('ProcessData', {
-      requestId,
-      endpoint: request.url,
-      userAgent: request.headers['user-agent'],
-    });
-
-    requestLogger.log({
-      message: 'Processing request started',
-      dataSize: JSON.stringify(data).length,
-      contentType: request.headers['content-type'],
-    });
-
     try {
-      const result = await this.processBusinessLogic(data);
+      const result = await this.chargePayment(paymentData);
 
-      requestLogger.log({
-        message: 'Request processed successfully',
-        resultId: result.id,
-        duration: `${Date.now() - requestStart}ms`,
+      this.logger.log({
+        message: 'Payment processed successfully',
+        paymentId: result.id,
+        transactionId: result.transactionId,
+        status: result.status,
+        duration: result.processingTime,
       });
 
       return result;
     } catch (error) {
-      requestLogger.error({
-        message: 'Request processing failed',
+      this.logger.error({
+        message: 'Payment processing failed',
         error: error.message,
-        duration: `${Date.now() - requestStart}ms`,
+        paymentId: paymentData.id,
+        errorCode: error.code,
+        stack: error.stack,
       });
       throw error;
     }
@@ -372,303 +397,694 @@ export class ApiController {
 }
 ```
 
-## Auto-Tracing
-
-The `nestjs-observability` library provides a modern decorator system for automatic method tracing. This system automatically discovers and instruments your NestJS controllers and providers, providing comprehensive tracing coverage with minimal configuration.
-
-### How It Works
-
-1. **Controllers**: All controller methods are automatically traced by default
-2. **Providers**: Services and providers can opt-in to tracing using the `@TraceClass` decorator
-3. **Method-Level Control**: Fine-grained control with `@Trace` and `@NoTrace` decorators
-4. **Zero Configuration**: Works out of the box with sensible defaults
-
-### Basic Usage
-
-#### Provider Tracing
+### Context Management
 
 ```typescript
-import { Injectable } from '@nestjs/common';
-import { TraceClass } from '@paystackhq/nestjs-observability';
-
 @Injectable()
-@TraceClass() // Enable tracing for all methods in this class
-export class UserService {
-  async createUser(userData: any) {
-    // This method is automatically traced
-    // Span name: UserService.createUser
-    return await this.userRepository.create(userData);
+export class OrderService {
+  constructor(private readonly logger: LoggerService) {
+    this.logger.setContext('OrderService');
   }
 
-  async findUser(id: string) {
-    // This method is also automatically traced
-    // Span name: UserService.findUser
-    return await this.userRepository.findById(id);
+  async processOrder(orderId: string) {
+    // Add persistent context
+    this.logger.addContext({
+      orderId,
+      correlationId: `order_${Date.now()}`,
+      sessionId: 'session_123',
+    });
+
+    // All subsequent logs will include this context
+    this.logger.log('Order processing started');
+
+    await this.validateOrder(orderId);
+    await this.calculateTotals(orderId);
+
+    this.logger.log('Order processing completed');
+
+    // Clear context when done
+    this.logger.clearContext();
+  }
+
+  private async validateOrder(orderId: string) {
+    // Context is automatically included
+    this.logger.debug('Validating order');
+
+    // Create child logger for specific operation
+    const childLogger = this.logger.createChildLogger('OrderValidation', {
+      validationTimestamp: new Date().toISOString(),
+    });
+
+    childLogger.log('Starting validation process');
+    // Child logger inherits parent context
   }
 }
 ```
 
-#### Controller Tracing (Automatic)
+## 🔍 Distributed Tracing
+
+### Auto-Tracing with Decorators
 
 ```typescript
-import { Controller, Get, Post, Body, Param } from '@nestjs/common';
+import { Injectable, Controller, Get, Post, Body } from '@nestjs/common';
+import { TraceClass, Trace, NoTrace } from '@paystackhq/nestjs-observability';
 
+// Controllers are automatically traced
 @Controller('users')
 export class UserController {
   constructor(private readonly userService: UserService) {}
 
   @Get(':id')
   async getUser(@Param('id') id: string) {
-    // Automatically traced - no decorator needed
-    // Span name: UserController.getUser
+    // Automatically traced as UserController.getUser
     return await this.userService.findUser(id);
   }
 
   @Post()
+  @Trace('user.create') // Custom span name
   async createUser(@Body() userData: any) {
-    // Automatically traced - no decorator needed
-    // Span name: UserController.createUser
+    // Traced as 'user.create'
     return await this.userService.createUser(userData);
   }
+
+  @Get('health')
+  @NoTrace() // Exclude from tracing
+  getHealth() {
+    return { status: 'ok' };
+  }
 }
-```
 
-### Advanced Features
-
-#### Method-Level Customization
-
-```typescript
-import { Injectable } from '@nestjs/common';
-import { TraceClass, Trace, NoTrace } from '@paystackhq/nestjs-observability';
-
+// Providers need explicit tracing
 @Injectable()
-@TraceClass()
-export class PaymentService {
-  @Trace('payment.process', true) // Custom span name and capture arguments
-  async processPayment(paymentData: any) {
-    // Custom span name: payment.process
-    // Arguments captured in trace
-    return await this.paymentProcessor.process(paymentData);
+@TraceClass() // Enable tracing for all methods
+export class UserService {
+  async findUser(id: string) {
+    // Automatically traced as UserService.findUser
+    return await this.userRepository.findById(id);
   }
 
-  @Trace('payment.validate', false) // Don't capture arguments
-  async validatePayment(paymentData: any) {
-    // Custom span name: payment.validate
-    // Arguments NOT captured (for security)
-    return await this.validator.validate(paymentData);
+  @Trace('user.complex-operation') // Custom name
+  async complexOperation(data: any) {
+    // Custom span name
+    return await this.processComplexData(data);
   }
 
   @NoTrace() // Exclude this method from tracing
   private logSensitiveData(data: any) {
-    // This method will not be traced
+    // This method won't be traced
     console.log('Sensitive data:', data);
   }
 }
 ```
 
-#### Selective Controller Tracing
+### Manual Span Management
 
 ```typescript
-import { Controller, Get, Post, Body } from '@nestjs/common';
-import { Trace, NoTrace } from '@paystackhq/nestjs-observability';
+import { Injectable } from '@nestjs/common';
+import { addSpanAttribute, addSpanAttributes, getCurrentSpan } from '@paystackhq/nestjs-observability';
 
-@Controller('health')
-export class HealthController {
-  @Get()
-  @NoTrace() // Exclude health check from tracing
-  getHealth() {
-    // This method won't be traced (reduces noise)
-    return { status: 'ok' };
+@Injectable()
+@TraceClass()
+export class AnalyticsService {
+  async processAnalytics(data: any) {
+    // Add custom attributes to current span
+    addSpanAttribute('data.size', data.length);
+    addSpanAttribute('processing.type', 'batch');
+
+    // Add multiple attributes
+    addSpanAttributes({
+      'user.id': data.userId,
+      'batch.id': data.batchId,
+      'processing.priority': 'high',
+    });
+
+    // Get current span for advanced operations
+    const span = getCurrentSpan();
+    if (span) {
+      span.addEvent('Processing started', {
+        timestamp: Date.now(),
+        attributes: { 'event.type': 'processing' },
+      });
+    }
+
+    const result = await this.performAnalysis(data);
+
+    // Add result attributes
+    addSpanAttributes({
+      'result.count': result.length,
+      'processing.duration': result.processingTime,
+      'processing.status': 'completed',
+    });
+
+    return result;
+  }
+}
+```
+
+### Excluding Classes from Tracing
+
+```typescript
+import { Injectable } from '@nestjs/common';
+import { NoTraceClass } from '@paystackhq/nestjs-observability';
+
+@Injectable()
+@NoTraceClass() // Exclude entire class from auto-tracing
+export class InternalService {
+  // No methods in this class will be traced
+  async internalOperation() {
+    return 'internal result';
+  }
+}
+```
+
+## 📊 Metrics Collection
+
+### Built-in Metrics
+
+The library automatically collects:
+
+- **HTTP Request Metrics**: Request count, duration, status codes
+- **Node.js Metrics**: Memory usage, CPU, garbage collection
+- **Application Metrics**: Service information, environment labels
+
+### Custom Metrics
+
+```typescript
+import { Injectable } from '@nestjs/common';
+import { MetricsService } from '@paystackhq/nestjs-observability';
+
+@Injectable()
+export class BusinessMetricsService {
+  private readonly paymentCounter;
+  private readonly orderDurationHistogram;
+  private readonly activeUsersGauge;
+  private readonly processingTimeSummary;
+
+  constructor(private readonly metricsService: MetricsService) {
+    // Create custom metrics
+    this.paymentCounter = this.metricsService.createCounter('payments_total', 'Total number of payments processed', [
+      'method',
+      'status',
+      'currency',
+    ]);
+
+    this.orderDurationHistogram = this.metricsService.createHistogram(
+      'order_processing_duration_seconds',
+      'Time spent processing orders',
+      ['order_type', 'priority'],
+      [0.1, 0.5, 1, 2, 5, 10, 30] // Custom buckets
+    );
+
+    this.activeUsersGauge = this.metricsService.createGauge('active_users', 'Number of currently active users', [
+      'user_type',
+    ]);
+
+    this.processingTimeSummary = this.metricsService.createSummary(
+      'processing_time_seconds',
+      'Summary of processing times',
+      ['operation_type'],
+      [0.5, 0.9, 0.95, 0.99] // Custom percentiles
+    );
   }
 
-  @Post('complex')
-  @Trace('health.complex-check', true) // Custom span name
-  async complexHealthCheck(@Body() criteria: any) {
-    // Custom span name: health.complex-check
-    return await this.performComplexCheck(criteria);
+  recordPayment(method: string, status: string, currency: string) {
+    this.paymentCounter.inc({ method, status, currency });
+  }
+
+  recordOrderProcessing(orderType: string, priority: string, duration: number) {
+    this.orderDurationHistogram.observe({ order_type: orderType, priority }, duration);
+  }
+
+  updateActiveUsers(userType: string, count: number) {
+    this.activeUsersGauge.set({ user_type: userType }, count);
+  }
+
+  recordProcessingTime(operationType: string, duration: number) {
+    this.processingTimeSummary.observe({ operation_type: operationType }, duration);
   }
 }
 ```
 
-### Configuration Options
+### Metrics Controller
 
-#### Enable/Disable Auto-Tracing
-
-```typescript
-ObservabilityModule.forRoot({
-  tracing: {
-    enabled: true,
-    autoInstrumentation: {
-      enabled: true, // Enable auto-tracing system
-      captureArguments: true, // Capture method arguments by default
-    },
-  },
-});
-```
-
-#### Environment Variables
+Access metrics via the built-in endpoint:
 
 ```bash
-# Enable/disable auto-tracing
-AUTO_INSTRUMENTATION_ENABLED=true
-
-# Control argument capture
-CAPTURE_ARGUMENTS=true
-
-# Exclude specific classes (comma-separated)
-TRACING_EXCLUDE_CLASSES=LoggerService,MetricsService
-
-# Exclude specific methods (comma-separated)
-TRACING_EXCLUDE_METHODS=constructor,onModuleInit
+curl http://localhost:3000/metrics
 ```
 
-### Trace Context
+Response format:
 
-Auto-traced methods automatically include rich context:
+```
+# HELP http_requests_total Total number of HTTP requests
+# TYPE http_requests_total counter
+http_requests_total{method="GET",route="/users",status_code="200",service="my-service",version="1.0.0"} 42
+
+# HELP http_request_duration_seconds Duration of HTTP requests in seconds
+# TYPE http_request_duration_seconds histogram
+http_request_duration_seconds_bucket{method="GET",route="/users",status_code="200",le="0.01"} 5
+http_request_duration_seconds_bucket{method="GET",route="/users",status_code="200",le="0.05"} 15
+```
+
+## 🛠️ Best Practices
+
+### 1. Logging Best Practices
 
 ```typescript
-// Trace attributes automatically added:
-{
-  "class.name": "UserService",
-  "method.name": "createUser",
-  "instrumentation.type": "auto",
-  "method.args.0.email": "user@example.com", // If captureArguments is true
-  "method.args.0.name": "John Doe",
-  "method.args.count": "1"
+@Injectable()
+export class OrderService {
+  constructor(private readonly logger: LoggerService) {
+    this.logger.setContext('OrderService');
+  }
+
+  async processOrder(orderId: string) {
+    // ✅ DO: Use structured logging
+    this.logger.log({
+      message: 'Processing order',
+      orderId,
+      timestamp: new Date().toISOString(),
+    });
+
+    // ❌ DON'T: Use string interpolation
+    this.logger.log(`Processing order ${orderId}`);
+
+    // ✅ DO: Include correlation IDs
+    this.logger.addContext({
+      orderId,
+      correlationId: generateCorrelationId(),
+    });
+
+    // ✅ DO: Log both success and failure
+    try {
+      const result = await this.processOrderLogic(orderId);
+
+      this.logger.log({
+        message: 'Order processed successfully',
+        orderId,
+        processingTime: result.duration,
+        status: result.status,
+      });
+
+      return result;
+    } catch (error) {
+      this.logger.error({
+        message: 'Order processing failed',
+        orderId,
+        error: error.message,
+        errorCode: error.code,
+      });
+      throw error;
+    }
+  }
 }
 ```
 
-### Performance
+### 2. Tracing Best Practices
 
-- **Overhead**: < 1ms per traced method call
-- **Memory**: Minimal memory impact
-- **Instrumentation**: Only methods that are actually called are instrumented
-- **Coordination**: Integrates seamlessly with HTTP interceptors to prevent duplicate spans
+```typescript
+@Injectable()
+@TraceClass()
+export class PaymentService {
+  // ✅ DO: Use meaningful span names
+  @Trace('payment.process')
+  async processPayment(data: any) {
+    // Add relevant attributes
+    addSpanAttributes({
+      'payment.id': data.id,
+      'payment.amount': data.amount,
+      'payment.currency': data.currency,
+    });
 
-### Best Practices
+    return await this.chargePayment(data);
+  }
 
-1. **Use `@TraceClass` for Services**: Enable tracing for your business logic services
-2. **Controllers Are Automatic**: No need to add decorators to controllers
-3. **Exclude Sensitive Methods**: Use `@NoTrace` for methods that handle sensitive data
-4. **Custom Span Names**: Use `@Trace` with custom names for important operations
-5. **Argument Capture**: Disable argument capture for methods with sensitive parameters
-6. **Health Checks**: Exclude health check endpoints to reduce trace noise
+  // ✅ DO: Exclude sensitive operations
+  @NoTrace()
+  private logCreditCardDetails(cardData: any) {
+    // Sensitive operations should not be traced
+  }
 
-## Environment Configuration
+  // ✅ DO: Use child spans for complex operations
+  @Trace('payment.validate')
+  async validatePayment(data: any) {
+    const span = getCurrentSpan();
+    if (span) {
+      span.addEvent('Validation started');
+    }
 
-### Development Environment
+    await this.validateCard(data.card);
+    await this.validateAmount(data.amount);
 
-- Pretty formatted logs for readability
-- Debug level logging enabled
-- Colorized output
-- Full stack traces
+    if (span) {
+      span.addEvent('Validation completed');
+    }
+  }
+}
+```
 
-### Production Environment
+### 3. Metrics Best Practices
 
-- Structured JSON formatted logs for log aggregation
-- Info/warn level logging
-- Structured format for monitoring tools
-- Trace correlation with OpenTelemetry
+```typescript
+@Injectable()
+export class MetricsCollector {
+  constructor(private readonly metricsService: MetricsService) {}
 
-### Environment Variables
+  // ✅ DO: Use consistent naming
+  private readonly apiRequestCounter = this.metricsService.createCounter('api_requests_total', 'Total API requests', [
+    'method',
+    'endpoint',
+    'status',
+  ]);
+
+  // ✅ DO: Include relevant labels
+  recordApiRequest(method: string, endpoint: string, status: number) {
+    this.apiRequestCounter.inc({
+      method: method.toUpperCase(),
+      endpoint: this.normalizeEndpoint(endpoint),
+      status: status.toString(),
+    });
+  }
+
+  // ✅ DO: Normalize high-cardinality labels
+  private normalizeEndpoint(endpoint: string): string {
+    return endpoint.replace(/\/\d+/g, '/:id');
+  }
+}
+```
+
+### 4. Error Handling Best Practices
+
+```typescript
+@Injectable()
+export class RobustService {
+  constructor(private readonly logger: LoggerService) {
+    this.logger.setContext('RobustService');
+  }
+
+  async processData(data: any) {
+    const startTime = Date.now();
+
+    try {
+      // Add tracing context
+      addSpanAttributes({
+        'data.size': data.length,
+        'processing.type': 'batch',
+      });
+
+      const result = await this.performProcessing(data);
+
+      // Log successful completion
+      this.logger.log({
+        message: 'Data processing completed',
+        duration: Date.now() - startTime,
+        recordsProcessed: result.length,
+        success: true,
+      });
+
+      return result;
+    } catch (error) {
+      // Comprehensive error logging
+      this.logger.error({
+        message: 'Data processing failed',
+        duration: Date.now() - startTime,
+        error: error.message,
+        errorType: error.constructor.name,
+        stack: error.stack,
+        dataSize: data.length,
+        success: false,
+      });
+
+      // Add error attributes to span
+      addSpanAttributes({
+        'error.type': error.constructor.name,
+        'error.message': error.message,
+        'processing.success': false,
+      });
+
+      throw error;
+    }
+  }
+}
+```
+
+## 🔧 Development & Contributing
+
+### Development Setup
 
 ```bash
-# Basic Configuration
-NODE_ENV=production
-SERVICE_NAME=my-service
-SERVICE_VERSION=1.0.0
-LOG_LEVEL=info
+# Clone the repository
+git clone https://github.com/paystackhq/nestjs-observability.git
+cd nestjs-observability
 
-# OpenTelemetry Configuration
-TRACING_ENABLED=true
-OTLP_TRACES_ENDPOINT=https://api.honeycomb.io/v1/traces
-OTLP_LOGS_ENDPOINT=https://api.honeycomb.io/v1/logs
-OTLP_HEADERS={"x-honeycomb-team":"your-api-key"}
+# Install dependencies
+pnpm install
 
-# Metrics Configuration
-METRICS_ENABLED=true
-METRICS_ENDPOINT=/metrics
+# Run tests
+pnpm test
+
+# Run tests with coverage
+pnpm test:coverage
+
+# Type checking
+pnpm type-check
+
+# Linting
+pnpm lint
+pnpm lint:fix
+
+# Format code
+pnpm format
 ```
 
-## Integration with OpenTelemetry
+### Building the Library
 
-The logger automatically includes trace context when OpenTelemetry tracing is active:
+```bash
+# Build both CommonJS and ESM versions
+pnpm build
 
-**Development Output (Pretty Format):**
+# Build information
+pnpm build:info
 
-```
-[12:34:56.789] LOG [MyService] Processing user data [trace: a1b2c3d4]
-```
+# Validate build
+pnpm validate-build
 
-**Production Output (Structured Format):**
-
-```json
-{
-  "level": "info",
-  "timestamp": "2024-01-01T12:34:56.789Z",
-  "message": "Processing user data",
-  "context": "MyService",
-  "service": "my-service",
-  "environment": "production",
-  "traceId": "a1b2c3d4e5f6g7h8",
-  "spanId": "i9j0k1l2m3n4",
-  "userId": "12345",
-  "operation": "user-processing"
-}
+# Clean build artifacts
+pnpm clean
 ```
 
-## Best Practices
+### Testing Changes
 
-1. **Set Context**: Always set context for your services using `logger.setContext()`
-2. **Use Structured Logging**: Include relevant metadata as objects rather than string interpolation
-3. **Child Loggers**: Use child loggers for request-scoped or operation-scoped logging
-4. **Error Handling**: Include error context, correlation IDs, and relevant state
-5. **Performance Monitoring**: Log operation durations and success/failure metrics
-6. **Security**: Never log sensitive data like passwords, tokens, or PII
-7. **Correlation**: Use correlation IDs to track requests across services
+```bash
+# Run the example application
+cd examples/basic-app
+pnpm install
+pnpm start
 
-## Configuration Options
+# Test different endpoints
+curl http://localhost:3000/health
+curl http://localhost:3000/metrics
+curl http://localhost:3000/users
+```
 
-### Complete Configuration Interface
+### Publishing New Versions
+
+This library uses [Changesets](https://github.com/changesets/changesets) for version management:
+
+```bash
+# Add a changeset for your changes
+pnpm changeset
+
+# Version packages (updates package.json and CHANGELOG.md)
+pnpm changeset:version
+
+# Publish to registry
+pnpm changeset:publish
+```
+
+#### Changeset Types
+
+- **patch**: Bug fixes, minor improvements
+- **minor**: New features, backwards compatible
+- **major**: Breaking changes
+
+#### Example Changeset Process
+
+```bash
+# 1. Make your changes
+git checkout -b feature/new-feature
+
+# 2. Add changeset
+pnpm changeset
+# Choose change type and describe your changes
+
+# 3. Commit everything
+git add .
+git commit -m "feat: add new feature"
+
+# 4. Create PR
+# After merge, maintainers will run version and publish
+```
+
+### Build Architecture
+
+The library supports dual package distribution:
+
+```
+dist/
+├── cjs/                    # CommonJS build
+│   ├── index.js
+│   ├── index.d.ts
+│   └── ...
+├── esm/                    # ESM build
+│   ├── index.js
+│   ├── index.d.ts
+│   └── ...
+```
+
+**Build Scripts:**
+
+- `scripts/build-info.js` - Display build information
+- `scripts/fix-esm-imports.js` - Fix ESM import extensions
+- `scripts/validate-build.js` - Validate build outputs
+
+### Pre-commit Hooks
+
+The project uses Husky for pre-commit hooks:
+
+```bash
+# Runs automatically before commits
+- ESLint checking
+- Prettier formatting
+- Type checking
+```
+
+### CI/CD Pipeline
+
+The library uses GitHub Actions for:
+
+- **Testing**: Run tests on multiple Node.js versions
+- **Building**: Validate build outputs
+- **Publishing**: Automatic publishing on version tags
+
+### Documentation
+
+Update documentation when:
+
+- Adding new features
+- Changing APIs
+- Updating configuration options
+- Adding new examples
+
+### Performance Considerations
+
+When developing:
+
+- **Tracing**: Minimize overhead in hot paths
+- **Logging**: Use appropriate log levels
+- **Metrics**: Avoid high-cardinality labels
+- **Memory**: Monitor memory usage in long-running processes
+
+## 📚 Documentation
+
+- [First Steps Guide](docs/first-steps.md) - Complete getting started guide
+- [Best Practices](docs/best-practices.md) - Production-ready best practices and patterns
+- [Advanced Factory Configuration](docs/advanced-factory-configuration.md) - Complex configuration patterns
+
+## 📚 Examples
+
+### Complete NestJS Application
 
 ```typescript
-interface ObservabilityConfig {
-  serviceName: string;
-  serviceVersion: string;
-  environment: string;
+// app.module.ts
+@Module({
+  imports: [
+    ConfigModule.forRoot({ isGlobal: true }),
+    ObservabilityModule.forRootAsync({
+      imports: [ConfigModule],
+      inject: [ConfigService],
+      useFactory: (config: ConfigService) => ({
+        serviceName: config.get('SERVICE_NAME', 'example-app'),
+        serviceVersion: config.get('SERVICE_VERSION', '1.0.0'),
+        environment: config.get('NODE_ENV', 'development'),
+        // Environment variables are automatically loaded
+      }),
+    }),
+  ],
+  controllers: [AppController],
+  providers: [AppService],
+})
+export class AppModule {}
 
-  logging: {
-    level: 'error' | 'warn' | 'info' | 'debug' | 'verbose';
-    consoleOutput: boolean;
-    otlpExport: {
-      enabled: boolean;
-      endpoint: string;
-    };
-  };
+// app.controller.ts
+@Controller('api')
+export class AppController {
+  constructor(
+    private readonly appService: AppService,
+    private readonly logger: LoggerService,
+    private readonly metrics: MetricsService
+  ) {
+    this.logger.setContext('AppController');
+  }
 
-  metrics: {
-    enabled: boolean;
-    endpoint: string;
-    defaultLabels: Record<string, string>;
-    defaultMetrics: boolean;
-  };
+  @Get('users/:id')
+  async getUser(@Param('id') id: string) {
+    // Automatically traced and logged
+    return await this.appService.findUser(id);
+  }
 
-  tracing: {
-    enabled: boolean;
-    sampler: {
-      type: 'always_on' | 'always_off' | 'trace_id_ratio';
-      ratio?: number;
-    };
-    exporter: {
-      type: 'otlp';
-      endpoint: string;
-      headers?: Record<string, string>;
-    };
-    instrumentations: {
-      http: boolean;
-      nestJs: boolean;
-      winston: boolean;
-    };
-  };
+  @Post('users')
+  @Trace('user.create')
+  async createUser(@Body() userData: any) {
+    // Custom span name
+    return await this.appService.createUser(userData);
+  }
+}
+
+// app.service.ts
+@Injectable()
+@TraceClass()
+export class AppService {
+  constructor(private readonly logger: LoggerService) {
+    this.logger.setContext('AppService');
+  }
+
+  async findUser(id: string) {
+    // Automatically traced as AppService.findUser
+    this.logger.log({ message: 'Finding user', userId: id });
+
+    addSpanAttribute('user.id', id);
+
+    return { id, name: 'John Doe' };
+  }
+
+  async createUser(userData: any) {
+    // Traced and logged with full context
+    this.logger.log({
+      message: 'Creating user',
+      email: userData.email,
+      timestamp: new Date().toISOString(),
+    });
+
+    addSpanAttributes({
+      'user.email': userData.email,
+      'user.type': userData.type || 'standard',
+    });
+
+    return { id: 'new-id', ...userData };
+  }
 }
 ```
+
+## 🤝 Contributing
+
+We welcome contributions! Please see our [Contributing Guide](CONTRIBUTING.md) for details.
+
+## 📄 License
+
+This project is licensed under the PROPRIETARY License - see the [LICENSE](LICENSE) file for details.
+
+## 🆘 Support
+
+- **Documentation**: Check this README and inline code comments
+- **Issues**: Report bugs and feature requests on GitHub
+- **Discussions**: Join our GitHub Discussions for questions and ideas

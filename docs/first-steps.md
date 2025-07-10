@@ -30,9 +30,8 @@ import { ObservabilityModule } from '@paystackhq/nestjs-observability';
       environment: process.env.NODE_ENV || 'development',
       tracing: {
         enabled: true,
-        autoInstrumentation: {
-          enabled: true,
-          captureArguments: true,
+        instrumentations: {
+          autoInstrumentations: true,
         },
       },
     }),
@@ -50,8 +49,7 @@ SERVICE_NAME=my-service
 SERVICE_VERSION=1.0.0
 NODE_ENV=development
 TRACING_ENABLED=true
-AUTO_INSTRUMENTATION_ENABLED=true
-CAPTURE_ARGUMENTS=true
+TRACING_AUTO_INSTRUMENTATIONS=true
 OTLP_TRACES_ENDPOINT=http://localhost:4318/v1/traces
 ```
 
@@ -141,9 +139,9 @@ export class OrderService {
     return this.processOrder(orderData);
   }
 
-  @Trace('order.validate', false) // Custom name, don't capture arguments
+  @Trace('order.validate') // Custom name
   async validateOrder(order: Order): Promise<boolean> {
-    // This method is traced as "order.validate" without argument capture
+    // This method is traced as "order.validate"
     return this.validator.validate(order);
   }
 }
@@ -160,9 +158,8 @@ ObservabilityModule.forRoot({
   environment: 'production',
   tracing: {
     enabled: true,
-    autoInstrumentation: {
-      enabled: true,
-      captureArguments: true,
+    instrumentations: {
+      autoInstrumentations: true,
     },
   },
 });
@@ -178,8 +175,7 @@ NODE_ENV=production
 
 # Tracing Configuration
 TRACING_ENABLED=true
-AUTO_INSTRUMENTATION_ENABLED=true
-CAPTURE_ARGUMENTS=true
+TRACING_AUTO_INSTRUMENTATIONS=true
 
 # OpenTelemetry Configuration
 OTLP_TRACES_ENDPOINT=http://localhost:4318/v1/traces
@@ -221,9 +217,8 @@ ObservabilityModule.forRoot({
   // Tracing Configuration
   tracing: {
     enabled: process.env.TRACING_ENABLED !== 'false',
-    autoInstrumentation: {
-      enabled: process.env.AUTO_INSTRUMENTATION_ENABLED !== 'false',
-      captureArguments: process.env.CAPTURE_ARGUMENTS !== 'false',
+    instrumentations: {
+      autoInstrumentations: process.env.TRACING_AUTO_INSTRUMENTATIONS !== 'false',
     },
     sampler: {
       type: 'always_on',
@@ -248,7 +243,7 @@ ObservabilityModule.forRoot({
 ### 2. Performance Considerations
 
 - The auto-tracing system has minimal overhead (< 1ms per method)
-- Use `captureArguments: false` for methods with large payloads
+- Use `autoInstrumentations: false` to disable automatic instrumentation if needed
 - Exclude utility methods that don't provide business value
 
 ### 3. Span Naming
@@ -525,7 +520,8 @@ OTLP_LOGS_ENDPOINT=https://your-otlp-endpoint.com/v1/logs
 {
   "timestamp": "2024-01-15T10:30:45.123Z",
   "level": "info",
-  "service": "my-service",
+  "serviceName": "my-service",
+  "serviceVersion": "1.0.0",
   "environment": "production",
   "pid": 12345,
   "context": "UserService",

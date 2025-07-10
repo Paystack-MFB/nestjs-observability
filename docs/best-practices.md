@@ -1,0 +1,1309 @@
+# Best Practices for NestJS Observability
+
+This document outlines best practices for using the NestJS Observability library effectively in production environments.
+
+## Table of Contents
+
+1. [Tracing Best Practices](#tracing-best-practices)
+2. [Logging Best Practices](#logging-best-practices)
+3. [Metrics Best Practices](#metrics-best-practices)
+4. [Configuration Best Practices](#configuration-best-practices)
+5. [Performance Best Practices](#performance-best-practices)
+6. [Security Best Practices](#security-best-practices)
+7. [Production Best Practices](#production-best-practices)
+8. [Development Best Practices](#development-best-practices)
+9. [Architecture Best Practices](#architecture-best-practices)
+10. [Troubleshooting Best Practices](#troubleshooting-best-practices)
+
+## Tracing Best Practices
+
+### When to Use Tracing Decorators
+
+#### ✅ **DO: Use @TraceClass for Business Logic Services**
+
+```typescript
+@Injectable()
+@TraceClass()
+export class UserService {
+  // All business methods automatically traced
+  async createUser(userData: CreateUserDto): Promise<User> {
+    return this.userRepository.create(userData);
+  }
+
+  async findUser(id: string): Promise<User> {
+    return this.userRepository.findById(id);
+  }
+}
+```
+
+#### ✅ **DO: Use @Trace for Important Operations**
+
+```typescript
+@Injectable()
+export class PaymentService {
+  @Trace('payment.process')
+  async processPayment(paymentData: PaymentDto): Promise<Payment> {
+    // Critical business operation with custom span name
+    return this.paymentProcessor.process(paymentData);
+  }
+}
+```
+
+#### ❌ **DON'T: Trace Utility Services**
+
+```typescript
+// Avoid tracing utility services
+@Injectable()
+export class UtilityService {
+  // Don't trace these - they add noise
+  formatDate(date: Date): string { ... }
+  validateEmail(email: string): boolean { ... }
+}
+```
+
+### Span Naming Conventions
+
+#### ✅ **DO: Use Descriptive, Hierarchical Names**
+
+```typescript
+@Injectable()
+@TraceClass()
+export class OrderService {
+  @Trace('order.validate')
+  async validateOrder(order: OrderDto): Promise<void> { ... }
+
+  @Trace('order.process')
+  async processOrder(order: OrderDto): Promise<Order> { ... }
+
+  @Trace('order.fulfill')
+  async fulfillOrder(orderId: string): Promise<void> { ... }
+}
+```
+
+#### ❌ **DON'T: Use Generic or Vague Names**
+
+```typescript
+// Bad span names
+@Trace('process')  // Too generic
+@Trace('doStuff')  // Not descriptive
+@Trace('method1')  // Meaningless
+```
+
+### Excluding Sensitive Operations
+
+#### ✅ **DO: Use @NoTrace for Sensitive Operations**
+
+```typescript
+@Injectable()
+@TraceClass()
+export class AuthService {
+  @NoTrace() // Exclude sensitive authentication logic
+  private async validateCredentials(credentials: LoginDto): Promise<boolean> {
+    // Authentication logic should not be traced
+    return this.verifyPassword(credentials.password);
+  }
+
+  @NoTrace() // Exclude password hashing
+  private async hashPassword(password: string): Promise<string> {
+    return bcrypt.hash(password, 10);
+  }
+}
+```
+
+### Manual Span Attributes
+
+#### ✅ **DO: Add Meaningful Attributes**
+
+```typescript
+@Injectable()
+@TraceClass()
+export class UserService {
+  async createUser(userData: CreateUserDto): Promise<User> {
+    // Add business context
+    addSpanAttributes({
+      'user.email': userData.email,
+      'user.role': userData.role,
+      'user.plan': userData.plan,
+      'operation.priority': 'high',
+    });
+
+    const user = await this.userRepository.create(userData);
+
+    // Add result attributes
+    addSpanAttributes({
+      'user.id': user.id,
+      'user.created_at': user.createdAt.toISOString(),
+      'operation.status': 'success',
+    });
+
+    return user;
+  }
+}
+```
+
+#### ❌ **DON'T: Add Sensitive or High-Cardinality Attributes**
+
+```typescript
+// Bad attributes
+addSpanAttributes({
+  'user.password': userData.password, // Sensitive data
+  'user.credit_card': userData.creditCard, // Sensitive data
+  'request.timestamp': Date.now(), // High cardinality
+  'session.id': generateUniqueId(), // High cardinality
+});
+```
+
+## Logging Best Practices
+
+### Structured Logging
+
+#### ✅ **DO: Use Structured Logging**
+
+```typescript
+@Injectable()
+export class OrderService {
+  constructor(private readonly logger: LoggerService) {
+    this.logger.setContext('OrderService');
+  }
+
+  async processOrder(orderData: OrderDto): Promise<Order> {
+    // Structured log with context
+    this.logger.log({
+      message: 'Processing order',
+      orderId: orderData.id,
+      userId: orderData.userId,
+      amount: orderData.total,
+      currency: orderData.currency,
+      timestamp: new Date().toISOString(),
+    });
+
+    try {
+      const order = await this.createOrder(orderData);
+
+      this.logger.log({
+        message: 'Order processed successfully',
+        orderId: order.id,
+        status: order.status,
+        processingTime: Date.now() - startTime,
+      });
+
+      return order;
+    } catch (error) {
+      this.logger.error({
+        message: 'Order processing failed',
+        orderId: orderData.id,
+        error: error.message,
+        stack: error.stack,
+      });
+      throw error;
+    }
+  }
+}
+```
+
+#### ❌ **DON'T: Use String Interpolation**
+
+```typescript
+// Bad logging practices
+this.logger.log(`Processing order ${orderId} for user ${userId}`);
+this.logger.error(`Order ${orderId} failed: ${error.message}`);
+```
+
+### Log Levels
+
+#### ✅ **DO: Use Appropriate Log Levels**
+
+```typescript
+@Injectable()
+export class PaymentService {
+  constructor(private readonly logger: LoggerService) {
+    this.logger.setContext('PaymentService');
+  }
+
+  async processPayment(paymentData: PaymentDto): Promise<Payment> {
+    // DEBUG: Detailed information for debugging
+    this.logger.debug({
+      message: 'Starting payment processing',
+      paymentId: paymentData.id,
+      amount: paymentData.amount,
+      provider: paymentData.provider,
+    });
+
+    // INFO: General information about normal operations
+    this.logger.log({
+      message: 'Payment processing initiated',
+      paymentId: paymentData.id,
+      amount: paymentData.amount,
+    });
+
+    try {
+      const payment = await this.processPaymentInternal(paymentData);
+
+      // INFO: Successful operations
+      this.logger.log({
+        message: 'Payment processed successfully',
+        paymentId: payment.id,
+        status: payment.status,
+      });
+
+      return payment;
+    } catch (error) {
+      if (error instanceof ValidationError) {
+        // WARN: Expected errors that don't require immediate attention
+        this.logger.warn({
+          message: 'Payment validation failed',
+          paymentId: paymentData.id,
+          error: error.message,
+        });
+      } else {
+        // ERROR: Unexpected errors that require attention
+        this.logger.error({
+          message: 'Payment processing failed',
+          paymentId: paymentData.id,
+          error: error.message,
+          stack: error.stack,
+        });
+      }
+      throw error;
+    }
+  }
+}
+```
+
+### Context Management
+
+#### ✅ **DO: Use Context Effectively**
+
+```typescript
+@Injectable()
+export class UserService {
+  constructor(private readonly logger: LoggerService) {
+    this.logger.setContext('UserService');
+  }
+
+  async handleUserRequest(userId: string, requestId: string): Promise<void> {
+    // Add persistent context for this request
+    this.logger.addContext({
+      userId,
+      requestId,
+      timestamp: new Date().toISOString(),
+    });
+
+    this.logger.log('Processing user request');
+
+    try {
+      await this.processUserData(userId);
+      await this.updateUserProfile(userId);
+      await this.sendNotification(userId);
+
+      this.logger.log('User request completed successfully');
+    } catch (error) {
+      this.logger.error({
+        message: 'User request failed',
+        error: error.message,
+        stack: error.stack,
+      });
+      throw error;
+    } finally {
+      // Clean up context
+      this.logger.clearContext();
+    }
+  }
+}
+```
+
+#### ✅ **DO: Use Child Loggers for Scoped Operations**
+
+```typescript
+@Injectable()
+export class OrderService {
+  constructor(private readonly logger: LoggerService) {
+    this.logger.setContext('OrderService');
+  }
+
+  async processOrder(orderData: OrderDto): Promise<Order> {
+    // Create child logger for this specific order
+    const orderLogger = this.logger.createChildLogger('OrderProcessor', {
+      orderId: orderData.id,
+      userId: orderData.userId,
+      correlationId: generateCorrelationId(),
+    });
+
+    orderLogger.log('Starting order processing');
+
+    try {
+      await this.validateOrder(orderLogger, orderData);
+      await this.processPayment(orderLogger, orderData);
+      await this.fulfillOrder(orderLogger, orderData);
+
+      orderLogger.log('Order processing completed');
+    } catch (error) {
+      orderLogger.error({
+        message: 'Order processing failed',
+        error: error.message,
+        stack: error.stack,
+      });
+      throw error;
+    }
+  }
+
+  private async validateOrder(logger: LoggerService, orderData: OrderDto): Promise<void> {
+    // Child logger automatically includes parent context
+    logger.debug('Validating order data');
+    // ... validation logic
+  }
+}
+```
+
+## Metrics Best Practices
+
+### Metric Types and Usage
+
+#### ✅ **DO: Use Appropriate Metric Types**
+
+```typescript
+@Injectable()
+export class BusinessMetricsService {
+  private readonly requestCounter: Counter<string>;
+  private readonly responseTimeHistogram: Histogram<string>;
+  private readonly activeConnectionsGauge: Gauge<string>;
+
+  constructor(private readonly metricsService: MetricsService) {
+    // Counter: For counting events
+    this.requestCounter = this.metricsService.createCounter('http_requests_total', 'Total number of HTTP requests', [
+      'method',
+      'status_code',
+      'route',
+    ]);
+
+    // Histogram: For measuring durations and sizes
+    this.responseTimeHistogram = this.metricsService.createHistogram(
+      'http_request_duration_seconds',
+      'HTTP request duration in seconds',
+      ['method', 'route'],
+      [0.01, 0.05, 0.1, 0.2, 0.5, 1, 2, 5, 10] // Appropriate buckets
+    );
+
+    // Gauge: For measuring current values
+    this.activeConnectionsGauge = this.metricsService.createGauge(
+      'active_connections',
+      'Number of active connections',
+      ['connection_type']
+    );
+  }
+
+  recordRequest(method: string, route: string, statusCode: number, duration: number): void {
+    this.requestCounter.inc({ method, route, status_code: statusCode.toString() });
+    this.responseTimeHistogram.observe({ method, route }, duration);
+  }
+
+  updateActiveConnections(connectionType: string, count: number): void {
+    this.activeConnectionsGauge.set({ connection_type: connectionType }, count);
+  }
+}
+```
+
+### Label Best Practices
+
+#### ✅ **DO: Use Low-Cardinality Labels**
+
+```typescript
+// Good labels - low cardinality
+this.requestCounter.inc({
+  method: 'GET', // ~10 values
+  status_code: '200', // ~20 values
+  route: '/api/users', // ~100 values
+});
+
+// Good business metrics
+this.paymentCounter.inc({
+  payment_method: 'credit_card', // ~5 values
+  currency: 'USD', // ~10 values
+  status: 'success', // ~5 values
+});
+```
+
+#### ❌ **DON'T: Use High-Cardinality Labels**
+
+```typescript
+// Bad labels - high cardinality
+this.requestCounter.inc({
+  user_id: '12345', // Potentially millions of values
+  request_id: 'req-abc123', // Unique per request
+  timestamp: '1640995200', // Unique per second
+  ip_address: '192.168.1.1', // Thousands of values
+});
+```
+
+### Custom Business Metrics
+
+#### ✅ **DO: Create Meaningful Business Metrics**
+
+```typescript
+@Injectable()
+export class BusinessMetricsService {
+  private readonly userRegistrationCounter: Counter<string>;
+  private readonly orderValueHistogram: Histogram<string>;
+  private readonly inventoryGauge: Gauge<string>;
+
+  constructor(private readonly metricsService: MetricsService) {
+    this.userRegistrationCounter = this.metricsService.createCounter(
+      'user_registrations_total',
+      'Total number of user registrations',
+      ['plan_type', 'source']
+    );
+
+    this.orderValueHistogram = this.metricsService.createHistogram(
+      'order_value_dollars',
+      'Order value in dollars',
+      ['product_category'],
+      [10, 25, 50, 100, 250, 500, 1000, 2500, 5000] // Dollar amount buckets
+    );
+
+    this.inventoryGauge = this.metricsService.createGauge('inventory_items', 'Current inventory levels', [
+      'product_type',
+      'warehouse',
+    ]);
+  }
+
+  recordUserRegistration(planType: string, source: string): void {
+    this.userRegistrationCounter.inc({ plan_type: planType, source });
+  }
+
+  recordOrderValue(category: string, value: number): void {
+    this.orderValueHistogram.observe({ product_category: category }, value);
+  }
+
+  updateInventory(productType: string, warehouse: string, count: number): void {
+    this.inventoryGauge.set({ product_type: productType, warehouse }, count);
+  }
+}
+```
+
+## Configuration Best Practices
+
+### Environment-Specific Configuration
+
+#### ✅ **DO: Use Environment-Specific Settings**
+
+```typescript
+// config/observability.config.ts
+export const createObservabilityConfig = (env: string) => {
+  const baseConfig = {
+    serviceName: process.env.SERVICE_NAME || 'my-service',
+    serviceVersion: process.env.SERVICE_VERSION || '1.0.0',
+    environment: env,
+  };
+
+  switch (env) {
+    case 'production':
+      return {
+        ...baseConfig,
+        logging: {
+          level: 'info',
+          consoleOutput: false, // Use structured logging in production
+          otlpExport: {
+            enabled: true,
+            endpoint: process.env.OTLP_LOGS_ENDPOINT,
+          },
+        },
+        tracing: {
+          enabled: true,
+          sampler: {
+            type: 'trace_id_ratio',
+            ratio: 0.1, // Sample 10% in production
+          },
+        },
+        metrics: {
+          enabled: true,
+          defaultLabels: {
+            datacenter: process.env.DATACENTER,
+            region: process.env.AWS_REGION,
+          },
+        },
+      };
+
+    case 'staging':
+      return {
+        ...baseConfig,
+        logging: {
+          level: 'debug',
+          consoleOutput: true,
+        },
+        tracing: {
+          enabled: true,
+          sampler: {
+            type: 'trace_id_ratio',
+            ratio: 0.5, // Sample 50% in staging
+          },
+        },
+      };
+
+    case 'development':
+      return {
+        ...baseConfig,
+        logging: {
+          level: 'debug',
+          consoleOutput: true,
+        },
+        tracing: {
+          enabled: true,
+          sampler: {
+            type: 'always_on', // Trace everything in development
+          },
+        },
+      };
+
+    default:
+      return baseConfig;
+  }
+};
+```
+
+### Configuration Validation
+
+#### ✅ **DO: Validate Configuration**
+
+```typescript
+import { IsString, IsEnum, IsOptional, IsNumber, Min, Max } from 'class-validator';
+import { plainToClass, Transform } from 'class-transformer';
+
+export class ObservabilityConfigDto {
+  @IsString()
+  serviceName: string;
+
+  @IsString()
+  serviceVersion: string;
+
+  @IsEnum(['development', 'staging', 'production'])
+  environment: string;
+
+  @IsOptional()
+  @IsNumber()
+  @Min(0)
+  @Max(1)
+  @Transform(({ value }) => parseFloat(value))
+  samplingRatio?: number;
+
+  @IsOptional()
+  @IsEnum(['debug', 'info', 'warn', 'error'])
+  logLevel?: string;
+}
+
+export function validateObservabilityConfig(config: any): ObservabilityConfigDto {
+  const configDto = plainToClass(ObservabilityConfigDto, config);
+  const errors = validate(configDto);
+
+  if (errors.length > 0) {
+    throw new Error(`Invalid observability configuration: ${errors.join(', ')}`);
+  }
+
+  return configDto;
+}
+```
+
+## Performance Best Practices
+
+### Sampling Strategies
+
+#### ✅ **DO: Use Appropriate Sampling**
+
+```typescript
+// Environment-based sampling
+const getSamplingRatio = (environment: string): number => {
+  switch (environment) {
+    case 'production':
+      return 0.01; // 1% sampling in production
+    case 'staging':
+      return 0.1; // 10% sampling in staging
+    case 'development':
+      return 1.0; // 100% sampling in development
+    default:
+      return 0.01;
+  }
+};
+
+// Load-based sampling
+const getLoadBasedSampling = (currentLoad: number): number => {
+  if (currentLoad > 0.8) return 0.01; // 1% under high load
+  if (currentLoad > 0.5) return 0.05; // 5% under medium load
+  return 0.1; // 10% under normal load
+};
+```
+
+### Avoiding Performance Bottlenecks
+
+#### ✅ **DO: Optimize Hot Paths**
+
+```typescript
+@Injectable()
+export class HighThroughputService {
+  // Don't trace utility methods called frequently
+  private formatData(data: any): any {
+    return data.map((item) => ({ ...item, formatted: true }));
+  }
+
+  @Trace('process.batch')
+  async processBatch(items: any[]): Promise<void> {
+    // Trace the batch operation, not individual items
+    const formattedItems = this.formatData(items);
+
+    // Add meaningful attributes without high cardinality
+    addSpanAttributes({
+      'batch.size': items.length,
+      'batch.type': 'user_data',
+      'processing.priority': 'high',
+    });
+
+    await this.processItems(formattedItems);
+  }
+}
+```
+
+#### ❌ **DON'T: Trace Every Operation**
+
+```typescript
+// Bad - too much tracing overhead
+@Injectable()
+@TraceClass()
+export class UtilityService {
+  @Trace('format.single-item') // Don't trace individual items
+  formatSingleItem(item: any): any {
+    return { ...item, formatted: true };
+  }
+
+  @Trace('validate.field') // Don't trace field validation
+  validateField(field: string): boolean {
+    return field.length > 0;
+  }
+}
+```
+
+### Memory Management
+
+#### ✅ **DO: Manage Context Properly**
+
+```typescript
+@Injectable()
+export class RequestHandler {
+  constructor(private readonly logger: LoggerService) {}
+
+  async handleRequest(requestData: RequestDto): Promise<Response> {
+    // Add context for this request
+    this.logger.addContext({
+      requestId: requestData.id,
+      userId: requestData.userId,
+    });
+
+    try {
+      const result = await this.processRequest(requestData);
+      return result;
+    } finally {
+      // Always clean up context to prevent memory leaks
+      this.logger.clearContext();
+    }
+  }
+}
+```
+
+## Security Best Practices
+
+### Sensitive Data Protection
+
+#### ✅ **DO: Sanitize Sensitive Data**
+
+```typescript
+@Injectable()
+export class UserService {
+  constructor(private readonly logger: LoggerService) {
+    this.logger.setContext('UserService');
+  }
+
+  async createUser(userData: CreateUserDto): Promise<User> {
+    // Log sanitized data
+    this.logger.log({
+      message: 'Creating user',
+      email: userData.email,
+      // Never log passwords, tokens, or PII
+      hasPassword: !!userData.password,
+      dataSource: 'api',
+    });
+
+    // Add sanitized span attributes
+    addSpanAttributes({
+      'user.email_domain': userData.email.split('@')[1],
+      'user.has_password': !!userData.password,
+      'user.registration_source': 'web',
+    });
+
+    const user = await this.userRepository.create(userData);
+
+    // Log success with non-sensitive data
+    this.logger.log({
+      message: 'User created successfully',
+      userId: user.id,
+      email: user.email,
+      createdAt: user.createdAt,
+    });
+
+    return user;
+  }
+}
+```
+
+#### ❌ **DON'T: Log Sensitive Information**
+
+```typescript
+// Bad - logging sensitive data
+this.logger.log({
+  message: 'User login',
+  email: userData.email,
+  password: userData.password, // Never log passwords
+  creditCard: userData.creditCard, // Never log credit cards
+  ssn: userData.ssn, // Never log SSNs
+  apiKey: userData.apiKey, // Never log API keys
+});
+
+// Bad - tracing sensitive data
+addSpanAttributes({
+  'user.password': userData.password,
+  'payment.credit_card': paymentData.creditCard,
+  'auth.token': authToken,
+});
+```
+
+### Configuration Security
+
+#### ✅ **DO: Secure Configuration**
+
+```typescript
+// Use environment variables for sensitive configuration
+const observabilityConfig = {
+  tracing: {
+    enabled: process.env.TRACING_ENABLED === 'true',
+    exporter: {
+      type: 'otlp',
+      endpoint: process.env.OTLP_TRACES_ENDPOINT,
+      headers: {
+        Authorization: `Bearer ${process.env.OTLP_API_TOKEN}`,
+      },
+    },
+  },
+  metrics: {
+    enabled: process.env.METRICS_ENABLED === 'true',
+    // Don't expose internal service names in metrics
+    defaultLabels: {
+      service: process.env.SERVICE_NAME,
+      version: process.env.SERVICE_VERSION,
+      environment: process.env.NODE_ENV,
+    },
+  },
+};
+
+// Never log the configuration that contains secrets
+console.log('Observability initialized'); // Don't log config details
+```
+
+## Production Best Practices
+
+### Monitoring and Alerting
+
+#### ✅ **DO: Set Up Proper Monitoring**
+
+```typescript
+@Injectable()
+export class HealthCheckService {
+  constructor(
+    private readonly logger: LoggerService,
+    private readonly metricsService: MetricsService
+  ) {
+    this.logger.setContext('HealthCheckService');
+  }
+
+  @Trace('health.check')
+  async performHealthCheck(): Promise<HealthCheckResult> {
+    const healthMetrics = this.metricsService.createGauge(
+      'service_health_status',
+      'Service health status (1=healthy, 0=unhealthy)',
+      ['component']
+    );
+
+    const checks = [
+      { name: 'database', check: () => this.checkDatabase() },
+      { name: 'redis', check: () => this.checkRedis() },
+      { name: 'external_api', check: () => this.checkExternalApi() },
+    ];
+
+    const results = await Promise.all(
+      checks.map(async ({ name, check }) => {
+        try {
+          const result = await check();
+          healthMetrics.set({ component: name }, 1);
+          return { name, status: 'healthy', ...result };
+        } catch (error) {
+          healthMetrics.set({ component: name }, 0);
+          this.logger.error({
+            message: `Health check failed for ${name}`,
+            component: name,
+            error: error.message,
+          });
+          return { name, status: 'unhealthy', error: error.message };
+        }
+      })
+    );
+
+    const overallHealthy = results.every((r) => r.status === 'healthy');
+    healthMetrics.set({ component: 'overall' }, overallHealthy ? 1 : 0);
+
+    return { healthy: overallHealthy, checks: results };
+  }
+}
+```
+
+### Error Handling and Recovery
+
+#### ✅ **DO: Implement Proper Error Handling**
+
+```typescript
+@Injectable()
+export class ResilientService {
+  constructor(private readonly logger: LoggerService) {
+    this.logger.setContext('ResilientService');
+  }
+
+  @Trace('process.with-retry')
+  async processWithRetry<T>(operation: () => Promise<T>, maxRetries: number = 3, backoffMs: number = 1000): Promise<T> {
+    for (let attempt = 1; attempt <= maxRetries; attempt++) {
+      try {
+        addSpanAttributes({
+          'retry.attempt': attempt,
+          'retry.max_attempts': maxRetries,
+        });
+
+        const result = await operation();
+
+        if (attempt > 1) {
+          this.logger.log({
+            message: 'Operation succeeded after retry',
+            attempt,
+            totalAttempts: maxRetries,
+          });
+        }
+
+        return result;
+      } catch (error) {
+        const isLastAttempt = attempt === maxRetries;
+
+        if (isLastAttempt) {
+          this.logger.error({
+            message: 'Operation failed after all retries',
+            attempt,
+            totalAttempts: maxRetries,
+            error: error.message,
+            stack: error.stack,
+          });
+
+          addSpanAttributes({
+            'retry.failed': true,
+            'retry.final_attempt': attempt,
+          });
+
+          throw error;
+        } else {
+          this.logger.warn({
+            message: 'Operation failed, retrying',
+            attempt,
+            totalAttempts: maxRetries,
+            error: error.message,
+            nextRetryIn: backoffMs * attempt,
+          });
+
+          await new Promise((resolve) => setTimeout(resolve, backoffMs * attempt));
+        }
+      }
+    }
+  }
+}
+```
+
+## Development Best Practices
+
+### Testing Observability
+
+#### ✅ **DO: Test Observability Features**
+
+```typescript
+// test/observability.test.ts
+import { Test, TestingModule } from '@nestjs/testing';
+import { ObservabilityModule } from '@paystackhq/nestjs-observability';
+
+describe('Observability Integration', () => {
+  let app: TestingModule;
+
+  beforeEach(async () => {
+    app = await Test.createTestingModule({
+      imports: [
+        ObservabilityModule.forRoot({
+          serviceName: 'test-service',
+          serviceVersion: '1.0.0',
+          environment: 'test',
+          tracing: { enabled: false }, // Disable tracing in tests
+          metrics: { enabled: false }, // Disable metrics in tests
+          logging: { level: 'error', consoleOutput: false }, // Minimal logging
+        }),
+      ],
+    }).compile();
+  });
+
+  it('should initialize without errors', () => {
+    expect(app).toBeDefined();
+  });
+});
+```
+
+#### ✅ **DO: Mock Observability in Unit Tests**
+
+```typescript
+// user.service.spec.ts
+import { Test, TestingModule } from '@nestjs/testing';
+import { LoggerService } from '@paystackhq/nestjs-observability';
+import { UserService } from './user.service';
+
+describe('UserService', () => {
+  let service: UserService;
+  let loggerService: LoggerService;
+
+  beforeEach(async () => {
+    const mockLogger = {
+      log: jest.fn(),
+      error: jest.fn(),
+      warn: jest.fn(),
+      debug: jest.fn(),
+      setContext: jest.fn(),
+      addContext: jest.fn(),
+      clearContext: jest.fn(),
+      createChildLogger: jest.fn().mockReturnValue({
+        log: jest.fn(),
+        error: jest.fn(),
+      }),
+    };
+
+    const module: TestingModule = await Test.createTestingModule({
+      providers: [UserService, { provide: LoggerService, useValue: mockLogger }],
+    }).compile();
+
+    service = module.get<UserService>(UserService);
+    loggerService = module.get<LoggerService>(LoggerService);
+  });
+
+  it('should log user creation', async () => {
+    const userData = { email: 'test@example.com', name: 'Test User' };
+
+    await service.createUser(userData);
+
+    expect(loggerService.log).toHaveBeenCalledWith({
+      message: 'Creating user',
+      email: userData.email,
+      hasPassword: false,
+    });
+  });
+});
+```
+
+### Local Development
+
+#### ✅ **DO: Use Development-Friendly Configuration**
+
+```typescript
+// Local development configuration
+export const developmentConfig = {
+  serviceName: 'my-service-dev',
+  serviceVersion: '1.0.0-dev',
+  environment: 'development',
+
+  logging: {
+    level: 'debug',
+    consoleOutput: true, // Enable console output for development
+  },
+
+  tracing: {
+    enabled: true,
+    sampler: {
+      type: 'always_on', // Trace everything in development
+    },
+    exporter: {
+      type: 'otlp',
+      endpoint: 'http://localhost:4318/v1/traces', // Local Jaeger
+    },
+  },
+
+  metrics: {
+    enabled: true,
+    endpoint: '/metrics',
+  },
+};
+```
+
+## Architecture Best Practices
+
+### Microservices
+
+#### ✅ **DO: Implement Distributed Tracing**
+
+```typescript
+@Injectable()
+export class OrderService {
+  constructor(
+    private readonly logger: LoggerService,
+    private readonly paymentService: PaymentService,
+    private readonly inventoryService: InventoryService,
+    private readonly notificationService: NotificationService
+  ) {
+    this.logger.setContext('OrderService');
+  }
+
+  @Trace('order.process')
+  async processOrder(orderData: OrderDto): Promise<Order> {
+    const correlationId = generateCorrelationId();
+
+    // Add correlation ID to span
+    addSpanAttributes({
+      'order.correlation_id': correlationId,
+      'order.total': orderData.total,
+      'order.items_count': orderData.items.length,
+    });
+
+    // Add correlation ID to logs
+    this.logger.addContext({ correlationId });
+
+    try {
+      // Each service call will create child spans
+      const paymentResult = await this.paymentService.processPayment({
+        ...orderData.payment,
+        correlationId,
+      });
+
+      const inventoryResult = await this.inventoryService.reserveItems({
+        ...orderData.items,
+        correlationId,
+      });
+
+      const order = await this.createOrder(orderData, paymentResult, inventoryResult);
+
+      // Fire and forget notification (separate span)
+      this.notificationService.sendOrderConfirmation({
+        orderId: order.id,
+        correlationId,
+      });
+
+      return order;
+    } finally {
+      this.logger.clearContext();
+    }
+  }
+}
+```
+
+### Event-Driven Architecture
+
+#### ✅ **DO: Trace Across Event Boundaries**
+
+```typescript
+@Injectable()
+export class EventHandler {
+  constructor(private readonly logger: LoggerService) {
+    this.logger.setContext('EventHandler');
+  }
+
+  @Trace('event.handle')
+  async handleOrderCreated(event: OrderCreatedEvent): Promise<void> {
+    // Extract tracing context from event
+    const traceContext = event.metadata?.traceContext;
+
+    addSpanAttributes({
+      'event.type': 'order.created',
+      'event.id': event.id,
+      'event.timestamp': event.timestamp,
+      'order.id': event.orderId,
+    });
+
+    // Link to parent trace if available
+    if (traceContext) {
+      addSpanAttributes({
+        'parent.trace_id': traceContext.traceId,
+        'parent.span_id': traceContext.spanId,
+      });
+    }
+
+    this.logger.log({
+      message: 'Processing order created event',
+      eventId: event.id,
+      orderId: event.orderId,
+      traceContext,
+    });
+
+    // Process the event
+    await this.processOrderCreatedEvent(event);
+  }
+}
+```
+
+## Troubleshooting Best Practices
+
+### Common Issues and Solutions
+
+#### ✅ **DO: Implement Proper Error Correlation**
+
+```typescript
+@Injectable()
+export class ErrorTrackingService {
+  constructor(private readonly logger: LoggerService) {
+    this.logger.setContext('ErrorTrackingService');
+  }
+
+  @Trace('error.track')
+  async trackError(error: Error, context: ErrorContext): Promise<void> {
+    const errorId = generateErrorId();
+
+    // Add error attributes to span
+    addSpanAttributes({
+      'error.id': errorId,
+      'error.type': error.constructor.name,
+      'error.message': error.message,
+      'error.stack_trace': error.stack,
+      'error.context.user_id': context.userId,
+      'error.context.operation': context.operation,
+    });
+
+    // Log detailed error information
+    this.logger.error({
+      message: 'Error occurred',
+      errorId,
+      errorType: error.constructor.name,
+      errorMessage: error.message,
+      stack: error.stack,
+      context,
+      timestamp: new Date().toISOString(),
+    });
+
+    // Send to error tracking service
+    await this.sendToErrorTrackingService(errorId, error, context);
+  }
+}
+```
+
+#### ✅ **DO: Create Debugging Utilities**
+
+```typescript
+@Injectable()
+export class DebugService {
+  constructor(private readonly logger: LoggerService) {
+    this.logger.setContext('DebugService');
+  }
+
+  @Trace('debug.performance')
+  async measurePerformance<T>(operation: () => Promise<T>, operationName: string): Promise<T> {
+    const startTime = Date.now();
+
+    addSpanAttributes({
+      'debug.operation': operationName,
+      'debug.start_time': startTime,
+    });
+
+    try {
+      const result = await operation();
+      const duration = Date.now() - startTime;
+
+      addSpanAttributes({
+        'debug.duration_ms': duration,
+        'debug.success': true,
+      });
+
+      this.logger.debug({
+        message: `Operation completed: ${operationName}`,
+        duration,
+        success: true,
+      });
+
+      return result;
+    } catch (error) {
+      const duration = Date.now() - startTime;
+
+      addSpanAttributes({
+        'debug.duration_ms': duration,
+        'debug.success': false,
+        'debug.error': error.message,
+      });
+
+      this.logger.error({
+        message: `Operation failed: ${operationName}`,
+        duration,
+        error: error.message,
+        stack: error.stack,
+      });
+
+      throw error;
+    }
+  }
+}
+```
+
+### Performance Debugging
+
+#### ✅ **DO: Monitor Performance Metrics**
+
+```typescript
+@Injectable()
+export class PerformanceMonitor {
+  private readonly performanceMetrics: Histogram<string>;
+
+  constructor(private readonly metricsService: MetricsService) {
+    this.performanceMetrics = this.metricsService.createHistogram(
+      'operation_duration_seconds',
+      'Operation duration in seconds',
+      ['operation', 'status'],
+      [0.001, 0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1, 2.5, 5, 10]
+    );
+  }
+
+  @Trace('performance.monitor')
+  async monitorOperation<T>(operation: () => Promise<T>, operationName: string): Promise<T> {
+    const startTime = Date.now();
+
+    try {
+      const result = await operation();
+      const duration = (Date.now() - startTime) / 1000;
+
+      this.performanceMetrics.observe({ operation: operationName, status: 'success' }, duration);
+
+      return result;
+    } catch (error) {
+      const duration = (Date.now() - startTime) / 1000;
+
+      this.performanceMetrics.observe({ operation: operationName, status: 'error' }, duration);
+
+      throw error;
+    }
+  }
+}
+```
+
+## Summary
+
+Following these best practices will help you:
+
+1. **Implement effective observability** without performance impact
+2. **Maintain security** while gaining insights
+3. **Scale your observability** with your application
+4. **Troubleshoot issues** quickly and efficiently
+5. **Optimize performance** based on real data
+
+Remember to:
+
+- Start simple and add complexity as needed
+- Monitor the monitoring (observability overhead)
+- Regular review and optimization of your observability setup
+- Keep security and performance in mind at all times
+- Use the right tool for the right job (logs vs metrics vs traces)
+
+For more specific guidance on any of these topics, refer to the individual documentation sections or reach out to your platform team.
