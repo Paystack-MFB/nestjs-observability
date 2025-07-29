@@ -18,16 +18,29 @@ function fixEsmImports(dir) {
     } else if (file.endsWith('.js') || file.endsWith('.d.ts')) {
       let content = fs.readFileSync(filePath, 'utf8');
 
-      // Fix relative imports - add .js extension
-      content = content.replace(/from\s+['"](\.[^'"]*?)['"](?!\.[jt]s)/g, "from '$1.js'");
+      // Fix relative imports - add .js extension only if not already present
+      content = content.replace(/from\s+['"](\.[^'"]*?)['"](?!\.[jt]s)/g, (match, relativePath) => {
+        if (relativePath.endsWith('.js')) {
+          return match; // Already has .js extension
+        }
+        return match.replace(relativePath, relativePath + '.js');
+      });
 
       // Fix relative imports in import() calls
-      content = content.replace(/import\s*\(\s*['"](\.[^'"]*?)['"](?!\.[jt]s)/g, "import('$1.js'");
+      content = content.replace(/import\s*\(\s*['"](\.[^'"]*?)['"](?!\.[jt]s)/g, (match, relativePath) => {
+        if (relativePath.endsWith('.js')) {
+          return match; // Already has .js extension
+        }
+        return match.replace(relativePath, relativePath + '.js');
+      });
 
       // Fix export from statements
-      content = content.replace(/export\s+.*?\s+from\s+['"](\.[^'"]*?)['"](?!\.[jt]s)/g, (match, relativePath) =>
-        match.replace(relativePath, relativePath + '.js')
-      );
+      content = content.replace(/export\s+.*?\s+from\s+['"](\.[^'"]*?)['"](?!\.[jt]s)/g, (match, relativePath) => {
+        if (relativePath.endsWith('.js')) {
+          return match; // Already has .js extension
+        }
+        return match.replace(relativePath, relativePath + '.js');
+      });
 
       fs.writeFileSync(filePath, content);
     }

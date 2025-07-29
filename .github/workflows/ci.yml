@@ -53,6 +53,7 @@ jobs:
           test -f dist/cjs/index.d.ts
           test -f dist/esm/index.js
           test -f dist/esm/index.d.ts
+          test -f dist/package.json
 
   build-examples:
     name: Test Examples

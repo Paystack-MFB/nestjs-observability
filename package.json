@@ -27,10 +27,11 @@
     "LICENSE"
   ],
   "scripts": {
-    "build": "pnpm run clean && pnpm run build:cjs && pnpm run build:esm && pnpm run validate-build",
+    "build": "pnpm run clean && pnpm run build:cjs && pnpm run build:esm && pnpm run copy-package-json && pnpm run validate-build",
     "build:cjs": "tsc -p tsconfig.build.cjs.json",
     "build:esm": "tsc -p tsconfig.build.esm.json && pnpm run fix-esm-imports",
     "build:info": "node scripts/build-info.js",
+    "copy-package-json": "node scripts/copy-package-json.js",
     "fix-esm-imports": "node scripts/fix-esm-imports.js",
     "validate-build": "node scripts/validate-build.js",
     "dev": "tsx --watch src/index.ts",
