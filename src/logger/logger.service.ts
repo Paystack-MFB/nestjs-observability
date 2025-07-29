@@ -1,6 +1,7 @@
 import { ConsoleLogger, Inject, Injectable, LogLevel, Scope } from '@nestjs/common';
-import { OTLPLogExporter } from '@opentelemetry/exporter-logs-otlp-proto';
 import { trace } from '@opentelemetry/api';
+import { OTLPLogExporter } from '@opentelemetry/exporter-logs-otlp-proto';
+import { resourceFromAttributes } from '@opentelemetry/resources';
 import { BatchLogRecordProcessor, LoggerProvider } from '@opentelemetry/sdk-logs';
 
 import type { ObservabilityConfig } from '../config/observability.config';
@@ -26,9 +27,17 @@ export class LoggerService extends ConsoleLogger {
     });
 
     if (this.config.logging.otlpExport.enabled) {
-      this.loggerProvider = new LoggerProvider();
       const exporter = new OTLPLogExporter({ url: this.config.logging.otlpExport.endpoint });
-      this.loggerProvider.addLogRecordProcessor(new BatchLogRecordProcessor(exporter));
+      const resource = resourceFromAttributes({
+        'deployment.environment': this.config.environment,
+        'service.name': this.config.serviceName,
+        'service.version': this.config.serviceVersion,
+      });
+
+      this.loggerProvider = new LoggerProvider({
+        processors: [new BatchLogRecordProcessor(exporter)],
+        resource,
+      });
     }
   }
 

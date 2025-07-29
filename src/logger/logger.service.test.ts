@@ -119,14 +119,14 @@ describe('LoggerService', () => {
 
       const parsed = JSON.parse(loggedMessage);
       expect(parsed).toMatchObject({
-        level: 'log',
-        message: 'Test message',
+        context: 'TestContext',
         dd: {
           env: 'production',
           service: 'test-service',
           version: '1.0.0',
         },
-        context: 'TestContext',
+        level: 'log',
+        message: 'Test message',
         timestamp: expect.stringMatching(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/),
       });
     });
@@ -148,12 +148,12 @@ describe('LoggerService', () => {
       const parsed = JSON.parse(loggedMessage);
 
       expect(parsed).toMatchObject({
-        level: 'log',
-        message: 'Test message with trace',
         dd: {
           span_id: 'abc123',
           trace_id: 'def456',
         },
+        level: 'log',
+        message: 'Test message with trace',
       });
     });
 
@@ -168,13 +168,13 @@ describe('LoggerService', () => {
 
       expect(parsed).toMatchObject({
         context: 'ErrorContext',
-        level: 'error',
-        message: 'Test error message',
         dd: {
           env: 'production',
           service: 'test-service',
           version: '1.0.0',
         },
+        level: 'error',
+        message: 'Test error message',
       });
     });
 
@@ -186,15 +186,15 @@ describe('LoggerService', () => {
       const parsed = JSON.parse(loggedMessage);
 
       expect(parsed).toMatchObject({
-        level: 'log',
-        message: 'Test message with context',
-        sessionId: 'session-456',
-        userId: '123',
         dd: {
           env: 'production',
           service: 'test-service',
           version: '1.0.0',
         },
+        level: 'log',
+        message: 'Test message with context',
+        sessionId: 'session-456',
+        userId: '123',
       });
     });
 
@@ -212,15 +212,15 @@ describe('LoggerService', () => {
 
       expect(parsed).toMatchObject({
         context: 'ObjectContext',
-        level: 'log',
-        message: 'Object message',
-        requestId: 'req-123',
         data: { key: 'value' },
         dd: {
           env: 'production',
           service: 'test-service',
           version: '1.0.0',
         },
+        level: 'log',
+        message: 'Object message',
+        requestId: 'req-123',
       });
     });
 
@@ -295,15 +295,15 @@ describe('LoggerService', () => {
       const parsed = JSON.parse(loggedMessage);
 
       expect(parsed).toMatchObject({
-        level: 'log',
-        message: 'Context test message',
-        sessionId: 'session-456',
-        userId: 'user-789', // Should be overridden value
         dd: {
           env: 'production',
           service: 'test-service',
           version: '1.0.0',
         },
+        level: 'log',
+        message: 'Context test message',
+        sessionId: 'session-456',
+        userId: 'user-789', // Should be overridden value
       });
     });
 
@@ -351,23 +351,23 @@ describe('LoggerService', () => {
       const childParsed = JSON.parse(childMessage);
 
       expect(parentParsed).toMatchObject({
-        level: 'log',
-        message: 'Parent message',
-        parentContext: 'parent-value',
         dd: {
           env: 'production',
         },
+        level: 'log',
+        message: 'Parent message',
+        parentContext: 'parent-value',
       });
 
       expect(childParsed).toMatchObject({
         childContext: 'child-value',
+        dd: {
+          env: 'production',
+        },
         level: 'log',
         message: 'Child message',
         operationId: 'op-123',
         parentContext: 'parent-value', // Should inherit from parent
-        dd: {
-          env: 'production',
-        },
       });
     });
 
@@ -387,22 +387,22 @@ describe('LoggerService', () => {
       const child2Parsed = JSON.parse(child2Message);
 
       expect(child1Parsed).toMatchObject({
-        level: 'log',
-        message: 'Message from service 1',
-        service1Ctx: 'value1',
         dd: {
           env: 'production',
         },
+        level: 'log',
+        message: 'Message from service 1',
+        service1Ctx: 'value1',
       });
       expect(child1Parsed).not.toHaveProperty('service2Ctx');
 
       expect(child2Parsed).toMatchObject({
-        level: 'log',
-        message: 'Message from service 2',
-        service2Ctx: 'value2',
         dd: {
           env: 'production',
         },
+        level: 'log',
+        message: 'Message from service 2',
+        service2Ctx: 'value2',
       });
       expect(child2Parsed).not.toHaveProperty('service1Ctx');
     });

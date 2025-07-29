@@ -168,12 +168,10 @@ pnpm run prepublishOnly
 ### Common Issues
 
 1. **ESM Import Errors**
-
    - Ensure `.js` extensions are added to relative imports
    - Run `pnpm run fix-esm-imports` manually if needed
 
 2. **Type Definition Issues**
-
    - Check that both CommonJS and ESM type definitions are generated
    - Verify `composite: true` is set in build configurations
 
