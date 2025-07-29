@@ -1,5 +1,7 @@
 import { ConsoleLogger, Inject, Injectable, LogLevel, Scope } from '@nestjs/common';
+import { OTLPLogExporter } from '@opentelemetry/exporter-logs-otlp-proto';
 import { trace } from '@opentelemetry/api';
+import { BatchLogRecordProcessor, LoggerProvider } from '@opentelemetry/sdk-logs';
 
 import type { ObservabilityConfig } from '../config/observability.config';
 
@@ -15,12 +17,19 @@ interface LogContext extends Record<string, unknown> {
  */
 @Injectable({ scope: Scope.TRANSIENT })
 export class LoggerService extends ConsoleLogger {
+  private readonly loggerProvider: LoggerProvider | null = null;
   private readonly persistentContext: LogContext = {};
 
   constructor(@Inject('OBSERVABILITY_CONFIG') private readonly config: ObservabilityConfig) {
     super('LoggerService', {
       logLevels: LoggerService.getLogLevels(config.logging.level),
     });
+
+    if (this.config.logging.otlpExport.enabled) {
+      this.loggerProvider = new LoggerProvider();
+      const exporter = new OTLPLogExporter({ url: this.config.logging.otlpExport.endpoint });
+      this.loggerProvider.addLogRecordProcessor(new BatchLogRecordProcessor(exporter));
+    }
   }
 
   private static getLogLevels(level: string): LogLevel[] {
@@ -122,12 +131,17 @@ export class LoggerService extends ConsoleLogger {
    * Format message as structured JSON
    */
   private formatAsJSON(level: LogLevel, message: unknown, context?: string, stack?: string): string {
+    const traceContext = this.getTraceContext();
+
     const logEntry: Record<string, unknown> = {
-      environment: this.config.environment,
+      dd: {
+        env: this.config.environment,
+        service: this.config.serviceName,
+        span_id: traceContext?.spanId,
+        trace_id: traceContext?.traceId,
+        version: this.config.serviceVersion,
+      },
       level,
-      pid: process.pid,
-      serviceName: this.config.serviceName,
-      serviceVersion: this.config.serviceVersion,
       timestamp: new Date().toISOString(),
     };
 
@@ -138,13 +152,6 @@ export class LoggerService extends ConsoleLogger {
     // Add stack trace for errors
     if (stack) {
       logEntry['stack'] = stack;
-    }
-
-    // Add trace context
-    const traceContext = this.getTraceContext();
-    if (traceContext) {
-      logEntry['traceId'] = traceContext.traceId;
-      logEntry['spanId'] = traceContext.spanId;
     }
 
     // Handle message extraction and object context merging
@@ -160,7 +167,7 @@ export class LoggerService extends ConsoleLogger {
       } else if (message instanceof Error) {
         logEntry['message'] = message.message;
       } else {
-        logEntry['message'] = JSON.stringify(message);
+        logEntry['params'] = message;
       }
 
       // Merge additional context from object
@@ -198,6 +205,16 @@ export class LoggerService extends ConsoleLogger {
    * Core method that handles all logging with console output check
    */
   private writeLog(level: LogLevel, message: unknown, context?: string, stack?: string): void {
+    // OTLP export
+    if (this.loggerProvider) {
+      // In production, output structured JSON directly to console
+      const formattedMessage = this.formatAsJSON(level, message, context, stack);
+      this.loggerProvider.getLogger(this.config.serviceName, this.config.serviceVersion).emit({
+        body: formattedMessage,
+        severityText: level,
+      });
+    }
+
     if (!this.config.logging.consoleOutput) {
       return;
     }
