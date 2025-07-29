@@ -120,12 +120,13 @@ describe('LoggerService', () => {
       const parsed = JSON.parse(loggedMessage);
       expect(parsed).toMatchObject({
         context: 'TestContext',
-        environment: 'production',
+        dd: {
+          env: 'production',
+          service: 'test-service',
+          version: '1.0.0',
+        },
         level: 'log',
         message: 'Test message',
-        pid: expect.any(Number),
-        serviceName: 'test-service',
-        serviceVersion: '1.0.0',
         timestamp: expect.stringMatching(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/),
       });
     });
@@ -147,10 +148,12 @@ describe('LoggerService', () => {
       const parsed = JSON.parse(loggedMessage);
 
       expect(parsed).toMatchObject({
+        dd: {
+          span_id: 'abc123',
+          trace_id: 'def456',
+        },
         level: 'log',
         message: 'Test message with trace',
-        spanId: 'abc123',
-        traceId: 'def456',
       });
     });
 
@@ -165,11 +168,13 @@ describe('LoggerService', () => {
 
       expect(parsed).toMatchObject({
         context: 'ErrorContext',
-        environment: 'production',
+        dd: {
+          env: 'production',
+          service: 'test-service',
+          version: '1.0.0',
+        },
         level: 'error',
         message: 'Test error message',
-        serviceName: 'test-service',
-        serviceVersion: '1.0.0',
       });
     });
 
@@ -181,11 +186,13 @@ describe('LoggerService', () => {
       const parsed = JSON.parse(loggedMessage);
 
       expect(parsed).toMatchObject({
-        environment: 'production',
+        dd: {
+          env: 'production',
+          service: 'test-service',
+          version: '1.0.0',
+        },
         level: 'log',
         message: 'Test message with context',
-        serviceName: 'test-service',
-        serviceVersion: '1.0.0',
         sessionId: 'session-456',
         userId: '123',
       });
@@ -206,12 +213,14 @@ describe('LoggerService', () => {
       expect(parsed).toMatchObject({
         context: 'ObjectContext',
         data: { key: 'value' },
-        environment: 'production',
+        dd: {
+          env: 'production',
+          service: 'test-service',
+          version: '1.0.0',
+        },
         level: 'log',
         message: 'Object message',
         requestId: 'req-123',
-        serviceName: 'test-service',
-        serviceVersion: '1.0.0',
       });
     });
 
@@ -286,11 +295,13 @@ describe('LoggerService', () => {
       const parsed = JSON.parse(loggedMessage);
 
       expect(parsed).toMatchObject({
-        environment: 'production',
+        dd: {
+          env: 'production',
+          service: 'test-service',
+          version: '1.0.0',
+        },
         level: 'log',
         message: 'Context test message',
-        serviceName: 'test-service',
-        serviceVersion: '1.0.0',
         sessionId: 'session-456',
         userId: 'user-789', // Should be overridden value
       });
@@ -340,7 +351,9 @@ describe('LoggerService', () => {
       const childParsed = JSON.parse(childMessage);
 
       expect(parentParsed).toMatchObject({
-        environment: 'production',
+        dd: {
+          env: 'production',
+        },
         level: 'log',
         message: 'Parent message',
         parentContext: 'parent-value',
@@ -348,7 +361,9 @@ describe('LoggerService', () => {
 
       expect(childParsed).toMatchObject({
         childContext: 'child-value',
-        environment: 'production',
+        dd: {
+          env: 'production',
+        },
         level: 'log',
         message: 'Child message',
         operationId: 'op-123',
@@ -372,7 +387,9 @@ describe('LoggerService', () => {
       const child2Parsed = JSON.parse(child2Message);
 
       expect(child1Parsed).toMatchObject({
-        environment: 'production',
+        dd: {
+          env: 'production',
+        },
         level: 'log',
         message: 'Message from service 1',
         service1Ctx: 'value1',
@@ -380,7 +397,9 @@ describe('LoggerService', () => {
       expect(child1Parsed).not.toHaveProperty('service2Ctx');
 
       expect(child2Parsed).toMatchObject({
-        environment: 'production',
+        dd: {
+          env: 'production',
+        },
         level: 'log',
         message: 'Message from service 2',
         service2Ctx: 'value2',
@@ -407,8 +426,8 @@ describe('LoggerService', () => {
       const [loggedMessage] = logSpy.mock.calls[0] as [string];
       const parsed = JSON.parse(loggedMessage);
 
-      expect(parsed).not.toHaveProperty('traceId');
-      expect(parsed).not.toHaveProperty('spanId');
+      expect(parsed.dd).not.toHaveProperty('traceId');
+      expect(parsed.dd).not.toHaveProperty('spanId');
       expect(parsed.message).toBe('Message without trace');
     });
 
@@ -426,8 +445,8 @@ describe('LoggerService', () => {
 
       // Should still log message even if trace extraction fails
       expect(parsed.message).toBe('Message with broken trace');
-      expect(parsed).not.toHaveProperty('traceId');
-      expect(parsed).not.toHaveProperty('spanId');
+      expect(parsed.dd).not.toHaveProperty('traceId');
+      expect(parsed.dd).not.toHaveProperty('spanId');
     });
   });
 
@@ -464,7 +483,7 @@ describe('LoggerService', () => {
       // Should be JSON
       expect(() => JSON.parse(prodMessage)).not.toThrow();
       const prodParsed = JSON.parse(prodMessage);
-      expect(prodParsed.environment).toBe('production');
+      expect(prodParsed.dd.env).toBe('production');
 
       await prodModule.close();
 

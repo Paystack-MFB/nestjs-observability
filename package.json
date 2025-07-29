@@ -1,6 +1,6 @@
 {
   "name": "@paystackhq/nestjs-observability",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "A comprehensive observability package for NestJS applications that provides structured logging, metrics collection, and distributed tracing capabilities.",
   "type": "commonjs",
   "main": "./dist/cjs/index.js",
@@ -27,10 +27,11 @@
     "LICENSE"
   ],
   "scripts": {
-    "build": "pnpm run clean && pnpm run build:cjs && pnpm run build:esm && pnpm run validate-build",
+    "build": "pnpm run clean && pnpm run build:cjs && pnpm run build:esm && pnpm run copy-package-json && pnpm run validate-build",
     "build:cjs": "tsc -p tsconfig.build.cjs.json",
     "build:esm": "tsc -p tsconfig.build.esm.json && pnpm run fix-esm-imports",
     "build:info": "node scripts/build-info.js",
+    "copy-package-json": "node scripts/copy-package-json.js",
     "fix-esm-imports": "node scripts/fix-esm-imports.js",
     "validate-build": "node scripts/validate-build.js",
     "dev": "tsx --watch src/index.ts",
@@ -93,11 +94,14 @@
   "dependencies": {
     "@opentelemetry/api": "^1.9.0",
     "@opentelemetry/auto-instrumentations-node": "^0.49.1",
+    "@opentelemetry/exporter-logs-otlp-proto": "^0.203.0",
     "@opentelemetry/exporter-trace-otlp-http": "^0.54.0",
     "@opentelemetry/instrumentation-express": "^0.42.0",
     "@opentelemetry/instrumentation-nestjs-core": "^0.40.0",
     "@opentelemetry/instrumentation-router": "^0.39.0",
     "@opentelemetry/instrumentation-winston": "^0.34.0",
+    "@opentelemetry/resources": "^2.0.1",
+    "@opentelemetry/sdk-logs": "^0.203.0",
     "@opentelemetry/sdk-node": "^0.54.0",
     "@opentelemetry/sdk-trace-node": "^1.27.0",
     "prom-client": "^15.1.3"
