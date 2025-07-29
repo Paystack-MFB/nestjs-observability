@@ -47,9 +47,12 @@ jobs:
         run: |
           # Verify dist directory exists and contains expected files
           test -d dist
-          test -f dist/index.js
-          test -f dist/index.d.ts
-          test -f dist/package.json
+          test -f dist/cjs/index.js
+          test -f dist/cjs/index.d.ts
+          test -f dist/cjs/package.json
+          test -f dist/esm/index.js
+          test -f dist/esm/index.d.ts
+          test -f dist/esm/package.json
 
   build-examples:
     name: Test Examples
