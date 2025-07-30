@@ -32,7 +32,7 @@ vi.mock('@opentelemetry/resources', () => ({
 }));
 
 // Mock OpenTelemetry exporter
-vi.mock('@opentelemetry/exporter-logs-otlp-proto', () => ({
+vi.mock('@opentelemetry/exporter-logs-otlp-http', () => ({
   OTLPLogExporter: vi.fn(),
 }));
 
@@ -482,7 +482,10 @@ describe('LoggerService', () => {
 
       // Mock the LoggerProvider constructor
       const { LoggerProvider } = await import('@opentelemetry/sdk-logs');
-      vi.mocked(LoggerProvider).mockImplementation(() => mockLoggerProvider);
+      vi.mocked(LoggerProvider).mockImplementation(() => ({
+        ...mockLoggerProvider,
+        addLogRecordProcessor: vi.fn(),
+      }));
 
       // Mock the BatchLogRecordProcessor
       const { BatchLogRecordProcessor } = await import('@opentelemetry/sdk-logs');
@@ -497,7 +500,7 @@ describe('LoggerService', () => {
       );
 
       // Mock the OTLPLogExporter
-      const { OTLPLogExporter } = await import('@opentelemetry/exporter-logs-otlp-proto');
+      const { OTLPLogExporter } = await import('@opentelemetry/exporter-logs-otlp-http');
       vi.mocked(OTLPLogExporter).mockImplementation(
         () =>
           ({
