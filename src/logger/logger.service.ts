@@ -1,3 +1,5 @@
+import type { AnyValueMap } from '@opentelemetry/api-logs';
+
 import { ConsoleLogger, Inject, Injectable, LogLevel, Scope } from '@nestjs/common';
 import { trace } from '@opentelemetry/api';
 import { OTLPLogExporter } from '@opentelemetry/exporter-logs-otlp-proto';
@@ -216,10 +218,58 @@ export class LoggerService extends ConsoleLogger {
   private writeLog(level: LogLevel, message: unknown, context?: string, stack?: string): void {
     // OTLP export
     if (this.loggerProvider) {
-      // In production, output structured JSON directly to console
-      const formattedMessage = this.formatAsJSON(level, message, context, stack);
+      const traceContext = this.getTraceContext();
+
+      // Create the log record body as an object, not a JSON string
+      const logBody: AnyValueMap = {
+        dd: {
+          env: this.config.environment,
+          service: this.config.serviceName,
+          span_id: traceContext?.spanId,
+          trace_id: traceContext?.traceId,
+          version: this.config.serviceVersion,
+        },
+        level,
+        timestamp: new Date().toISOString(),
+      };
+
+      if (context) {
+        logBody['context'] = context;
+      }
+
+      // Add stack trace for errors
+      if (stack) {
+        logBody['stack'] = stack;
+      }
+
+      // Handle message extraction and object context merging
+      if (typeof message === 'string') {
+        logBody['message'] = message;
+      } else if (typeof message === 'object' && message !== null && !Array.isArray(message)) {
+        const messageObj = message as LogContext;
+        const { message: msg, msg: msgAlias, ...additionalContext } = messageObj;
+
+        // Extract message from object
+        if (msg ?? msgAlias) {
+          logBody['message'] = String(msg ?? msgAlias);
+        } else if (message instanceof Error) {
+          logBody['message'] = message.message;
+        } else {
+          // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-explicit-any
+          logBody['params'] = message as any; // Cast to any to satisfy AnyValue type
+        }
+
+        // Merge additional context from object
+        Object.assign(logBody, additionalContext);
+      } else {
+        logBody['message'] = String(message);
+      }
+
+      // Merge persistent context
+      Object.assign(logBody, this.persistentContext);
+
       this.loggerProvider.getLogger(this.config.serviceName, this.config.serviceVersion).emit({
-        body: formattedMessage,
+        body: logBody,
         severityText: level,
       });
     }
