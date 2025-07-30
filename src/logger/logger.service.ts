@@ -2,7 +2,7 @@ import type { AnyValueMap } from '@opentelemetry/api-logs';
 
 import { ConsoleLogger, Inject, Injectable, LogLevel, Scope } from '@nestjs/common';
 import { trace } from '@opentelemetry/api';
-import { OTLPLogExporter } from '@opentelemetry/exporter-logs-otlp-proto';
+import { OTLPLogExporter } from '@opentelemetry/exporter-logs-otlp-http';
 import { resourceFromAttributes } from '@opentelemetry/resources';
 import { BatchLogRecordProcessor, LoggerProvider } from '@opentelemetry/sdk-logs';
 
@@ -29,17 +29,23 @@ export class LoggerService extends ConsoleLogger {
     });
 
     if (this.config.logging.otlpExport.enabled) {
-      const exporter = new OTLPLogExporter({ url: this.config.logging.otlpExport.endpoint });
-      const resource = resourceFromAttributes({
-        'deployment.environment': this.config.environment,
-        'service.name': this.config.serviceName,
-        'service.version': this.config.serviceVersion,
-      });
+      try {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-assignment
+        const exporter = new OTLPLogExporter({ url: this.config.logging.otlpExport.endpoint }) as any;
+        const resource = resourceFromAttributes({
+          'deployment.environment': this.config.environment,
+          'service.name': this.config.serviceName,
+          'service.version': this.config.serviceVersion,
+        });
 
-      this.loggerProvider = new LoggerProvider({
-        processors: [new BatchLogRecordProcessor(exporter)],
-        resource,
-      });
+        this.loggerProvider = new LoggerProvider({
+          resource,
+        });
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-argument
+        this.loggerProvider.addLogRecordProcessor(new BatchLogRecordProcessor(exporter));
+      } catch (error) {
+        console.warn('Failed to initialize OTLP log exporter:', error);
+      }
     }
   }
 
