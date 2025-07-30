@@ -1,5 +1,15 @@
 # @paystackhq/nestjs-observability
 
+## 0.1.4
+
+### Patch Changes
+
+- **chore**: Update OpenTelemetry dependencies to consistent versions
+  - Updated `@opentelemetry/api-logs` to `^0.54.0`
+  - Updated `@opentelemetry/sdk-logs` to `^0.54.0`
+  - Updated `@opentelemetry/exporter-logs-otlp-http` to `^0.54.0`
+  - Ensures compatibility across all OpenTelemetry packages
+
 ## 0.1.3
 
 ### Patch Changes

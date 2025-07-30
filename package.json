@@ -1,6 +1,6 @@
 {
   "name": "@paystackhq/nestjs-observability",
-  "version": "0.1.3",
+  "version": "0.1.4",
   "description": "A comprehensive observability package for NestJS applications that provides structured logging, metrics collection, and distributed tracing capabilities.",
   "type": "commonjs",
   "main": "./dist/cjs/index.js",
