@@ -14,11 +14,26 @@ import { ObservabilityConfig } from '../config/observability.config';
 import { LoggerService } from './logger.service';
 
 // Mock OpenTelemetry
-
 vi.mock('@opentelemetry/api', () => ({
   trace: {
     getActiveSpan: vi.fn(),
   },
+}));
+
+// Mock OpenTelemetry SDK logs
+vi.mock('@opentelemetry/sdk-logs', () => ({
+  BatchLogRecordProcessor: vi.fn(),
+  LoggerProvider: vi.fn(),
+}));
+
+// Mock OpenTelemetry resources
+vi.mock('@opentelemetry/resources', () => ({
+  resourceFromAttributes: vi.fn(),
+}));
+
+// Mock OpenTelemetry exporter
+vi.mock('@opentelemetry/exporter-logs-otlp-proto', () => ({
+  OTLPLogExporter: vi.fn(),
 }));
 
 describe('LoggerService', () => {
@@ -447,6 +462,169 @@ describe('LoggerService', () => {
       expect(parsed.message).toBe('Message with broken trace');
       expect(parsed.dd).not.toHaveProperty('traceId');
       expect(parsed.dd).not.toHaveProperty('spanId');
+    });
+  });
+
+  describe('OTLP Export Functionality', () => {
+    let mockLogger: any;
+    let mockLoggerProvider: any;
+    let mockEmit: any;
+
+    beforeEach(async () => {
+      // Mock the LoggerProvider and its methods
+      mockEmit = vi.fn();
+      mockLogger = {
+        emit: mockEmit,
+      };
+      mockLoggerProvider = {
+        getLogger: vi.fn().mockReturnValue(mockLogger),
+      };
+
+      // Mock the LoggerProvider constructor
+      const { LoggerProvider } = await import('@opentelemetry/sdk-logs');
+      vi.mocked(LoggerProvider).mockImplementation(() => mockLoggerProvider);
+
+      // Mock the BatchLogRecordProcessor
+      const { BatchLogRecordProcessor } = await import('@opentelemetry/sdk-logs');
+      vi.mocked(BatchLogRecordProcessor).mockImplementation(
+        () =>
+          ({
+            _exporter: {},
+            _maxExportBatchSize: 512,
+            _maxQueueSize: 2048,
+            onShutdown: vi.fn(),
+          }) as any
+      );
+
+      // Mock the OTLPLogExporter
+      const { OTLPLogExporter } = await import('@opentelemetry/exporter-logs-otlp-proto');
+      vi.mocked(OTLPLogExporter).mockImplementation(
+        () =>
+          ({
+            _delegate: {},
+            export: vi.fn(),
+            forceFlush: vi.fn(),
+            shutdown: vi.fn(),
+          }) as any
+      );
+
+      // Mock the resourceFromAttributes
+      const { resourceFromAttributes } = await import('@opentelemetry/resources');
+      vi.mocked(resourceFromAttributes).mockReturnValue({} as any);
+
+      const config = createConfig({
+        logging: {
+          consoleOutput: false, // Disable console output to focus on OTLP
+          level: 'debug',
+          otlpExport: {
+            enabled: true,
+            endpoint: 'http://localhost:4318/v1/logs',
+          },
+        },
+      });
+
+      module = await setupModule(config);
+      service = module.get<LoggerService>(LoggerService);
+    });
+
+    it('should emit properly structured log records to OTLP', () => {
+      service.log('Test message', 'TestContext');
+
+      expect(mockEmit).toHaveBeenCalledTimes(1);
+      const [logRecord] = mockEmit.mock.calls[0];
+
+      expect(logRecord).toMatchObject({
+        body: {
+          context: 'TestContext',
+          dd: {
+            env: 'test',
+            service: 'test-service',
+            version: '1.0.0',
+          },
+          level: 'log',
+          message: 'Test message',
+          timestamp: expect.stringMatching(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/),
+        },
+        severityText: 'log',
+      });
+
+      // Verify the body is an object, not a JSON string
+      expect(typeof logRecord.body).toBe('object');
+      expect(typeof logRecord.body.message).toBe('string');
+    });
+
+    it('should include trace context in OTLP logs when span is available', () => {
+      const mockSpan = {
+        spanContext: () => ({
+          spanId: 'abc123',
+          traceId: 'def456',
+        }),
+      };
+      vi.mocked(trace.getActiveSpan).mockReturnValue(mockSpan as any);
+
+      service.log('Test message with trace');
+
+      expect(mockEmit).toHaveBeenCalledTimes(1);
+      const [logRecord] = mockEmit.mock.calls[0];
+
+      expect(logRecord.body).toMatchObject({
+        dd: {
+          span_id: 'abc123',
+          trace_id: 'def456',
+        },
+        message: 'Test message with trace',
+      });
+    });
+
+    it('should handle object messages in OTLP export', () => {
+      const messageObj = {
+        data: { key: 'value' },
+        message: 'Object message',
+        requestId: 'req-123',
+      };
+
+      service.log(messageObj, 'ObjectContext');
+
+      expect(mockEmit).toHaveBeenCalledTimes(1);
+      const [logRecord] = mockEmit.mock.calls[0];
+
+      expect(logRecord.body).toMatchObject({
+        context: 'ObjectContext',
+        data: { key: 'value' },
+        message: 'Object message',
+        requestId: 'req-123',
+      });
+    });
+
+    it('should include persistent context in OTLP logs', () => {
+      service.addContext({ sessionId: 'session-456', userId: 'user-123' });
+      service.log('Test message with context');
+
+      expect(mockEmit).toHaveBeenCalledTimes(1);
+      const [logRecord] = mockEmit.mock.calls[0];
+
+      expect(logRecord.body).toMatchObject({
+        message: 'Test message with context',
+        sessionId: 'session-456',
+        userId: 'user-123',
+      });
+    });
+
+    it('should handle error logs with stack traces in OTLP export', () => {
+      const error = new Error('Test error');
+      service.error(error, 'Error stack', 'ErrorContext');
+
+      expect(mockEmit).toHaveBeenCalledTimes(1);
+      const [logRecord] = mockEmit.mock.calls[0];
+
+      expect(logRecord).toMatchObject({
+        body: {
+          context: 'ErrorContext',
+          message: 'Test error',
+          stack: 'Error stack',
+        },
+        severityText: 'error',
+      });
     });
   });
 
