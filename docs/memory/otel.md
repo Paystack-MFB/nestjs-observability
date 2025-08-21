@@ -20,18 +20,33 @@ node -r @paystackhq/nestjs-observability/register dist/main.js
 ### 🔄 **Iteration 1: Foundation & Register Module**
 
 #### Task 1: Create TypeScript Register Module Foundation
-Status: **Pending**
+Status: **Completed** ✅
 
 Goal: Create the core TypeScript register module that initializes OpenTelemetry SDK with environment variable configuration and safe defaults.
 
 Working Result: A **src/register.ts** file that works with the examples app and demonstrates OpenTelemetry initialization with console exporters and auto-instrumentation.
 
+**Completed Components:**
+- ✅ **src/register.ts** - OpenTelemetry SDK initialization with latest v0.203.0 patterns
+- ✅ **src/register.test.ts** - Comprehensive unit tests (12 tests passing)
+- ✅ **scripts/test-register.sh** - Integration test script with examples app
+- ✅ **package.json** exports updated with "./register" path
+- ✅ TypeScript build configurations updated for dual CJS/ESM output
+
 Validation:
-- [ ] **src/register.ts** compiles without TypeScript errors
-- [ ] **scripts/test-register.sh** script passes - tests register module with examples app
-- [ ] Unit test **src/register.test.ts** validates environment variable handling
-- [ ] Running examples app with register shows HTTP traces from auto-instrumentation
-- [ ] Environment variables correctly override defaults in examples app
+- ✅ **src/register.ts** compiles without TypeScript errors
+- ✅ **scripts/test-register.sh** script passes - tests register module with examples app
+- ✅ Unit test **src/register.test.ts** validates environment variable handling
+- ✅ Running examples app with register shows HTTP traces from auto-instrumentation
+- ✅ Environment variables correctly override defaults in examples app
+
+**Integration Test Results:**
+- ✅ Register module initialization works correctly
+- ✅ Environment variables are processed correctly
+- ✅ Auto-instrumentation is enabled (HTTP traces generated)
+- ✅ Console exporters are working for traces and metrics
+- ✅ Service name, version, and environment configuration works
+- ✅ Custom environment variables override defaults
 
 ```text
 Create **src/register.ts** and comprehensive testing:
