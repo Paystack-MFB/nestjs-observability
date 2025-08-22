@@ -1,10 +1,6 @@
-// Configuration
-export { createObservabilityConfig, ensureServiceLabels } from './config/observability.config';
-export type {
-  AttributeSanitizationConfig,
-  ObservabilityConfig,
-  SimpleObservabilityConfig,
-} from './config/observability.config';
+// Note: Configuration is now handled via environment variables
+// The ObservabilityModule.forRoot() method uses OTEL_* environment variables
+// Legacy configuration exports deprecated - will be removed in next major version
 // Controllers
 export { MetricsController } from './controllers/metrics.controller';
 // Decorators

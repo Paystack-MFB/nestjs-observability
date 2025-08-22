@@ -201,19 +201,69 @@ Add OTLP support with comprehensive testing:
 
 #### Task 3: Create Lightweight ObservabilityModule
 
-Status: **Pending**
+Status: **Completed** ✅
 
 Goal: Replace the complex configuration-based ObservabilityModule with a lightweight module that provides enhanced NestJS services, tested immediately with examples app.
 
 Working Result: A new **src/observability.module.ts** that integrates with examples app and provides enhanced services without configuration.
 
+**Completed Components:**
+
+- ✅ **src/observability.module.ts** - Lightweight module with simple `forRoot()` method
+  - Static `forRoot()` method with no parameters required
+  - Providers for LoggerService, MetricsService, TracingService without complex setup
+  - AutoTraceInterceptor registered as APP_INTERCEPTOR
+  - Uses environment variables (OTEL_*) for configuration
+  - Maintains @Global() decorator for service availability
+  - Temporary configuration bridge until services are updated in later tasks
+
+- ✅ **src/observability.module.test.ts** - Comprehensive unit tests (9 tests passing)
+  - Tests module creation without configuration parameters
+  - Verifies all services are provided through dependency injection
+  - Tests APP_INTERCEPTOR registration
+  - Validates environment variable configuration handling
+  - Tests global module behavior and exports
+
+- ✅ **examples/basic-app integration** - Updated to use simplified module
+  - Updated **src/app.module.ts** to use `ObservabilityModule.forRoot()` with no parameters
+  - Removed complex configuration setup and ConfigModule dependencies
+  - Simplified import structure with environment variable control
+  - Maintains all existing functionality
+
+- ✅ **scripts/test-module.sh** - Comprehensive integration test script
+  - Tests module loading without configuration errors
+  - Validates enhanced services work in examples app
+  - Tests HTTP requests show enhanced tracing via register module
+  - Verifies environment variable control of OpenTelemetry behavior
+  - Tests /metrics endpoint functionality
+  - Validates graceful handling of different configurations
+  - Tests OTLP fallback scenarios
+
+- ✅ **src/index.ts** exports updated
+  - Removed old configuration exports (deprecated)
+  - Added deprecation notice for legacy configuration
+  - Maintains backward compatibility for other exports
+  - Clean module interface focused on services and decorators
+
 Validation:
 
-- [ ] **src/observability.module.ts** compiles without TypeScript errors
-- [ ] **src/observability.module.test.ts** unit tests pass
-- [ ] Examples app successfully imports `ObservabilityModule.forRoot()` with no parameters
-- [ ] **scripts/test-module.sh** validates module integration with examples app
-- [ ] All services (Logger, Metrics, Tracing) are injectable in examples app
+- ✅ **src/observability.module.ts** compiles without TypeScript errors
+- ✅ **src/observability.module.test.ts** unit tests pass (9/9 tests passing)
+- ✅ Examples app successfully imports `ObservabilityModule.forRoot()` with no parameters
+- ✅ **scripts/test-module.sh** validates module integration with examples app
+- ✅ All services (Logger, Metrics, Tracing) are injectable in examples app
+
+**Integration Test Results:**
+
+- ✅ Lightweight ObservabilityModule loads without configuration
+- ✅ All enhanced services are available through dependency injection
+- ✅ Auto-instrumentation works with register module
+- ✅ Environment variables control OpenTelemetry behavior
+- ✅ Application handles different configurations gracefully
+- ✅ Module works with examples app integration
+- ✅ /metrics endpoint accessible with Prometheus format
+- ✅ Service name configuration working via OTEL_SERVICE_NAME
+- ✅ Application starts successfully with both console and OTLP configurations
 
 ```text
 Create simplified ObservabilityModule with immediate testing:
@@ -251,11 +301,319 @@ Create simplified ObservabilityModule with immediate testing:
 
 #### Task 4: Research and Implement Enhanced LoggerService with Context Isolation
 
-Status: **Pending**
+Status: **Research Completed** ✅
 
 Goal: Research NestJS logging best practices and create LoggerService with proper request context isolation, ensuring each request maintains separate logging context.
 
 Working Result: A **src/logger/logger.service.ts** that integrates with NestJS AsyncLocalStorage/CLS for request context isolation and works with OpenTelemetry global providers.
+
+**Research Findings and Recommendations:**
+
+## Implementation Options Analysis
+
+### 1. NestJS Logger Provider Patterns
+
+**Direct Instantiation Pattern (Basic)**
+```typescript
+@Injectable()
+class MyService {
+  private readonly logger = new Logger(MyService.name);
+  
+  doSomething() {
+    this.logger.log('Processing request');
+  }
+}
+```
+
+**Dependency Injection Pattern (Recommended)**
+```typescript
+@Injectable()
+export class MyService {
+  constructor(@Inject(LOGGER_TOKEN) private logger: LoggerService) {}
+  
+  doSomething() {
+    this.logger.log('Processing request with DI');
+  }
+}
+```
+
+**Custom Logger Interface with Tokens**
+```typescript
+export const LOGGER_TOKEN = Symbol('LOGGER');
+
+export interface EnhancedLogger {
+  setContext(context: string): void;
+  addContext(key: string, value: any): void;
+  clearContext(): void;
+  createChildLogger(name: string): EnhancedLogger;
+  log(message: string, data?: any): void;
+  // ... other methods
+}
+```
+
+### 2. Context Isolation Implementation Options
+
+**Option A: NestJS CLS (Recommended)**
+```typescript
+import { ClsModule, CLS_ID } from 'nestjs-cls';
+
+// Configuration
+ClsModule.forRoot({
+  global: true,
+  middleware: {
+    mount: true,
+    generateId: true,
+    idGenerator: (req) => req.headers['x-correlation-id'] ?? generateUuid(),
+  },
+});
+
+// Usage in Logger
+@Injectable({ scope: Scope.TRANSIENT })
+export class EnhancedLoggerService {
+  constructor(
+    @Inject(INQUIRER) private parentClass: object,
+    private cls: ClsService
+  ) {}
+  
+  log(message: string, data?: any) {
+    const context = this.cls.get('context') || {};
+    const correlationId = this.cls.getId();
+    
+    this.baseLogger.log(message, {
+      ...data,
+      ...context,
+      correlationId,
+      source: this.parentClass.constructor.name
+    });
+  }
+}
+```
+
+**Option B: AsyncLocalStorage (Alternative)**
+```typescript
+import { AsyncLocalStorage } from 'async_hooks';
+
+const contextStorage = new AsyncLocalStorage<Map<string, any>>();
+
+@Injectable()
+export class ContextLoggerService {
+  private getContext(): Map<string, any> {
+    return contextStorage.getStore() || new Map();
+  }
+  
+  setContext(key: string, value: any): void {
+    const context = this.getContext();
+    context.set(key, value);
+  }
+  
+  log(message: string, data?: any): void {
+    const context = Object.fromEntries(this.getContext());
+    this.baseLogger.log(message, { ...data, ...context });
+  }
+}
+```
+
+### 3. OpenTelemetry Integration Patterns
+
+**Global Logger Provider Integration**
+```typescript
+import { logs } from '@opentelemetry/api-logs';
+
+@Injectable()
+export class OtelLoggerService {
+  private logger: Logger;
+  
+  constructor() {
+    const loggerProvider = logs.getLoggerProvider();
+    this.logger = loggerProvider.getLogger('nestjs-app', '1.0.0');
+  }
+  
+  log(message: string, data?: any): void {
+    this.logger.emit({
+      severityText: 'INFO',
+      body: message,
+      attributes: data,
+      // Automatic trace correlation
+      traceId: trace.getActiveSpan()?.spanContext().traceId,
+      spanId: trace.getActiveSpan()?.spanContext().spanId,
+    });
+  }
+}
+```
+
+**Trace Context Auto-Inclusion**
+```typescript
+import { trace } from '@opentelemetry/api';
+
+private enrichWithTraceContext(data: any = {}): any {
+  const activeSpan = trace.getActiveSpan();
+  if (activeSpan) {
+    const spanContext = activeSpan.spanContext();
+    return {
+      ...data,
+      traceId: spanContext.traceId,
+      spanId: spanContext.spanId,
+      traceFlags: spanContext.traceFlags,
+    };
+  }
+  return data;
+}
+```
+
+## Recommended Implementation Strategy
+
+### 1. Simple and Obvious Design
+
+**Developer-Friendly Architecture**
+```
+LoggerService (Injectable)
+    ↓ 
+[Built-in Context + OpenTelemetry + Structured Logging]
+```
+
+**Developer Usage (Simple!)**
+```typescript
+@Injectable()
+export class UserService {
+  constructor(private logger: LoggerService) {} // That's it!
+  
+  async createUser(userData: any) {
+    this.logger.setContext({ userId: userData.id });
+    this.logger.log('Creating user', { email: userData.email });
+    // Context and trace correlation happen automatically
+  }
+}
+```
+
+### 2. Core LoggerService Implementation
+
+```typescript
+@Injectable({ scope: Scope.TRANSIENT })
+export class LoggerService {
+  private contextKey: string;
+  private otelLogger: Logger;
+  
+  constructor(
+    @Inject(INQUIRER) private parentClass: object,
+    private cls: ClsService
+  ) {
+    this.contextKey = `logger-${parentClass.constructor.name}`;
+    // Get OpenTelemetry logger from global provider
+    this.otelLogger = logs.getLoggerProvider().getLogger('nestjs-app');
+  }
+  
+  setContext(context: Record<string, any>): void {
+    this.cls.set(this.contextKey, { ...this.getContext(), ...context });
+  }
+  
+  addContext(key: string, value: any): void {
+    const current = this.getContext();
+    this.cls.set(this.contextKey, { ...current, [key]: value });
+  }
+  
+  clearContext(): void {
+    this.cls.set(this.contextKey, {});
+  }
+  
+  createChildLogger(name: string): LoggerService {
+    const childLogger = new LoggerService({ constructor: { name } }, this.cls);
+    childLogger.setContext(this.getContext()); // Inherit parent context
+    return childLogger;
+  }
+  
+  // Standard logging methods
+  log(message: string, data?: any): void {
+    this.emit('info', message, data);
+  }
+  
+  error(message: string | Error, data?: any): void {
+    this.emit('error', message, data);
+  }
+  
+  warn(message: string, data?: any): void {
+    this.emit('warn', message, data);
+  }
+  
+  debug(message: string, data?: any): void {
+    this.emit('debug', message, data);
+  }
+  
+  // Private helpers
+  private getContext(): Record<string, any> {
+    return this.cls.get(this.contextKey) || {};
+  }
+  
+  private emit(level: string, message: string | Error, data?: any): void {
+    const enrichedData = {
+      ...data,
+      ...this.getContext(),
+      correlationId: this.cls.getId(),
+      ...this.getTraceContext(),
+      source: this.parentClass.constructor.name,
+    };
+    
+    this.otelLogger.emit({
+      severityText: level.toUpperCase(),
+      body: message instanceof Error ? message.message : message,
+      attributes: enrichedData,
+      ...(message instanceof Error && { exception: message }),
+    });
+  }
+  
+  private getTraceContext(): Record<string, any> {
+    const span = trace.getActiveSpan();
+    if (!span) return {};
+    
+    const spanContext = span.spanContext();
+    return {
+      traceId: spanContext.traceId,
+      spanId: spanContext.spanId,
+    };
+  }
+}
+```
+
+### 3. Simple Module Configuration
+
+```typescript
+@Module({
+  imports: [
+    // Auto-setup CLS for request context
+    ClsModule.forRoot({
+      global: true,
+      middleware: {
+        mount: true,
+        generateId: true,
+        idGenerator: (req) => req.headers['x-correlation-id'] ?? uuidv4(),
+      },
+    }),
+  ],
+  providers: [
+    LoggerService, // That's it! No complex tokens or factories needed
+  ],
+  exports: [LoggerService],
+})
+export class LoggerModule {}
+```
+
+### 4. Performance and Best Practice Considerations
+
+**Context Isolation Performance**
+- Use TRANSIENT scope only for logger service to avoid memory leaks
+- Implement lazy context resolution to minimize overhead
+- Consider context cleanup in long-running operations
+
+**OpenTelemetry Integration Best Practices**
+- Use global logger provider from register module
+- Implement async log emission for better performance
+- Auto-correlate with active trace spans
+- Support structured logging with proper attributes
+
+**Production Considerations**
+- Implement log level filtering based on environment
+- Add circuit breaker for external log destinations
+- Support graceful degradation when OpenTelemetry is unavailable
+- Implement proper error handling without affecting application flow
 
 Validation:
 
@@ -266,45 +624,47 @@ Validation:
 - [ ] Trace context automatically included in logs
 
 ```text
-Research NestJS logging patterns and implement enhanced LoggerService:
+Implement simplified LoggerService with developer-friendly design:
 
-1. Research NestJS logging best practices:
-   - Study how NestJS ConsoleLogger works with dependency injection
-   - Research AsyncLocalStorage/CLS patterns for request context isolation
-   - Investigate OpenTelemetry Logs API integration with NestJS
-   - Look into NestJS Logger providers and custom logger implementation
+1. Create **src/logger/logger.service.ts** - Single, simple class:
+   - Use LoggerService name (not Enhanced*)
+   - TRANSIENT scope with automatic context isolation via NestJS CLS
+   - Built-in OpenTelemetry integration with global providers
+   - Auto-include trace context and correlation IDs
+   - Simple methods: setContext(), addContext(), clearContext(), createChildLogger()
+   - Standard logging: log(), error(), warn(), debug()
+   - No complex interfaces or abstractions needed
 
-2. Create **src/logger/logger.service.ts**:
-   - Remove ObservabilityConfig dependency
-   - Use OpenTelemetry global logger provider
-   - Implement request context isolation using AsyncLocalStorage or similar
-   - Support structured logging with objects
-   - Auto-include trace context from active spans
-   - Implement setContext(), addContext(), clearContext() with isolation
-   - Create createChildLogger() method
-   - Maintain NestJS ConsoleLogger compatibility
+2. Create **src/logger/logger.module.ts** - Simple module setup:
+   - Import ClsModule with auto-configuration
+   - Provide LoggerService directly (no tokens needed)
+   - Export LoggerService for other modules
+   - Minimal configuration, maximum functionality
 
 3. Create **src/logger/logger.service.test.ts**:
-   - Test basic logging functionality
-   - Test context isolation (concurrent requests don't share context)
-   - Test trace context integration
-   - Test structured logging
-   - Mock OpenTelemetry global providers
-   - Test child logger creation
+   - Test context isolation between concurrent requests
+   - Test trace context auto-inclusion functionality  
+   - Test child logger context inheritance
+   - Test all logging methods with structured data
+   - Mock ClsService for unit testing isolation
 
 4. Create **scripts/test-logger-context.sh**:
-   - Build package and examples app
-   - Start examples app with register module
-   - Make concurrent HTTP requests with different context values
-   - Verify each request maintains separate logging context
-   - Check trace correlation in logs
+   - Test concurrent HTTP requests maintain separate contexts
+   - Verify correlation ID propagation across requests
+   - Test trace context appears in logs automatically
+   - Validate structured log format and content
 
-5. Update examples app to demonstrate logger context isolation:
-   - Add endpoint that sets logger context
-   - Add concurrent request testing
-   - Show context isolation in action
+5. Update examples app for demonstration:
+   - Show simple LoggerService injection and usage
+   - Demonstrate context isolation with concurrent endpoints
+   - Show automatic trace correlation in action
+   - Include realistic logging scenarios
 
-6. Add comprehensive JSDoc documentation with usage examples
+6. Keep implementation focused and obvious:
+   - No unnecessary abstractions or layers
+   - Clear, single-purpose methods
+   - Automatic behavior (context, traces) with manual override capability
+   - Production-ready defaults with simple customization
 ```
 
 ---

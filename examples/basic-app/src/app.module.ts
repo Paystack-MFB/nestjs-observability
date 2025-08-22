@@ -1,5 +1,4 @@
 import { Module } from '@nestjs/common';
-import { ConfigModule, ConfigService } from '@nestjs/config';
 import { LoggerService, ObservabilityModule } from '@paystackhq/nestjs-observability';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
@@ -10,22 +9,9 @@ import { UserService } from './user.service';
 
 @Module({
   imports: [
-    ConfigModule.forRoot({
-      isGlobal: true,
-      envFilePath: '.env',
-    }),
-    // Use factory pattern for proper dependency injection
-    ObservabilityModule.forRootAsync({
-      imports: [ConfigModule],
-      inject: [ConfigService],
-      useFactory: (configService: ConfigService) => ({
-        serviceName: configService.get('SERVICE_NAME', 'basic-example'),
-        serviceVersion: configService.get('SERVICE_VERSION', '1.0.0'),
-        environment: configService.get('NODE_ENV', 'development'),
-        // All environment variables like OTLP_TRACES_ENDPOINT, OTLP_HEADERS,
-        // TRACING_ENABLED, METRICS_ENABLED, etc. are automatically loaded
-      }),
-    }),
+    // Lightweight observability module - no configuration required
+    // All configuration comes from environment variables (OTEL_*)
+    ObservabilityModule.forRoot(),
   ],
   controllers: [AppController, HealthController],
   providers: [

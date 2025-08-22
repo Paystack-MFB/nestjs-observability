@@ -1,122 +1,74 @@
-import { DynamicModule, Global, InjectionToken, Module, Provider, Type } from '@nestjs/common';
-import { ConfigModule, ConfigService } from '@nestjs/config';
+import { DynamicModule, Global, Module, Provider } from '@nestjs/common';
 import { APP_INTERCEPTOR } from '@nestjs/core';
 
-import {
-  createObservabilityConfig,
-  ensureServiceLabels,
-  ObservabilityConfig,
-  SimpleObservabilityConfig,
-} from './config/observability.config';
+import { createObservabilityConfig, ObservabilityConfig } from './config/observability.config';
 import { MetricsController } from './controllers/metrics.controller';
 import { AutoTraceInterceptor } from './interceptors/auto-trace.interceptor';
 import { LoggerService } from './logger/logger.service';
 import { MetricsService } from './metrics/metrics.service';
 import { TracingService } from './tracing/tracing.service';
-import { setAttributeSanitizationConfig } from './utils/span-attributes';
 
+/**
+ * Lightweight ObservabilityModule that provides enhanced NestJS services
+ * Uses global OpenTelemetry providers initialized by the register module
+ * No configuration required - controlled via environment variables
+ */
 @Global()
 @Module({})
-// eslint-disable-next-line @typescript-eslint/no-extraneous-class
 export class ObservabilityModule {
   /**
-   * Register the module with configuration
-   * Now accepts SimpleObservabilityConfig for cleaner user configuration
+   * Register the module without configuration
+   * All configuration comes from environment variables via the register module
    */
-  static forRoot(config: SimpleObservabilityConfig): DynamicModule {
-    const configProvider: Provider = {
-      inject: [ConfigService],
+  static forRoot(): DynamicModule {
+    // Create a default configuration based on environment variables
+    // This will be removed once services are updated to use global OpenTelemetry providers
+    const defaultConfigProvider: Provider = {
       provide: 'OBSERVABILITY_CONFIG',
-      useFactory: (configService: ConfigService) => {
-        // Create complete configuration from user input and environment variables
-        const fullConfig = createObservabilityConfig(config, configService);
-        // Process configuration to ensure service labels are present
-        return ensureServiceLabels(fullConfig);
+      useFactory: (): ObservabilityConfig => {
+        // Create configuration from environment variables only
+        const defaultConfig = createObservabilityConfig(
+          {
+            environment: process.env['NODE_ENV'] ?? 'development',
+            serviceName: process.env['OTEL_SERVICE_NAME'] ?? 'nestjs-app',
+            serviceVersion: process.env['OTEL_SERVICE_VERSION'] ?? '1.0.0',
+          },
+          // Mock ConfigService since we're using environment variables directly
+          {
+            get: (key: string) => process.env[key],
+          } as any
+        );
+        return defaultConfig;
       },
     };
 
-    const moduleDefinition = this.registerModule(null, configProvider);
-
-    return {
-      ...moduleDefinition,
-      imports: [ConfigModule], // Ensure ConfigModule is available
-    };
-  }
-
-  /**
-   * Register the module with async configuration
-   * Supports dependency injection for configuration
-   */
-  static forRootAsync(options: {
-    imports?: (DynamicModule | Type<unknown>)[];
-    inject?: InjectionToken[];
-    useFactory: (...args: unknown[]) => Promise<SimpleObservabilityConfig> | SimpleObservabilityConfig;
-  }): DynamicModule {
-    const configProvider: Provider = {
-      inject: [ConfigService, ...(options.inject ?? [])],
-      provide: 'OBSERVABILITY_CONFIG',
-      useFactory: async (configService: ConfigService, ...args: unknown[]) => {
-        // Get user configuration from factory
-        const userConfig = await options.useFactory(...args);
-        // Create complete configuration from user input and environment variables
-        const fullConfig = createObservabilityConfig(userConfig, configService);
-        // Process configuration to ensure service labels are present
-        return ensureServiceLabels(fullConfig);
-      },
-    };
-
-    const moduleDefinition = this.registerModule(null, configProvider);
-
-    // Ensure ConfigModule is included in imports
-    const imports = [ConfigModule, ...(options.imports ?? [])];
-
-    return {
-      ...moduleDefinition,
-      imports,
-    };
-  }
-
-  /**
-   * Register the module with providers and controllers
-   */
-  private static registerModule(config: null | ObservabilityConfig, configProvider?: Provider): DynamicModule {
-    // Initialize attribute sanitization configuration if config is provided
-    if (config) {
-      setAttributeSanitizationConfig(config.tracing.attributeSanitization);
-    }
-
-    // Core providers with proper dependency order
+    // Core providers - simplified without complex dependencies
     const providers: Provider[] = [
-      // Configuration must be first
-      configProvider ?? {
-        provide: 'OBSERVABILITY_CONFIG',
-        useValue: config,
-      },
-      // LoggerService depends only on configuration
+      // Default configuration provider (temporary until services are updated)
+      defaultConfigProvider,
+
+      // LoggerService - will be updated to use global logger provider in Task 4
       {
         inject: ['OBSERVABILITY_CONFIG'],
         provide: LoggerService,
-        useFactory: (observabilityConfig: ObservabilityConfig) => {
-          return new LoggerService(observabilityConfig);
-        },
+        useFactory: (config: ObservabilityConfig) => new LoggerService(config),
       },
-      // MetricsService depends on configuration and LoggerService
+
+      // MetricsService - will be updated to use global meter provider in Task 5
       {
         inject: ['OBSERVABILITY_CONFIG', LoggerService],
         provide: MetricsService,
-        useFactory: (observabilityConfig: ObservabilityConfig, logger: LoggerService) => {
-          return new MetricsService(observabilityConfig, logger);
-        },
+        useFactory: (config: ObservabilityConfig, logger: LoggerService) => new MetricsService(config, logger),
       },
-      // TracingService depends on configuration and LoggerService
+
+      // TracingService - will be updated to use global tracer provider in Task 6
       {
         inject: ['OBSERVABILITY_CONFIG', LoggerService],
         provide: TracingService,
-        useFactory: (observabilityConfig: ObservabilityConfig, logger: LoggerService) => {
-          return new TracingService(observabilityConfig, logger);
-        },
+        useFactory: (config: ObservabilityConfig, logger: LoggerService) => new TracingService(config, logger),
       },
-      // Register AutoTraceInterceptor as global interceptor
+
+      // AutoTraceInterceptor as global interceptor
       {
         provide: APP_INTERCEPTOR,
         useClass: AutoTraceInterceptor,
