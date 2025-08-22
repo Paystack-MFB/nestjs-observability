@@ -1,0 +1,241 @@
+#!/usr/bin/env node
+
+/**
+ * Mock OTLP Collector Server
+ *
+ * A simple HTTP server that accepts OTLP requests and logs received data
+ * for validation during integration tests.
+ */
+
+const http = require('http');
+const url = require('url');
+
+const PORT = 4318;
+const HOST = 'localhost';
+
+// Statistics
+let stats = {
+  traces: 0,
+  metrics: 0,
+  logs: 0,
+  requests: 0,
+};
+
+/**
+ * Log received data with headers
+ */
+function logData(type, headers, body) {
+  console.log(`\n📦 Received ${type} data`);
+  console.log(`⏰ Timestamp: ${new Date().toISOString()}`);
+  console.log(`📊 Stats: ${JSON.stringify(stats)}`);
+
+  // Log relevant headers
+  const relevantHeaders = {};
+  for (const [key, value] of Object.entries(headers)) {
+    if (
+      key.toLowerCase().startsWith('x-') ||
+      key.toLowerCase().includes('auth') ||
+      key.toLowerCase().includes('content') ||
+      key.toLowerCase().includes('user-agent')
+    ) {
+      relevantHeaders[key] = value;
+    }
+  }
+
+  if (Object.keys(relevantHeaders).length > 0) {
+    console.log(`📋 Headers:`, relevantHeaders);
+  }
+
+  // Log body size and first few bytes if available
+  if (body && body.length > 0) {
+    console.log(`📏 Body size: ${body.length} bytes`);
+
+    // Try to detect if it's JSON
+    try {
+      const bodyStr = body.toString('utf8');
+      if (bodyStr.startsWith('{') || bodyStr.startsWith('[')) {
+        const parsed = JSON.parse(bodyStr);
+        console.log(`📄 JSON data: ${JSON.stringify(parsed, null, 2).substring(0, 500)}...`);
+      } else {
+        console.log(`📄 Raw data (first 200 chars): ${bodyStr.substring(0, 200)}...`);
+      }
+    } catch (error) {
+      console.log(`📄 Binary data: ${body.toString('hex').substring(0, 100)}...`);
+    }
+  }
+
+  console.log('─'.repeat(60));
+}
+
+/**
+ * Handle OTLP requests
+ */
+function handleRequest(req, res) {
+  const parsedUrl = url.parse(req.url, true);
+  const pathname = parsedUrl.pathname;
+
+  stats.requests++;
+
+  console.log(`\n🌐 ${req.method} ${pathname} - ${req.headers['content-type'] || 'no content-type'}`);
+
+  // Set CORS headers for browser requests
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, x-test-header, x-custom');
+
+  // Handle preflight requests
+  if (req.method === 'OPTIONS') {
+    res.writeHead(200);
+    res.end();
+    return;
+  }
+
+  // Collect request body
+  let body = Buffer.alloc(0);
+
+  req.on('data', (chunk) => {
+    body = Buffer.concat([body, chunk]);
+  });
+
+  req.on('end', () => {
+    // Route the request
+    switch (pathname) {
+      case '/v1/traces':
+        stats.traces++;
+        logData('trace', req.headers, body);
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(
+          JSON.stringify({
+            status: 'success',
+            message: 'Traces received',
+            count: stats.traces,
+          })
+        );
+        break;
+
+      case '/v1/metrics':
+        stats.metrics++;
+        logData('metrics', req.headers, body);
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(
+          JSON.stringify({
+            status: 'success',
+            message: 'Metrics received',
+            count: stats.metrics,
+          })
+        );
+        break;
+
+      case '/v1/logs':
+        stats.logs++;
+        logData('logs', req.headers, body);
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(
+          JSON.stringify({
+            status: 'success',
+            message: 'Logs received',
+            count: stats.logs,
+          })
+        );
+        break;
+
+      case '/health':
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(
+          JSON.stringify({
+            status: 'healthy',
+            uptime: process.uptime(),
+            stats,
+          })
+        );
+        break;
+
+      case '/stats':
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify(stats, null, 2));
+        break;
+
+      case '/reset':
+        stats = { traces: 0, metrics: 0, logs: 0, requests: 0 };
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ message: 'Stats reset', stats }));
+        break;
+
+      default:
+        console.log(`❓ Unknown endpoint: ${pathname}`);
+        res.writeHead(404, { 'Content-Type': 'application/json' });
+        res.end(
+          JSON.stringify({
+            error: 'Not found',
+            path: pathname,
+            availableEndpoints: ['/v1/traces', '/v1/metrics', '/v1/logs', '/health', '/stats', '/reset'],
+          })
+        );
+    }
+  });
+
+  req.on('error', (error) => {
+    console.error(`❌ Request error: ${error.message}`);
+    res.writeHead(500, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ error: 'Internal server error' }));
+  });
+}
+
+/**
+ * Create and start the server
+ */
+const server = http.createServer(handleRequest);
+
+server.on('error', (error) => {
+  if (error.code === 'EADDRINUSE') {
+    console.error(`❌ Port ${PORT} is already in use`);
+    process.exit(1);
+  } else {
+    console.error(`❌ Server error: ${error.message}`);
+    process.exit(1);
+  }
+});
+
+server.listen(PORT, HOST, () => {
+  console.log(`🚀 Mock OTLP Collector running on http://${HOST}:${PORT}`);
+  console.log(`📊 Available endpoints:`);
+  console.log(`   POST /v1/traces  - Accept trace data`);
+  console.log(`   POST /v1/metrics - Accept metrics data`);
+  console.log(`   POST /v1/logs    - Accept log data`);
+  console.log(`   GET  /health     - Health check`);
+  console.log(`   GET  /stats      - View statistics`);
+  console.log(`   GET  /reset      - Reset statistics`);
+  console.log('');
+  console.log('📝 All received data will be logged to stdout');
+  console.log('💡 Use Ctrl+C to stop the server');
+  console.log('─'.repeat(60));
+});
+
+// Graceful shutdown
+process.on('SIGINT', () => {
+  console.log('\n\n🛑 Shutting down mock OTLP collector...');
+  console.log(`📊 Final stats: ${JSON.stringify(stats)}`);
+  server.close(() => {
+    console.log('✅ Server closed gracefully');
+    process.exit(0);
+  });
+});
+
+process.on('SIGTERM', () => {
+  console.log('\n\n🛑 Received SIGTERM, shutting down...');
+  server.close(() => {
+    console.log('✅ Server closed gracefully');
+    process.exit(0);
+  });
+});
+
+// Handle unhandled errors
+process.on('uncaughtException', (error) => {
+  console.error('❌ Uncaught exception:', error);
+  process.exit(1);
+});
+
+process.on('unhandledRejection', (reason, promise) => {
+  console.error('❌ Unhandled promise rejection at:', promise, 'reason:', reason);
+  process.exit(1);
+});

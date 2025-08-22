@@ -52,21 +52,37 @@ pnpm install
 
 ### 2. Configure Environment
 
-Copy the example environment file:
+Choose the appropriate environment configuration:
+
+#### Development (Console Exporters)
 
 ```bash
-cp env.example .env
+cp .env.development .env
 ```
 
-The example includes all available configuration options:
+#### Production (OTLP Exporters)
 
-- **Application**: service name, version, port
-- **Logging**: level, OTLP export settings
-- **Metrics**: Prometheus endpoint, labels
-- **Tracing**: OpenTelemetry configuration
-- **Argument Sanitization**: configurable data protection
+```bash
+cp .env.production .env
+```
+
+#### Docker/Container Deployment
+
+```bash
+cp .env.docker .env
+```
+
+#### Integration Testing with Mock Collector
+
+```bash
+cp .env.test-otlp .env
+```
+
+Or create your own based on `env.example` which includes all available configuration options.
 
 ### 3. Run the Application
+
+#### Option A: Traditional NestJS Module Pattern
 
 ```bash
 # Development mode with hot reload
@@ -76,6 +92,23 @@ pnpm run start:dev
 pnpm run build
 pnpm run start:prod
 ```
+
+#### Option B: Register Pattern (Recommended)
+
+```bash
+# Build first
+pnpm run build
+
+# Start with register module for automatic OpenTelemetry initialization
+node -r @paystackhq/nestjs-observability/register dist/src/main.js
+```
+
+The register pattern provides:
+
+- Automatic OpenTelemetry SDK initialization
+- Environment variable-driven configuration
+- Auto-instrumentation out of the box
+- No code changes required
 
 ### 4. Test the Endpoints
 
@@ -135,57 +168,67 @@ The app runs on `http://localhost:3000` with these endpoints:
 
 ## 🔧 Configuration Options
 
-### Environment Variables
+### OpenTelemetry Standard Environment Variables (Recommended)
 
-#### Basic Configuration
+The register pattern uses standard OpenTelemetry environment variables for configuration:
+
+#### Service Identification
 
 ```env
-SERVICE_NAME=basic-example
-SERVICE_VERSION=1.0.0
-NODE_ENV=development
-PORT=3000
+OTEL_SERVICE_NAME=basic-example
+OTEL_SERVICE_VERSION=1.0.0
+OTEL_RESOURCE_ATTRIBUTES=service.name=basic-example,service.version=1.0.0,deployment.environment=production
 ```
 
-#### Logging Configuration
+#### Exporter Configuration
 
 ```env
-LOG_LEVEL=info
-OTLP_LOGS_ENABLED=false
-OTLP_LOGS_ENDPOINT=http://localhost:4318/v1/logs
+# Choose exporters: console, otlp, jaeger, zipkin
+OTEL_TRACES_EXPORTER=console
+OTEL_METRICS_EXPORTER=console
+OTEL_LOGS_EXPORTER=none
 ```
 
-#### Metrics Configuration
+#### OTLP Endpoints
 
 ```env
-METRICS_ENABLED=true
-METRICS_ENDPOINT=/metrics
+# General endpoint (used by all signals if specific endpoints not set)
+OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:4318
+
+# Signal-specific endpoints (override general endpoint)
+OTEL_EXPORTER_OTLP_TRACES_ENDPOINT=http://localhost:4318/v1/traces
+OTEL_EXPORTER_OTLP_METRICS_ENDPOINT=http://localhost:4318/v1/metrics
+OTEL_EXPORTER_OTLP_LOGS_ENDPOINT=http://localhost:4318/v1/logs
 ```
 
-#### Tracing Configuration
+#### OTLP Authentication
 
 ```env
-TRACING_ENABLED=true
-OTLP_TRACES_ENDPOINT=http://localhost:4318/v1/traces
-TRACING_SAMPLER_TYPE=always_on
-TRACING_SAMPLER_RATIO=1.0
+# General headers (used by all signals if specific headers not set)
+OTEL_EXPORTER_OTLP_HEADERS=authorization=Bearer your-token,x-custom-header=value
+
+# Signal-specific headers (override general headers)
+OTEL_EXPORTER_OTLP_TRACES_HEADERS=x-trace-header=trace-value
+OTEL_EXPORTER_OTLP_METRICS_HEADERS=x-metrics-header=metrics-value
+OTEL_EXPORTER_OTLP_LOGS_HEADERS=x-logs-header=logs-value
 ```
 
-#### OpenTelemetry Auto-Instrumentations
+#### Sampling Configuration
 
 ```env
-TRACING_AUTO_INSTRUMENTATIONS=true
-TRACING_DISABLED_INSTRUMENTATIONS=@opentelemetry/instrumentation-fs
-TRACING_INSTRUMENTATION_OVERRIDES={}
+# Sample all traces
+OTEL_TRACES_SAMPLER=always_on
+
+# Sample 10% of traces
+OTEL_TRACES_SAMPLER=traceidratio
+OTEL_TRACES_SAMPLER_ARG=0.1
 ```
 
-#### Argument Sanitization
+#### Export Intervals
 
 ```env
-ARGUMENT_SANITIZATION_ENABLED=true
-ARGUMENT_SANITIZATION_MAX_LENGTH=100
-ARGUMENT_SANITIZATION_PLACEHOLDER=[REDACTED]
-ARGUMENT_SANITIZATION_IDENTIFIER_FIELDS=id,userId,name,email,type,status
-ARGUMENT_SANITIZATION_ADDITIONAL_PATTERNS=api[_-]?key,secret,token,password
+# Metrics export interval in milliseconds
+OTEL_METRIC_EXPORT_INTERVAL=10000
 ```
 
 ## 🎯 Testing Different Scenarios

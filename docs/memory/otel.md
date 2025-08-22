@@ -1,16 +1,20 @@
 # OpenTelemetry NestJS Observability Package Modernization Plan
 
 ## Overview
+
 Refactor the package to align with 2025 OpenTelemetry best practices using environment variable configuration and the `-r` register pattern, while maintaining enhanced NestJS features.
 
 ## Exporter Control Strategy
+
 Exporters will be controlled via standard OpenTelemetry environment variables:
+
 - `OTEL_TRACES_EXPORTER` (console, otlp, jaeger, zipkin)
 - `OTEL_METRICS_EXPORTER` (console, otlp, prometheus)
 - `OTEL_LOGS_EXPORTER` (console, otlp)
 - TypeScript factory functions for programmatic control when needed
 
 ## Integration Pattern
+
 ```bash
 node -r @paystackhq/nestjs-observability/register dist/main.js
 ```
@@ -20,6 +24,7 @@ node -r @paystackhq/nestjs-observability/register dist/main.js
 ### 🔄 **Iteration 1: Foundation & Register Module**
 
 #### Task 1: Create TypeScript Register Module Foundation
+
 Status: **Completed** ✅
 
 Goal: Create the core TypeScript register module that initializes OpenTelemetry SDK with environment variable configuration and safe defaults.
@@ -27,6 +32,7 @@ Goal: Create the core TypeScript register module that initializes OpenTelemetry 
 Working Result: A **src/register.ts** file that works with the examples app and demonstrates OpenTelemetry initialization with console exporters and auto-instrumentation.
 
 **Completed Components:**
+
 - ✅ **src/register.ts** - OpenTelemetry SDK initialization with latest v0.203.0 patterns
 - ✅ **src/register.test.ts** - Comprehensive unit tests (12 tests passing)
 - ✅ **scripts/test-register.sh** - Integration test script with examples app
@@ -34,6 +40,7 @@ Working Result: A **src/register.ts** file that works with the examples app and 
 - ✅ TypeScript build configurations updated for dual CJS/ESM output
 
 Validation:
+
 - ✅ **src/register.ts** compiles without TypeScript errors
 - ✅ **scripts/test-register.sh** script passes - tests register module with examples app
 - ✅ Unit test **src/register.test.ts** validates environment variable handling
@@ -41,6 +48,7 @@ Validation:
 - ✅ Environment variables correctly override defaults in examples app
 
 **Integration Test Results:**
+
 - ✅ Register module initialization works correctly
 - ✅ Environment variables are processed correctly
 - ✅ Auto-instrumentation is enabled (HTTP traces generated)
@@ -83,18 +91,78 @@ Create **src/register.ts** and comprehensive testing:
 ---
 
 #### Task 2: Add OTLP Exporter Support with Environment Variables
-Status: **Pending**
+
+Status: **Completed** ✅
 
 Goal: Extend the register module to support OTLP exporters controlled by environment variables, with comprehensive testing using the examples app.
 
 Working Result: The register module dynamically configures OTLP exporters when environment variables are set, validated through automated tests and examples app integration.
 
+**Completed Components:**
+
+- ✅ **src/register.ts** - Extended with OTLP exporters and factory functions
+  - Added parseOtlpHeaders() utility function
+  - createTraceExporter() supports OTLP with environment variable configuration
+  - createMetricReader() supports OTLP with configurable export intervals
+  - createLogProcessor() supports OTLP with batch processing
+  - Error handling with fallback to console exporters
+  - Environment variable precedence (specific > general > defaults)
+  - **BREAKING**: Removed all legacy environment variables (SERVICE_NAME, SERVICE_VERSION, etc.)
+  - **CLEAN**: Only OpenTelemetry standard OTEL\_\* environment variables supported
+
+- ✅ **src/register.test.ts** - Extended with comprehensive OTLP configuration tests
+  - Tests for OTLP trace exporter creation and configuration
+  - Tests for OTLP metrics exporter with custom intervals
+  - Tests for OTLP log processor configuration
+  - Tests for environment variable precedence (specific vs general)
+  - Tests for header parsing and validation
+  - Tests for fallback behavior when OTLP unavailable
+  - Tests for error handling scenarios
+
+- ✅ **scripts/test-otlp.sh** - Comprehensive integration test script
+  - Tests OTLP trace exporter with mock collector
+  - Tests OTLP metrics exporter with custom intervals
+  - Tests environment variable precedence
+  - Tests fallback to console when OTLP unavailable
+  - Tests header configuration and transmission
+  - Validates end-to-end OTLP functionality
+
+- ✅ **scripts/mock-otlp-collector.js** - Mock OTLP collector server
+  - HTTP server accepting OTLP requests on standard endpoints
+  - Logs received traces, metrics, and logs for validation
+  - Statistics tracking and health endpoints
+  - Proper CORS headers for testing
+  - Graceful shutdown handling
+
+- ✅ **examples/basic-app environment configurations** - OTLP examples
+  - Updated env.example with comprehensive OpenTelemetry standard configuration
+  - **CLEAN**: Removed all legacy environment variables (SERVICE_NAME, LOG_LEVEL, etc.)
+  - .env.development - Console exporters for local development
+  - .env.production - OTLP exporters for production deployment
+  - .env.docker - Container-optimized OTLP configuration
+  - .env.test-otlp - Integration testing with mock collector
+  - Updated README.md with register pattern and OpenTelemetry standard variables
+
 Validation:
-- [ ] **src/register.test.ts** unit tests pass for OTLP configuration
-- [ ] **scripts/test-otlp.sh** integration test validates OTLP exporter setup
-- [ ] Examples app works with OTLP environment variables (mock OTLP endpoint)
-- [ ] Error handling works for invalid OTLP configuration
-- [ ] Console exporters remain default when OTLP variables not set
+
+- ✅ **src/register.test.ts** unit tests pass for OTLP configuration
+- ✅ **scripts/test-otlp.sh** integration test validates OTLP exporter setup
+- ✅ Examples app works with OTLP environment variables (mock OTLP endpoint)
+- ✅ Error handling works for invalid OTLP configuration
+- ✅ Console exporters remain default when OTLP variables not set
+
+**Integration Test Results:**
+
+- ✅ OTLP trace exporter creates spans and sends to collector
+- ✅ OTLP metrics exporter exports metrics with configurable intervals
+- ✅ OTLP log processor sends logs to collector (when enabled)
+- ✅ Environment variable precedence works correctly (specific > general)
+- ✅ Headers are properly parsed and sent with OTLP requests
+- ✅ Fallback to console exporters works when OTLP unavailable
+- ✅ Error handling prevents application crashes on OTLP failures
+- ✅ Examples app configurations demonstrate real-world usage patterns
+- ✅ **BREAKING**: Legacy environment variables completely removed (no backward compatibility)
+- ✅ **CLEAN**: Only OpenTelemetry standard OTEL\_\* environment variables work
 
 ```text
 Add OTLP support with comprehensive testing:
@@ -131,7 +199,8 @@ Add OTLP support with comprehensive testing:
 
 ### 🔄 **Iteration 2: Simplified NestJS Module**
 
-#### Task 3: Create Lightweight ObservabilityModule  
+#### Task 3: Create Lightweight ObservabilityModule
+
 Status: **Pending**
 
 Goal: Replace the complex configuration-based ObservabilityModule with a lightweight module that provides enhanced NestJS services, tested immediately with examples app.
@@ -139,6 +208,7 @@ Goal: Replace the complex configuration-based ObservabilityModule with a lightwe
 Working Result: A new **src/observability.module.ts** that integrates with examples app and provides enhanced services without configuration.
 
 Validation:
+
 - [ ] **src/observability.module.ts** compiles without TypeScript errors
 - [ ] **src/observability.module.test.ts** unit tests pass
 - [ ] Examples app successfully imports `ObservabilityModule.forRoot()` with no parameters
@@ -180,6 +250,7 @@ Create simplified ObservabilityModule with immediate testing:
 ---
 
 #### Task 4: Research and Implement Enhanced LoggerService with Context Isolation
+
 Status: **Pending**
 
 Goal: Research NestJS logging best practices and create LoggerService with proper request context isolation, ensuring each request maintains separate logging context.
@@ -187,6 +258,7 @@ Goal: Research NestJS logging best practices and create LoggerService with prope
 Working Result: A **src/logger/logger.service.ts** that integrates with NestJS AsyncLocalStorage/CLS for request context isolation and works with OpenTelemetry global providers.
 
 Validation:
+
 - [ ] **src/logger/logger.service.ts** compiles without TypeScript errors
 - [ ] **src/logger/logger.service.test.ts** unit tests pass including context isolation tests
 - [ ] **scripts/test-logger-context.sh** validates context isolation with concurrent requests
@@ -198,7 +270,7 @@ Research NestJS logging patterns and implement enhanced LoggerService:
 
 1. Research NestJS logging best practices:
    - Study how NestJS ConsoleLogger works with dependency injection
-   - Research AsyncLocalStorage/CLS patterns for request context isolation  
+   - Research AsyncLocalStorage/CLS patterns for request context isolation
    - Investigate OpenTelemetry Logs API integration with NestJS
    - Look into NestJS Logger providers and custom logger implementation
 
@@ -238,6 +310,7 @@ Research NestJS logging patterns and implement enhanced LoggerService:
 ---
 
 #### Task 5: Update MetricsService for Global OpenTelemetry
+
 Status: **Pending**
 
 Goal: Refactor MetricsService to use OpenTelemetry's global meter provider while keeping the enhanced business metrics API.
@@ -245,6 +318,7 @@ Goal: Refactor MetricsService to use OpenTelemetry's global meter provider while
 Working Result: A **src/metrics/metrics.service.ts** that provides enhanced metrics functionality using global OpenTelemetry meter.
 
 Validation:
+
 - [ ] MetricsService compiles without TypeScript errors
 - [ ] Can create counters, gauges, histograms without configuration
 - [ ] Service labels automatically applied from resource attributes
@@ -262,7 +336,7 @@ Refactor **src/metrics/metrics.service.ts** to remove configuration dependency:
 
 3. Update metrics creation methods:
    - `createCounter()` - use meter.createCounter()
-   - `createGauge()` - use meter.createObservableGauge() 
+   - `createGauge()` - use meter.createObservableGauge()
    - `createHistogram()` - use meter.createHistogram()
    - `createSummary()` - create histogram with percentile configuration
 
@@ -287,6 +361,7 @@ Refactor **src/metrics/metrics.service.ts** to remove configuration dependency:
 ### 🔄 **Iteration 3: Enhanced Services Modernization**
 
 #### Task 6: Modernize TracingService and Decorators
+
 Status: **Pending**
 
 Goal: Update TracingService and tracing decorators to work with OpenTelemetry's global tracer provider while maintaining enhanced NestJS tracing features, with immediate validation using examples app.
@@ -294,6 +369,7 @@ Goal: Update TracingService and tracing decorators to work with OpenTelemetry's 
 Working Result: Updated **src/tracing/tracing.service.ts** and **src/decorators/auto-trace.decorators.ts** that work without configuration and use global OpenTelemetry tracer, validated through examples app integration.
 
 Validation:
+
 - [ ] TracingService compiles without TypeScript errors
 - [ ] **scripts/test-tracing.sh** passes - validates tracing with examples app
 - [ ] @Trace, @TraceClass, @NoTrace decorators work correctly in examples app
@@ -307,7 +383,7 @@ Modernize tracing components with immediate examples app testing:
 
 1. Update **src/tracing/tracing.service.ts**:
    - Remove ObservabilityConfig dependency from constructor
-   - Use `trace.getTracerProvider().getTracer('nestjs-app')` 
+   - Use `trace.getTracerProvider().getTracer('nestjs-app')`
    - Keep existing tracing helper methods
    - Update span attribute utilities to work with global tracer
 
@@ -345,7 +421,7 @@ Modernize tracing components with immediate examples app testing:
 7. Update examples app to demonstrate custom tracing:
    - Add @TraceClass decorator to a service
    - Add @Trace decorator to specific methods
-   - Add @NoTrace to sensitive methods  
+   - Add @NoTrace to sensitive methods
    - Show span attribute customization
 
 8. Maintain all existing TypeScript interfaces and update JSDoc
@@ -354,6 +430,7 @@ Modernize tracing components with immediate examples app testing:
 ---
 
 #### Task 7: Update MetricsController for Simplified Architecture
+
 Status: **Pending**
 
 Goal: Update the MetricsController to work with the new simplified architecture and global OpenTelemetry providers, with immediate validation through examples app.
@@ -361,6 +438,7 @@ Goal: Update the MetricsController to work with the new simplified architecture 
 Working Result: A **src/controllers/metrics.controller.ts** that provides /metrics endpoint without configuration dependency, validated through examples app integration.
 
 Validation:
+
 - [ ] MetricsController compiles without TypeScript errors
 - [ ] **scripts/test-metrics-endpoint.sh** passes - validates /metrics endpoint with examples app
 - [ ] /metrics endpoint works correctly in examples app
@@ -416,6 +494,7 @@ Update MetricsController with immediate examples app testing:
 ### 🔄 **Iteration 4: Environment Variable Configuration & Documentation**
 
 #### Task 8: Create Comprehensive Environment Variable Configuration
+
 Status: **Pending**
 
 Goal: Document all supported OpenTelemetry environment variables and add library-specific variables for enhanced features, with immediate validation through examples app testing.
@@ -423,6 +502,7 @@ Goal: Document all supported OpenTelemetry environment variables and add library
 Working Result: Updated **CLAUDE.md** with comprehensive environment variable documentation and a new **docs/environment-variables.md** file, validated through examples app with different configurations.
 
 Validation:
+
 - [ ] **CLAUDE.md** updated with new environment variables section
 - [ ] **docs/environment-variables.md** created with full variable list
 - [ ] **scripts/test-env-vars.sh** passes - validates environment variables with examples app
@@ -477,6 +557,7 @@ Create comprehensive environment variable documentation with examples app valida
 ---
 
 #### Task 9: Update Build Configuration and Package Exports
+
 Status: **Pending**
 
 Goal: Update build system to properly compile TypeScript register module and update package.json exports for the new architecture, with immediate validation through examples app.
@@ -484,6 +565,7 @@ Goal: Update build system to properly compile TypeScript register module and upd
 Working Result: Updated build configuration that produces both CJS and ESM versions of the register module with proper package.json exports, validated through examples app testing.
 
 Validation:
+
 - [ ] `pnpm build` successfully compiles register.ts for both CJS and ESM
 - [ ] **package.json** exports include register module paths
 - [ ] **scripts/test-build-exports.sh** passes - validates build exports with examples app
@@ -540,6 +622,7 @@ Update build system with immediate examples app validation:
 ### 🔄 **Iteration 5: Testing & Examples Update**
 
 #### Task 10: Update Example Application for New Architecture
+
 Status: **Pending**
 
 Goal: Update the basic example application to demonstrate the new register pattern and simplified module usage, serving as comprehensive validation for all previous tasks.
@@ -547,6 +630,7 @@ Goal: Update the basic example application to demonstrate the new register patte
 Working Result: Updated **examples/basic-app** that uses the new `-r` register pattern and simplified ObservabilityModule, demonstrating all enhanced features working together.
 
 Validation:
+
 - [ ] Example app runs with `node -r @paystackhq/nestjs-observability/register dist/main.js`
 - [ ] **scripts/test-complete-example.sh** passes - validates full functionality
 - [ ] All observability features work (tracing, metrics, logging) together
@@ -615,6 +699,7 @@ Update example application as comprehensive validation:
 ---
 
 #### Task 11: Create Integration Tests for New Architecture
+
 Status: **Pending**
 
 Goal: Create comprehensive integration tests that verify the register module and simplified architecture work correctly, building on all previous task implementations.
@@ -622,6 +707,7 @@ Goal: Create comprehensive integration tests that verify the register module and
 Working Result: New test files in **src/** that validate OpenTelemetry integration, environment variable configuration, and enhanced services working together.
 
 Validation:
+
 - [ ] Integration tests pass with `pnpm test`
 - [ ] **src/register.test.ts** validates register module functionality
 - [ ] **src/integration/full-stack.test.ts** tests complete workflow
@@ -694,6 +780,7 @@ Create comprehensive integration tests building on implemented tasks:
 ---
 
 #### Task 12: Update Documentation and Migration Guide
+
 Status: **Pending**
 
 Goal: Create comprehensive documentation for the new architecture and a migration guide for existing users, with validation through examples and real migration scenarios.
@@ -701,6 +788,7 @@ Goal: Create comprehensive documentation for the new architecture and a migratio
 Working Result: Updated documentation files and a migration guide that helps users transition from the old configuration-based approach to the new environment variable approach, validated through examples app and migration testing.
 
 Validation:
+
 - [ ] **README.md** updated with new usage patterns
 - [ ] **docs/migration-guide.md** created with step-by-step migration instructions
 - [ ] **scripts/test-migration.sh** passes - validates migration scenarios
@@ -771,6 +859,7 @@ Create comprehensive documentation with migration validation:
 ### 🔄 **Iteration 6: Final Validation & Release Preparation**
 
 #### Task 13: Comprehensive End-to-End Testing
+
 Status: **Pending**
 
 Goal: Perform comprehensive testing of the complete new architecture with real applications and multiple exporter configurations, validating all previous task implementations working together.
@@ -778,6 +867,7 @@ Goal: Perform comprehensive testing of the complete new architecture with real a
 Working Result: Validated package that works correctly in real-world scenarios with comprehensive test coverage, performance validation, and real-world integration testing.
 
 Validation:
+
 - [ ] All tests pass with 90%+ coverage across all components
 - [ ] **scripts/test-e2e-complete.sh** passes - validates complete functionality
 - [ ] Example application works with all supported exporters
@@ -828,7 +918,7 @@ Perform comprehensive end-to-end testing validating all implementations:
    - Test on different Node.js versions (18, 20, 22)
    - Verify both CommonJS and ESM compatibility work correctly
    - Test in Docker containers with different configurations
-   - Test in Kubernetes with ConfigMaps and Secrets  
+   - Test in Kubernetes with ConfigMaps and Secrets
    - Validate register module works in different deployment scenarios
 
 7. Real-world scenario validation:
@@ -847,6 +937,7 @@ Perform comprehensive end-to-end testing validating all implementations:
 ---
 
 #### Task 14: Prepare Release and Update Changelog
+
 Status: **Pending**
 
 Goal: Prepare the package for release with proper versioning, changelog updates, and release notes, validated through final release testing.
@@ -854,6 +945,7 @@ Goal: Prepare the package for release with proper versioning, changelog updates,
 Working Result: Package ready for release with updated version, comprehensive changelog, proper Git tagging, and final validation of release artifacts.
 
 Validation:
+
 - [ ] Version bumped to 1.0.0 in package.json
 - [ ] CHANGELOG.md updated with breaking changes and new features
 - [ ] **scripts/test-release-artifacts.sh** passes - validates release package
@@ -880,7 +972,7 @@ Prepare package for release with comprehensive validation:
    - Add acknowledgments and contributor credits
 
 3. Create **scripts/test-release-artifacts.sh** validation script:
-   - Run `pnpm clean && pnpm build && pnpm test` 
+   - Run `pnpm clean && pnpm build && pnpm test`
    - Verify all build artifacts are correct and complete
    - Test package installation from tarball in clean environment
    - Validate register module works from installed package
