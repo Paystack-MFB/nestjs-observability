@@ -47,26 +47,14 @@ export class ObservabilityModule {
       // Default configuration provider (temporary until services are updated)
       defaultConfigProvider,
 
-      // LoggerService - will be updated to use global logger provider in Task 4
-      {
-        inject: ['OBSERVABILITY_CONFIG'],
-        provide: LoggerService,
-        useFactory: (config: ObservabilityConfig) => new LoggerService(config),
-      },
+      // LoggerService - uses global OpenTelemetry logger provider (Task 4 completed)
+      LoggerService,
 
-      // MetricsService - will be updated to use global meter provider in Task 5
-      {
-        inject: ['OBSERVABILITY_CONFIG', LoggerService],
-        provide: MetricsService,
-        useFactory: (config: ObservabilityConfig, logger: LoggerService) => new MetricsService(config, logger),
-      },
+      // MetricsService - uses global OpenTelemetry meter provider (Task 5 completed)
+      MetricsService,
 
-      // TracingService - will be updated to use global tracer provider in Task 6
-      {
-        inject: ['OBSERVABILITY_CONFIG', LoggerService],
-        provide: TracingService,
-        useFactory: (config: ObservabilityConfig, logger: LoggerService) => new TracingService(config, logger),
-      },
+      // TracingService - uses global OpenTelemetry tracer provider (Task 6 completed)
+      TracingService,
 
       // AutoTraceInterceptor as global interceptor
       {

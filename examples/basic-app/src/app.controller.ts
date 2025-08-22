@@ -1,5 +1,6 @@
 import { Body, Controller, Get, HttpException, HttpStatus, Inject, Param, Post } from '@nestjs/common';
 import { AppService } from './app.service';
+import { ExampleService } from './example.service';
 import { LoggingService } from './logging.service';
 import { PaymentService } from './payment.service';
 import { UserService } from './user.service';
@@ -10,7 +11,8 @@ export class AppController {
     @Inject(AppService) private appService: AppService,
     @Inject(UserService) private userService: UserService,
     @Inject(PaymentService) private paymentService: PaymentService,
-    @Inject(LoggingService) private loggingService: LoggingService
+    @Inject(LoggingService) private loggingService: LoggingService,
+    @Inject(ExampleService) private exampleService: ExampleService
   ) {}
 
   @Get()
@@ -160,5 +162,32 @@ export class AppController {
   @Get('error-test')
   async errorTest(): Promise<any> {
     throw new HttpException('Test error for tracing', HttpStatus.INTERNAL_SERVER_ERROR);
+  }
+
+  // ==== EXAMPLE SERVICE ENDPOINTS ====
+
+  @Post('example/simple')
+  async simpleExample(@Body() data: any): Promise<any> {
+    return this.exampleService.simpleOperation(data);
+  }
+
+  @Post('example/complex/:userId')
+  async complexExample(@Param('userId') userId: string, @Body() data: any): Promise<any> {
+    return this.exampleService.complexOperation(userId, data);
+  }
+
+  @Post('example/concurrent')
+  async concurrentExample(@Body() requests: any[]): Promise<any> {
+    return this.exampleService.concurrentOperations(requests);
+  }
+
+  @Post('example/sensitive')
+  async sensitiveExample(@Body() sensitiveData: any): Promise<any> {
+    return this.exampleService.sensitiveOperation(sensitiveData);
+  }
+
+  @Get('example/health')
+  async exampleHealth(): Promise<any> {
+    return this.exampleService.healthCheck();
   }
 }

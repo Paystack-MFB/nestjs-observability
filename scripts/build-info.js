@@ -27,18 +27,42 @@ function displayBuildInfo() {
   console.log('📤 Exports:');
   const exports = packageJson.exports;
   if (exports && exports['.']) {
+    console.log('   📦 Main Package (.)');
     const mainExports = exports['.'];
-    console.log(`   Types: ${mainExports.types}`);
+    console.log(`      Types: ${mainExports.types}`);
     if (mainExports.require) {
-      console.log(`   Require: ${mainExports.require.default || mainExports.require}`);
-      console.log(`   Require Types: ${mainExports.require.types || 'same as main types'}`);
+      console.log(`      Require: ${mainExports.require.default || mainExports.require}`);
+      console.log(`      Require Types: ${mainExports.require.types || 'same as main types'}`);
     }
     if (mainExports.import) {
-      console.log(`   Import: ${mainExports.import.default || mainExports.import}`);
-      console.log(`   Import Types: ${mainExports.import.types || 'generated'}`);
+      console.log(`      Import: ${mainExports.import.default || mainExports.import}`);
+      console.log(`      Import Types: ${mainExports.import.types || 'generated'}`);
     }
-    console.log(`   Default: ${mainExports.default}`);
+    console.log(`      Default: ${mainExports.default}`);
   }
+  
+  // Show register module exports
+  if (exports && exports['./register']) {
+    console.log('   🔧 Register Module (./register)');
+    const registerExports = exports['./register'];
+    console.log(`      Types: ${registerExports.types}`);
+    if (registerExports.require) {
+      console.log(`      Require: ${registerExports.require.default || registerExports.require}`);
+      console.log(`      Require Types: ${registerExports.require.types || 'same as types'}`);
+    }
+    if (registerExports.import) {
+      console.log(`      Import: ${registerExports.import.default || registerExports.import}`);
+      console.log(`      Import Types: ${registerExports.import.types || 'generated'}`);
+    }
+    console.log(`      Default: ${registerExports.default}`);
+  }
+  
+  // Show other exports
+  Object.keys(exports).forEach(exportKey => {
+    if (exportKey !== '.' && exportKey !== './register') {
+      console.log(`   📄 ${exportKey}: ${exports[exportKey]}`);
+    }
+  });
   console.log('');
 
   console.log('🎯 Build Targets:');
@@ -79,14 +103,20 @@ function displayBuildInfo() {
   console.log('');
 
   console.log('📚 Import Examples:');
-  console.log('   // CommonJS');
+  console.log('   // Main Package - CommonJS');
   console.log('   const { ObservabilityModule } = require("@paystackhq/nestjs-observability");');
   console.log('');
-  console.log('   // ESM');
+  console.log('   // Main Package - ESM');
   console.log('   import { ObservabilityModule } from "@paystackhq/nestjs-observability";');
   console.log('');
-  console.log('   // TypeScript (both formats supported)');
-  console.log('   import { ObservabilityModule } from "@paystackhq/nestjs-observability";');
+  console.log('   // Register Module - CommonJS');
+  console.log('   require("@paystackhq/nestjs-observability/register");');
+  console.log('');
+  console.log('   // Register Module - ESM');
+  console.log('   import "@paystackhq/nestjs-observability/register";');
+  console.log('');
+  console.log('   // Usage with Node.js register pattern');
+  console.log('   node -r @paystackhq/nestjs-observability/register dist/main.js');
   console.log('');
 }
 

@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { LoggerService, ObservabilityModule } from '@paystackhq/nestjs-observability';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
+import { ExampleService } from './example.service';
 import { HealthController } from './health.controller';
 import { LoggingService } from './logging.service';
 import { PaymentService } from './payment.service';
@@ -11,6 +12,8 @@ import { UserService } from './user.service';
   imports: [
     // Lightweight observability module - no configuration required
     // All configuration comes from environment variables (OTEL_*)
+    // Provides: LoggerService, MetricsService, TracingService, MetricsController
+    // Auto-configures: Global OpenTelemetry providers, AutoTraceInterceptor
     ObservabilityModule.forRoot(),
   ],
   controllers: [AppController, HealthController],
@@ -18,6 +21,7 @@ import { UserService } from './user.service';
     AppService,
     UserService,
     PaymentService,
+    ExampleService,
     {
       provide: LoggingService,
       useFactory: (loggerService: LoggerService) => {

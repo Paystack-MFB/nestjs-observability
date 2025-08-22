@@ -1,0 +1,622 @@
+/**
+ * Full-Stack Integration Tests
+ * 
+ * This test suite validates the complete integration between the register module
+ * and the NestJS observability module, ensuring all components work together
+ * correctly in various scenarios.
+ */
+
+import 'reflect-metadata';
+import { Test, TestingModule } from '@nestjs/testing';
+import { describe, expect, it, beforeEach, afterEach, vi } from 'vitest';
+
+import { ObservabilityModule } from '../observability.module';
+import { LoggerService } from '../logger/logger.service';
+import { MetricsService } from '../metrics/metrics.service';
+import { TracingService } from '../tracing/tracing.service';
+
+import { 
+  TestSetup, 
+  AsyncTestUtils, 
+  MockFactory
+} from '../test-helpers/otel-mocks';
+
+describe('Full-Stack Integration Tests', () => {
+  let moduleRef: TestingModule;
+  let loggerService: LoggerService;
+  let metricsService: MetricsService;
+  let tracingService: TracingService;
+  let metricsController: MetricsController;
+  let setup: TestSetup;
+
+  beforeEach(async () => {
+    setup = new TestSetup();
+    setup.setupDefault();
+  });
+
+  afterEach(async () => {
+    if (moduleRef) {
+      await moduleRef.close();
+    }
+    setup.cleanup();
+  });
+
+  describe('Complete Initialization Flow', () => {
+    it('should initialize all services with default configuration', async () => {
+      // Test complete module initialization
+      moduleRef = await Test.createTestingModule({
+        imports: [ObservabilityModule.forRoot()],
+      }).compile();
+
+      await moduleRef.init();
+
+      // Verify all services are available
+      loggerService = moduleRef.get<LoggerService>(LoggerService);
+      metricsService = moduleRef.get<MetricsService>(MetricsService);
+      tracingService = moduleRef.get<TracingService>(TracingService);
+
+      expect(loggerService).toBeDefined();
+      expect(metricsService).toBeDefined();
+      expect(tracingService).toBeDefined();
+
+      // Verify services are working
+      expect(loggerService.log).toBeDefined();
+      expect(metricsService.createCounter).toBeDefined();
+      expect(tracingService.startSpan).toBeDefined();
+    });
+
+    it('should provide all required services', async () => {
+      moduleRef = await Test.createTestingModule({
+        imports: [ObservabilityModule.forRoot()],
+      }).compile();
+
+      await moduleRef.init();
+
+      // Verify all core services are available
+      const logger = moduleRef.get<LoggerService>(LoggerService);
+      const metrics = moduleRef.get<MetricsService>(MetricsService);
+      const tracing = moduleRef.get<TracingService>(TracingService);
+      
+      expect(logger).toBeDefined();
+      expect(metrics).toBeDefined();
+      expect(tracing).toBeDefined();
+    });
+
+    it('should initialize MetricsController when metrics are enabled', async () => {
+      setup.environment.setEnvironment({
+        ...MockFactory.createEnvironment('test'),
+        OTEL_METRICS_ENABLED: 'true',
+      });
+
+      moduleRef = await Test.createTestingModule({
+        imports: [ObservabilityModule.forRoot()],
+      }).compile();
+
+      await moduleRef.init();
+
+      metricsController = moduleRef.get<MetricsController>(MetricsController);
+      expect(metricsController).toBeDefined();
+    });
+  });
+
+  describe('Environment Variable Configuration', () => {
+    it('should respect development environment configuration', async () => {
+      setup.environment.setEnvironment(MockFactory.createEnvironment('development'));
+
+      moduleRef = await Test.createTestingModule({
+        imports: [ObservabilityModule.forRoot()],
+      }).compile();
+
+      await moduleRef.init();
+
+      loggerService = moduleRef.get<LoggerService>(LoggerService);
+      metricsService = moduleRef.get<MetricsService>(MetricsService);
+      tracingService = moduleRef.get<TracingService>(TracingService);
+
+      // Verify services use global providers (through mocks)
+      expect(setup.otelMocks.mockLoggerProvider.getLogger).toHaveBeenCalled();
+      expect(setup.otelMocks.mockMeterProvider.getMeter).toHaveBeenCalled();
+      expect(setup.otelMocks.mockTracerProvider.getTracer).toHaveBeenCalled();
+    });
+
+    it('should respect production environment configuration', async () => {
+      setup.environment.setEnvironment(MockFactory.createEnvironment('production'));
+
+      moduleRef = await Test.createTestingModule({
+        imports: [ObservabilityModule.forRoot()],
+      }).compile();
+
+      await moduleRef.init();
+
+      // Services should still initialize correctly with OTLP configuration
+      loggerService = moduleRef.get<LoggerService>(LoggerService);
+      metricsService = moduleRef.get<MetricsService>(MetricsService);
+      tracingService = moduleRef.get<TracingService>(TracingService);
+
+      expect(loggerService).toBeDefined();
+      expect(metricsService).toBeDefined();
+      expect(tracingService).toBeDefined();
+    });
+
+    it('should handle disabled observability gracefully', async () => {
+      setup.environment.setEnvironment(MockFactory.createEnvironment('disabled'));
+
+      moduleRef = await Test.createTestingModule({
+        imports: [ObservabilityModule.forRoot()],
+      }).compile();
+
+      await moduleRef.init();
+
+      // Services should still be available but may behave differently
+      loggerService = moduleRef.get<LoggerService>(LoggerService);
+      metricsService = moduleRef.get<MetricsService>(MetricsService);
+      tracingService = moduleRef.get<TracingService>(TracingService);
+
+      expect(loggerService).toBeDefined();
+      expect(metricsService).toBeDefined();
+      expect(tracingService).toBeDefined();
+    });
+
+    it('should respect environment variable precedence', async () => {
+      // Set base environment
+      setup.environment.setEnvironment({
+        OTEL_SERVICE_NAME: 'base-service',
+        OTEL_TRACES_EXPORTER: 'console',
+        OTEL_METRICS_EXPORTER: 'console',
+      });
+
+      // Override with more specific variables
+      process.env.OTEL_SERVICE_NAME = 'override-service';
+      process.env.OTEL_TRACES_EXPORTER = 'otlp';
+
+      moduleRef = await Test.createTestingModule({
+        imports: [ObservabilityModule.forRoot()],
+      }).compile();
+
+      await moduleRef.init();
+
+      // Services should reflect the overridden values
+      loggerService = moduleRef.get<LoggerService>(LoggerService);
+      expect(loggerService).toBeDefined();
+
+      // Clean up the override
+      delete process.env.OTEL_SERVICE_NAME;
+      delete process.env.OTEL_TRACES_EXPORTER;
+    });
+  });
+
+  describe('Enhanced Services Integration', () => {
+    beforeEach(async () => {
+      moduleRef = await Test.createTestingModule({
+        imports: [ObservabilityModule.forRoot()],
+      }).compile();
+
+      await moduleRef.init();
+
+      loggerService = moduleRef.get<LoggerService>(LoggerService);
+      metricsService = moduleRef.get<MetricsService>(MetricsService);
+      tracingService = moduleRef.get<TracingService>(TracingService);
+    });
+
+    it('should integrate logging with tracing context', async () => {
+      // Create a span
+      const span = tracingService.startSpan('test-operation');
+      
+      // Log with context
+      loggerService.setContext({ operation: 'test', component: 'integration' });
+      loggerService.log('Test message with trace context', { data: 'test' });
+
+      // Verify logging was called
+      expect(setup.otelMocks.mockLogger.emit).toHaveBeenCalledWith(
+        expect.objectContaining({
+          severityText: 'INFO',
+          body: 'Test message with trace context',
+          attributes: expect.objectContaining({
+            data: 'test',
+            operation: 'test',
+            component: 'integration',
+          }),
+        })
+      );
+
+      span.end();
+    });
+
+    it('should create and record custom metrics', async () => {
+      // Create custom metrics
+      const counter = metricsService.createCounter('test_counter', 'Test counter description');
+      const histogram = metricsService.createHistogram('test_histogram', 'Test histogram description');
+
+      // Record metrics
+      counter.add(1, { operation: 'test' });
+      histogram.record(0.5, { operation: 'test' });
+
+      // Verify metrics creation
+      expect(setup.otelMocks.mockMeter.createCounter).toHaveBeenCalledWith('test_counter', {
+        description: 'Test counter description',
+      });
+
+      expect(setup.otelMocks.mockMeter.createHistogram).toHaveBeenCalledWith('test_histogram', {
+        description: 'Test histogram description',
+      });
+    });
+
+    it('should create and manage spans with attributes', async () => {
+      // Create spans with different methods
+      const manualSpan = tracingService.startSpan('manual-span');
+      
+      // Use withSpan method
+      const result = await tracingService.withSpan('operation-span', async () => {
+        return 'operation-result';
+      });
+
+      expect(result).toBe('operation-result');
+
+      // Verify span creation
+      expect(setup.otelMocks.mockTracer.startSpan).toHaveBeenCalledWith('manual-span');
+      expect(setup.otelMocks.mockTracer.startSpan).toHaveBeenCalledWith('operation-span');
+
+      manualSpan.end();
+    });
+
+    it('should handle concurrent operations with context isolation', async () => {
+      const operations = [
+        async () => {
+          const childLogger = loggerService.createChildLogger();
+          childLogger.setContext({ operationId: 'op-1', requestId: 'req-1' });
+          childLogger.log('Operation 1 message');
+          
+          const span = tracingService.startSpan('operation-1');
+          await AsyncTestUtils.delay(10);
+          span.end();
+          
+          return 'result-1';
+        },
+        async () => {
+          const childLogger = loggerService.createChildLogger();
+          childLogger.setContext({ operationId: 'op-2', requestId: 'req-2' });
+          childLogger.log('Operation 2 message');
+          
+          const span = tracingService.startSpan('operation-2');
+          await AsyncTestUtils.delay(15);
+          span.end();
+          
+          return 'result-2';
+        },
+        async () => {
+          const childLogger = loggerService.createChildLogger();
+          childLogger.setContext({ operationId: 'op-3', requestId: 'req-3' });
+          childLogger.log('Operation 3 message');
+          
+          const span = tracingService.startSpan('operation-3');
+          await AsyncTestUtils.delay(5);
+          span.end();
+          
+          return 'result-3';
+        },
+      ];
+
+      const results = await AsyncTestUtils.concurrent(operations);
+
+      expect(results).toEqual(['result-1', 'result-2', 'result-3']);
+
+      // Verify all logging operations were called
+      expect(setup.otelMocks.mockLogger.emit).toHaveBeenCalledTimes(3);
+      
+      // Verify all spans were created
+      expect(setup.otelMocks.mockTracer.startSpan).toHaveBeenCalledWith('operation-1');
+      expect(setup.otelMocks.mockTracer.startSpan).toHaveBeenCalledWith('operation-2');
+      expect(setup.otelMocks.mockTracer.startSpan).toHaveBeenCalledWith('operation-3');
+    });
+  });
+
+  describe('Error Handling and Edge Cases', () => {
+    beforeEach(async () => {
+      moduleRef = await Test.createTestingModule({
+        imports: [ObservabilityModule.forRoot()],
+      }).compile();
+
+      await moduleRef.init();
+
+      loggerService = moduleRef.get<LoggerService>(LoggerService);
+      metricsService = moduleRef.get<MetricsService>(MetricsService);
+      tracingService = moduleRef.get<TracingService>(TracingService);
+    });
+
+    it('should handle logging errors gracefully', async () => {
+      // Mock logger to throw error
+      setup.otelMocks.mockLogger.emit.mockImplementationOnce(() => {
+        throw new Error('Logging error');
+      });
+
+      // Should not throw error
+      expect(() => {
+        loggerService.log('Test message');
+      }).not.toThrow();
+
+      // Should have attempted to log
+      expect(setup.otelMocks.mockLogger.emit).toHaveBeenCalled();
+    });
+
+    it('should handle metrics creation errors gracefully', async () => {
+      // Mock meter to throw error
+      setup.otelMocks.mockMeter.createCounter.mockImplementationOnce(() => {
+        throw new Error('Metrics error');
+      });
+
+      // Should not throw error
+      expect(() => {
+        metricsService.createCounter('error-counter', 'Error counter');
+      }).not.toThrow();
+    });
+
+    it('should handle tracing errors gracefully', async () => {
+      // Mock tracer to throw error
+      setup.otelMocks.mockTracer.startSpan.mockImplementationOnce(() => {
+        throw new Error('Tracing error');
+      });
+
+      // Should not throw error
+      expect(() => {
+        tracingService.startSpan('error-span');
+      }).not.toThrow();
+    });
+
+    it('should handle missing environment variables', async () => {
+      // Clear environment variables
+      setup.environment.clearEnvironment([
+        'OTEL_SERVICE_NAME',
+        'OTEL_SERVICE_VERSION',
+        'OTEL_TRACES_EXPORTER',
+        'OTEL_METRICS_EXPORTER',
+        'OTEL_LOGS_EXPORTER',
+      ]);
+
+      const testModule = await Test.createTestingModule({
+        imports: [ObservabilityModule.forRoot()],
+      }).compile();
+
+      await testModule.init();
+
+      // Services should still initialize with defaults
+      const logger = testModule.get<LoggerService>(LoggerService);
+      const metrics = testModule.get<MetricsService>(MetricsService);
+      const tracing = testModule.get<TracingService>(TracingService);
+
+      expect(logger).toBeDefined();
+      expect(metrics).toBeDefined();
+      expect(tracing).toBeDefined();
+
+      await testModule.close();
+    });
+  });
+
+  describe('Performance and Resource Management', () => {
+    beforeEach(async () => {
+      moduleRef = await Test.createTestingModule({
+        imports: [ObservabilityModule.forRoot()],
+      }).compile();
+
+      await moduleRef.init();
+
+      loggerService = moduleRef.get<LoggerService>(LoggerService);
+      metricsService = moduleRef.get<MetricsService>(MetricsService);
+      tracingService = moduleRef.get<TracingService>(TracingService);
+    });
+
+    it('should handle high-frequency logging efficiently', async () => {
+      const startTime = Date.now();
+      const logCount = 100;
+
+      for (let i = 0; i < logCount; i++) {
+        loggerService.log(`High frequency log ${i}`, { iteration: i });
+      }
+
+      const endTime = Date.now();
+      const duration = endTime - startTime;
+
+      // Should complete quickly (less than 1 second for 100 logs)
+      expect(duration).toBeLessThan(1000);
+
+      // Should have called emit for each log
+      expect(setup.otelMocks.mockLogger.emit).toHaveBeenCalledTimes(logCount);
+    });
+
+    it('should handle concurrent metric operations', async () => {
+      const counter = metricsService.createCounter('concurrent_counter', 'Concurrent counter');
+      const histogram = metricsService.createHistogram('concurrent_histogram', 'Concurrent histogram');
+
+      const operations = Array.from({ length: 50 }, (_, i) => async () => {
+        counter.add(1, { operation: `concurrent-${i}` });
+        histogram.record(Math.random(), { operation: `concurrent-${i}` });
+        await AsyncTestUtils.delay(1);
+      });
+
+      const startTime = Date.now();
+      await AsyncTestUtils.concurrent(operations);
+      const endTime = Date.now();
+
+      // Should complete efficiently
+      expect(endTime - startTime).toBeLessThan(1000);
+    });
+
+    it('should handle span lifecycle correctly', async () => {
+      const spans: any[] = [];
+
+      // Create multiple spans
+      for (let i = 0; i < 10; i++) {
+        const span = tracingService.startSpan(`test-span-${i}`);
+        spans.push(span);
+      }
+
+      // End all spans
+      spans.forEach(span => span.end());
+
+      // Verify all spans were created and ended
+      expect(setup.otelMocks.mockTracer.startSpan).toHaveBeenCalledTimes(10);
+      spans.forEach(span => {
+        expect(span.end).toHaveBeenCalledTimes(1);
+      });
+    });
+  });
+
+  describe('Module Lifecycle', () => {
+    it('should initialize and destroy module correctly', async () => {
+      const testModule = await Test.createTestingModule({
+        imports: [ObservabilityModule.forRoot()],
+      }).compile();
+
+      await testModule.init();
+
+      // Verify services are available
+      const logger = testModule.get<LoggerService>(LoggerService);
+      const metrics = testModule.get<MetricsService>(MetricsService);
+      const tracing = testModule.get<TracingService>(TracingService);
+
+      expect(logger).toBeDefined();
+      expect(metrics).toBeDefined();
+      expect(tracing).toBeDefined();
+
+      // Should close without errors
+      await expect(testModule.close()).resolves.not.toThrow();
+    });
+
+    it('should handle multiple module instances', async () => {
+      const module1 = await Test.createTestingModule({
+        imports: [ObservabilityModule.forRoot()],
+      }).compile();
+
+      const module2 = await Test.createTestingModule({
+        imports: [ObservabilityModule.forRoot()],
+      }).compile();
+
+      await module1.init();
+      await module2.init();
+
+      // Both modules should have their own service instances
+      const logger1 = module1.get<LoggerService>(LoggerService);
+      const logger2 = module2.get<LoggerService>(LoggerService);
+
+      expect(logger1).toBeDefined();
+      expect(logger2).toBeDefined();
+
+      await module1.close();
+      await module2.close();
+    });
+  });
+
+  describe('Real-world Scenarios', () => {
+    beforeEach(async () => {
+      moduleRef = await Test.createTestingModule({
+        imports: [ObservabilityModule.forRoot()],
+      }).compile();
+
+      await moduleRef.init();
+
+      loggerService = moduleRef.get<LoggerService>(LoggerService);
+      metricsService = moduleRef.get<MetricsService>(MetricsService);
+      tracingService = moduleRef.get<TracingService>(TracingService);
+    });
+
+    it('should simulate a complete request lifecycle', async () => {
+      // Simulate request start
+      const requestId = 'req-12345';
+      const userId = 'user-67890';
+
+      // Start request span
+      const requestSpan = tracingService.startSpan('http-request');
+      
+      // Create request-scoped logger
+      const requestLogger = loggerService.createChildLogger();
+      requestLogger.setContext({ requestId, userId, operation: 'user-profile' });
+
+      // Log request start
+      requestLogger.log('Processing user profile request', { 
+        method: 'GET',
+        path: '/api/users/profile',
+        userId 
+      });
+
+      // Create and record request metrics
+      const requestCounter = metricsService.createCounter('http_requests_total', 'Total HTTP requests');
+      const requestDuration = metricsService.createHistogram('http_request_duration_seconds', 'HTTP request duration');
+
+      requestCounter.add(1, { method: 'GET', route: '/api/users/profile', status: '200' });
+
+      // Simulate business logic
+      await tracingService.withSpan('user-lookup', async () => {
+        requestLogger.log('Looking up user in database', { userId });
+        await AsyncTestUtils.delay(50);
+      });
+
+      await tracingService.withSpan('profile-enrichment', async () => {
+        requestLogger.log('Enriching user profile', { userId });
+        await AsyncTestUtils.delay(30);
+      });
+
+      // Record response
+      requestDuration.record(0.08, { method: 'GET', route: '/api/users/profile', status: '200' });
+      requestLogger.log('Request completed successfully', { 
+        statusCode: 200,
+        duration: '80ms',
+        userId 
+      });
+
+      // End request span
+      requestSpan.end();
+
+      // Verify all operations were recorded
+      expect(setup.otelMocks.mockLogger.emit).toHaveBeenCalledTimes(4);
+      expect(setup.otelMocks.mockTracer.startSpan).toHaveBeenCalledTimes(3); // request + 2 business logic spans
+    });
+
+    it('should simulate error handling scenario', async () => {
+      const requestId = 'req-error-123';
+      
+      // Start request span
+      const requestSpan = tracingService.startSpan('error-request');
+      
+      // Create request-scoped logger
+      const requestLogger = loggerService.createChildLogger();
+      requestLogger.setContext({ requestId, operation: 'error-test' });
+
+      try {
+        // Simulate operation that throws error
+        await tracingService.withSpan('failing-operation', async () => {
+          requestLogger.log('Starting operation that will fail');
+          throw new Error('Simulated business logic error');
+        });
+      } catch (error) {
+        // Handle error
+        requestLogger.error('Operation failed', { 
+          error: error.message,
+          stack: error.stack 
+        });
+
+        // Record error span
+        requestSpan.recordException(error);
+        requestSpan.setStatus({ code: 2, message: error.message });
+
+        // Record error metrics
+        const errorCounter = metricsService.createCounter('errors_total', 'Total errors');
+        errorCounter.add(1, { operation: 'failing-operation', type: 'business-logic' });
+      } finally {
+        requestSpan.end();
+      }
+
+      // Verify error was logged and span was recorded
+      expect(setup.otelMocks.mockLogger.emit).toHaveBeenCalledWith(
+        expect.objectContaining({
+          severityText: 'ERROR',
+          body: 'Operation failed',
+        })
+      );
+
+      expect(requestSpan.recordException).toHaveBeenCalled();
+      expect(requestSpan.setStatus).toHaveBeenCalledWith({
+        code: 2,
+        message: 'Simulated business logic error'
+      });
+    });
+  });
+});

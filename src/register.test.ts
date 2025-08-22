@@ -169,11 +169,10 @@ describe('Register Module', () => {
     it('should start the SDK after initialization', async () => {
       const mockStart = vi.fn();
       const { NodeSDK } = await import('@opentelemetry/sdk-node');
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-call
-      (NodeSDK as never).mockImplementation(() => ({
+      vi.mocked(NodeSDK).mockImplementation(() => ({
         shutdown: vi.fn().mockResolvedValue(undefined),
         start: mockStart,
-      }));
+      } as any));
 
       await import('./register');
 
@@ -188,8 +187,7 @@ describe('Register Module', () => {
       const exitSpy = vi.spyOn(process, 'exit').mockImplementation(() => undefined as never);
 
       const { NodeSDK } = await import('@opentelemetry/sdk-node');
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-call
-      (NodeSDK as never).mockImplementation(() => {
+      vi.mocked(NodeSDK).mockImplementation(() => {
         throw new Error('SDK initialization failed');
       });
 
@@ -209,11 +207,10 @@ describe('Register Module', () => {
 
       const mockShutdown = vi.fn().mockRejectedValue(new Error('Shutdown failed'));
       const { NodeSDK } = await import('@opentelemetry/sdk-node');
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-call
-      (NodeSDK as never).mockImplementation(() => ({
+      vi.mocked(NodeSDK).mockImplementation(() => ({
         shutdown: mockShutdown,
         start: vi.fn(),
-      }));
+      } as any));
 
       const { sdk } = await import('./register');
 
