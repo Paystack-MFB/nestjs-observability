@@ -225,6 +225,11 @@ export class ExampleService {
    * Concurrent operation demonstrating context isolation
    */
   async concurrentOperations(requests: any[]): Promise<any[]> {
+    // Validate that requests is actually an array to prevent type confusion attacks
+    if (!Array.isArray(requests)) {
+      throw new Error('Invalid input: requests must be an array');
+    }
+
     const batchId = Math.random().toString(36).substring(7);
 
     this.logger.log('Starting concurrent operations', {
