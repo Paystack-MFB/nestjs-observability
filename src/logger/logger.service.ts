@@ -14,8 +14,12 @@ export class LoggerService {
 
   constructor() {
     // Get OpenTelemetry logger from global provider
-    const loggerProvider = logs.getLoggerProvider();
-    this.otelLogger = loggerProvider.getLogger('nestjs-app', '1.0.0');
+    const loggerProvider = typeof logs.getLoggerProvider === 'function' ? logs.getLoggerProvider() : undefined;
+    const resolved =
+      loggerProvider && typeof loggerProvider.getLogger === 'function'
+        ? loggerProvider.getLogger('nestjs-app', '1.0.0')
+        : undefined;
+    this.otelLogger = resolved ?? ({ emit: (_r: unknown) => undefined } as unknown as Logger);
   }
 
   /**

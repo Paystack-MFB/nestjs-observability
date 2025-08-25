@@ -177,14 +177,14 @@ describe('MetricsController', () => {
       expect(mockMetricsService.getRegistry).not.toHaveBeenCalled();
     });
 
-    it('should handle errors when getting metric names', async () => {
+    it('should handle errors when getting metric names', () => {
       const error = new Error('Registry error');
       mockMetricsService.getRegistry.mockImplementation(() => {
         throw error;
       });
 
-      await expect(controller.getMetricNames()).rejects.toThrow(HttpException);
-      await expect(controller.getMetricNames()).rejects.toThrow('Error getting metric names: Registry error');
+      expect(() => controller.getMetricNames()).toThrow(HttpException);
+      expect(() => controller.getMetricNames()).toThrow('Error getting metric names: Registry error');
 
       expect(mockLoggerService.error).toHaveBeenCalledWith('Error getting metric names: Registry error', {
         context: 'MetricsController',
@@ -231,7 +231,7 @@ describe('MetricsController', () => {
       expect(config).toEqual({
         enabled: true,
         endpoint: '/metrics',
-        serviceName: 'nestjs-app',
+        serviceName: 'test-service', // This comes from test environment
       });
     });
 

@@ -33,6 +33,9 @@ beforeEach(() => {
     process.env[key] = value;
   });
 
+  // Increase max listeners to prevent warnings during repeated register imports
+  process.setMaxListeners(50);
+
   // Ensure clean module state
   vi.clearAllMocks();
 
@@ -44,6 +47,10 @@ beforeEach(() => {
 
 // Global cleanup
 afterEach(() => {
+  // Remove any listeners added by register module to prevent accumulation
+  process.removeAllListeners('SIGTERM');
+  process.removeAllListeners('SIGINT');
+
   // Restore original environment variables
   Object.entries(originalEnv).forEach(([key, value]) => {
     if (value === undefined) {

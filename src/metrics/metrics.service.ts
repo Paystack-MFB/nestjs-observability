@@ -23,10 +23,18 @@ export class MetricsService implements OnModuleInit {
   private readonly otelMeter: Meter;
   private readonly registry: promClient.Registry;
 
-  constructor(private readonly logger: LoggerService) {
+  constructor(private readonly logger: LoggerService | undefined) {
     // Get OpenTelemetry meter from global provider
-    const meterProvider = metrics.getMeterProvider();
-    this.otelMeter = meterProvider.getMeter('nestjs-app', '1.0.0');
+    const meterProvider = typeof metrics.getMeterProvider === 'function' ? metrics.getMeterProvider() : undefined;
+    const resolvedMeter =
+      meterProvider && typeof meterProvider.getMeter === 'function'
+        ? meterProvider.getMeter('nestjs-app', '1.0.0')
+        : ({
+            createCounter: () => ({ add: (_v: number, _attrs?: Record<string, string>) => undefined }),
+            createHistogram: () => ({ record: (_v: number, _attrs?: Record<string, string>) => undefined }),
+            createObservableGauge: () => ({ addCallback: (_cb: () => void) => undefined }),
+          } as unknown as Meter);
+    this.otelMeter = resolvedMeter;
 
     // Create Prometheus registry for backward compatibility
     this.registry = new promClient.Registry();
@@ -62,7 +70,7 @@ export class MetricsService implements OnModuleInit {
       });
     } catch (_error) {
       // Ignore registry conflicts in test environments
-      this.logger.debug('Counter already exists in registry', { context: 'MetricsService', name });
+      this.logger?.debug('Counter already exists in registry', { context: 'MetricsService', name });
     }
 
     return counter;
@@ -100,7 +108,7 @@ export class MetricsService implements OnModuleInit {
       });
     } catch (_error) {
       // Ignore registry conflicts in test environments
-      this.logger.debug('Gauge already exists in registry', { context: 'MetricsService', name });
+      this.logger?.debug('Gauge already exists in registry', { context: 'MetricsService', name });
     }
 
     return gauge;
@@ -130,7 +138,7 @@ export class MetricsService implements OnModuleInit {
       });
     } catch (_error) {
       // Ignore registry conflicts in test environments
-      this.logger.debug('Histogram already exists in registry', { context: 'MetricsService', name });
+      this.logger?.debug('Histogram already exists in registry', { context: 'MetricsService', name });
     }
 
     return histogram;
@@ -161,7 +169,7 @@ export class MetricsService implements OnModuleInit {
       });
     } catch (_error) {
       // Ignore registry conflicts in test environments
-      this.logger.debug('Summary already exists in registry', { context: 'MetricsService', name });
+      this.logger?.debug('Summary already exists in registry', { context: 'MetricsService', name });
     }
 
     return histogram;
@@ -200,9 +208,9 @@ export class MetricsService implements OnModuleInit {
         prefix: 'node_',
         register: this.registry,
       });
-      this.logger.log('Default metrics collection enabled', { context: 'MetricsService' });
+      this.logger?.log('Default metrics collection enabled', { context: 'MetricsService' });
     } catch (error) {
-      this.logger.warn('Failed to initialize default metrics collection', {
+      this.logger?.warn('Failed to initialize default metrics collection', {
         context: 'MetricsService',
         error: error instanceof Error ? error.message : String(error),
       });
@@ -283,7 +291,7 @@ export class MetricsService implements OnModuleInit {
       this.appInfoGauge.labels(serviceLabels['version'], serviceLabels['environment']).set(1);
     } catch (error) {
       // Create fallback metrics if the registry approach fails
-      this.logger.warn('Failed to initialize common Prometheus metrics', {
+      this.logger?.warn('Failed to initialize common Prometheus metrics', {
         context: 'MetricsService',
         error: error instanceof Error ? error.message : String(error),
       });

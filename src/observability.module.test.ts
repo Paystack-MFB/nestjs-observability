@@ -1,3 +1,4 @@
+import 'reflect-metadata';
 /**
  * Unit tests for ObservabilityModule - Lightweight Version
  */
@@ -5,6 +6,50 @@
 import { APP_INTERCEPTOR } from '@nestjs/core';
 import { Test, TestingModule } from '@nestjs/testing';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+
+// Mock OpenTelemetry modules
+vi.mock('@opentelemetry/api', () => ({
+  metrics: {
+    getMeterProvider: vi.fn().mockReturnValue({
+      getMeter: vi.fn().mockReturnValue({
+        createCounter: vi.fn(),
+        createHistogram: vi.fn(),
+        createObservableGauge: vi.fn(),
+      }),
+    }),
+  },
+  trace: {
+    getActiveSpan: vi.fn(),
+    getTracer: vi.fn().mockReturnValue({
+      startSpan: vi.fn().mockReturnValue({
+        end: vi.fn(),
+        setAttributes: vi.fn(),
+        setStatus: vi.fn(),
+        recordException: vi.fn(),
+      }),
+    }),
+    getTracerProvider: vi.fn().mockReturnValue({
+      getTracer: vi.fn().mockReturnValue({
+        startSpan: vi.fn().mockReturnValue({
+          end: vi.fn(),
+          setAttributes: vi.fn(),
+          setStatus: vi.fn(),
+          recordException: vi.fn(),
+        }),
+      }),
+    }),
+  },
+}));
+
+vi.mock('@opentelemetry/api-logs', () => ({
+  logs: {
+    getLoggerProvider: vi.fn().mockReturnValue({
+      getLogger: vi.fn().mockReturnValue({
+        emit: vi.fn(),
+      }),
+    }),
+  },
+}));
 
 import { MetricsController } from './controllers/metrics.controller';
 import { LoggerService } from './logger/logger.service';
@@ -27,11 +72,6 @@ describe('ObservabilityModule - Lightweight', () => {
     Object.entries(mockEnv).forEach(([key, value]) => {
       process.env[key] = value;
     });
-
-    // Mock the services to avoid actual OpenTelemetry initialization
-    vi.mock('./logger/logger.service');
-    vi.mock('./metrics/metrics.service');
-    vi.mock('./tracing/tracing.service');
   });
 
   describe('forRoot()', () => {

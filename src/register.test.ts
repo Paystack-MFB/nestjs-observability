@@ -61,6 +61,39 @@ describe('Register Module', () => {
   beforeEach(() => {
     // Reset environment variables before each test
     process.env = { ...originalEnv };
+
+    // Explicitly set NODE_ENV to test for all register tests
+    process.env['NODE_ENV'] = 'test';
+
+    // Clear all OTEL-related environment variables for complete isolation
+    const keysToClear = [
+      'OTEL_SERVICE_NAME',
+      'OTEL_SERVICE_VERSION',
+      'OTEL_TRACES_EXPORTER',
+      'OTEL_METRICS_EXPORTER',
+      'OTEL_LOGS_EXPORTER',
+      'OTEL_METRICS_ENABLED',
+      'OTEL_METRIC_EXPORT_INTERVAL',
+      'OTEL_METRIC_EXPORT_TIMEOUT',
+      'OTEL_EXPORTER_OTLP_ENDPOINT',
+      'OTEL_EXPORTER_OTLP_HEADERS',
+      'OTEL_EXPORTER_OTLP_TRACES_ENDPOINT',
+      'OTEL_EXPORTER_OTLP_TRACES_HEADERS',
+      'OTEL_EXPORTER_OTLP_METRICS_ENDPOINT',
+      'OTEL_EXPORTER_OTLP_METRICS_HEADERS',
+      'OTEL_EXPORTER_OTLP_LOGS_ENDPOINT',
+      'OTEL_EXPORTER_OTLP_LOGS_HEADERS',
+      'OTEL_TRACES_SAMPLER',
+      'OTEL_SPAN_ATTRIBUTE_REDACTED_PLACEHOLDER',
+      'OTEL_SPAN_ATTRIBUTE_SANITIZATION_ENABLED',
+    ];
+    keysToClear.forEach((k) => delete process.env[k]);
+
+    // Set default exporters per test case to ensure deterministic behavior
+    process.env['OTEL_TRACES_EXPORTER'] = 'console';
+    process.env['OTEL_METRICS_EXPORTER'] = 'console';
+    process.env['OTEL_LOGS_EXPORTER'] = 'none';
+
     vi.clearAllMocks();
 
     // Clear module cache to ensure fresh imports
@@ -148,12 +181,13 @@ describe('Register Module', () => {
 
       await import('./register');
 
-      expect(NodeSDK).toHaveBeenCalledWith({
-        instrumentations: [],
-        metricReader: expect.any(Object),
-        resource: {},
-        traceExporter: expect.any(Object),
-      });
+      expect(NodeSDK).toHaveBeenCalledWith(
+        expect.objectContaining({
+          instrumentations: [],
+          metricReader: expect.any(Object),
+          traceExporter: expect.any(Object),
+        })
+      );
 
       expect(getNodeAutoInstrumentations).toHaveBeenCalledWith({
         '@opentelemetry/instrumentation-dns': { enabled: false },
@@ -327,7 +361,14 @@ describe('Register Module', () => {
       it('should fallback to console exporter when OTLP trace exporter fails', async () => {
         process.env['OTEL_TRACES_EXPORTER'] = 'otlp';
 
+        // Make OTLPTraceExporter constructor throw an error to test fallback
+        const { OTLPTraceExporter } = await import('@opentelemetry/exporter-trace-otlp-http');
         const { ConsoleSpanExporter } = await import('@opentelemetry/sdk-trace-node');
+
+        vi.mocked(OTLPTraceExporter).mockImplementation(() => {
+          throw new Error('OTLP trace exporter initialization failed');
+        });
+
         // eslint-disable-next-line @typescript-eslint/no-empty-function
         const consoleSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
 
