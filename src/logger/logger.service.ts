@@ -101,7 +101,9 @@ export class LoggerService {
     } catch (error) {
       // Fallback to console if OpenTelemetry logging fails
       console.error('LoggerService emit failed:', error);
-      console.log(`[${level}]`, message instanceof Error ? message.message : message, data);
+      // Sanitize message to prevent log injection attacks while maintaining format compatibility
+      const sanitizedMessage = this.sanitizeLogMessage(message instanceof Error ? message.message : message);
+      console.log(`[${level}] ${sanitizedMessage}`, data);
     }
   }
 
@@ -123,5 +125,41 @@ export class LoggerService {
       // Silently ignore tracing errors to prevent affecting application flow
     }
     return {};
+  }
+
+  /**
+   * Sanitize log message to prevent log injection attacks
+   * Removes newlines and control characters that could be used to forge log entries
+   */
+  private sanitizeLogMessage(message: string): string {
+    if (typeof message !== 'string') {
+      return String(message);
+    }
+
+    // Replace dangerous characters that could be used for log injection
+    // Use a safer approach that avoids ESLint control character warnings
+    let sanitized = message;
+
+    // Replace various line endings and control characters
+    sanitized = sanitized.replace(/\r\n/g, ' [CRLF] '); // Windows line endings
+    sanitized = sanitized.replace(/\n/g, ' [LF] '); // Unix line endings
+    sanitized = sanitized.replace(/\r/g, ' [CR] '); // Mac line endings
+    sanitized = sanitized.replace(/\t/g, ' [TAB] '); // Tabs
+
+    // Replace null bytes and other problematic characters using char codes
+    // This avoids ESLint control character warnings
+    sanitized = sanitized.replace(/\0/g, ' [NULL] ');
+
+    // Replace other control characters by checking character codes
+    sanitized = sanitized.replace(/./g, (char) => {
+      const code = char.charCodeAt(0);
+      // Replace control characters (0x01-0x1F excluding already handled ones, and 0x7F)
+      if ((code >= 1 && code <= 8) || (code >= 11 && code <= 12) || (code >= 14 && code <= 31) || code === 127) {
+        return ' [CTRL] ';
+      }
+      return char;
+    });
+
+    return sanitized;
   }
 }
