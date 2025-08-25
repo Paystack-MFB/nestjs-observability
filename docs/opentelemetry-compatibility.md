@@ -6,34 +6,34 @@ This guide covers OpenTelemetry version compatibility, environment variable supp
 
 ### OpenTelemetry Versions
 
-| Component | Version | Status | Notes |
-|-----------|---------|--------|-------|
-| `@opentelemetry/api` | `^1.7.0` | ✅ Supported | Core API for manual instrumentation |
-| `@opentelemetry/sdk-node` | `^0.203.0` | ✅ Supported | Main SDK with auto-instrumentation |
-| `@opentelemetry/auto-instrumentations-node` | `^0.203.0` | ✅ Supported | Auto-instrumentation packages |
-| `@opentelemetry/exporter-otlp-http` | `^0.203.0` | ✅ Supported | OTLP HTTP exporter |
-| `@opentelemetry/exporter-console` | `^0.203.0` | ✅ Supported | Console exporter |
-| `@opentelemetry/exporter-jaeger` | `^1.17.0` | ✅ Supported | Jaeger exporter |
-| `@opentelemetry/exporter-zipkin` | `^1.17.0` | ✅ Supported | Zipkin exporter |
+| Component                                   | Version    | Status       | Notes                               |
+| ------------------------------------------- | ---------- | ------------ | ----------------------------------- |
+| `@opentelemetry/api`                        | `^1.7.0`   | ✅ Supported | Core API for manual instrumentation |
+| `@opentelemetry/sdk-node`                   | `^0.203.0` | ✅ Supported | Main SDK with auto-instrumentation  |
+| `@opentelemetry/auto-instrumentations-node` | `^0.203.0` | ✅ Supported | Auto-instrumentation packages       |
+| `@opentelemetry/exporter-otlp-http`         | `^0.203.0` | ✅ Supported | OTLP HTTP exporter                  |
+| `@opentelemetry/exporter-console`           | `^0.203.0` | ✅ Supported | Console exporter                    |
+| `@opentelemetry/exporter-jaeger`            | `^1.17.0`  | ✅ Supported | Jaeger exporter                     |
+| `@opentelemetry/exporter-zipkin`            | `^1.17.0`  | ✅ Supported | Zipkin exporter                     |
 
 ### Node.js Versions
 
-| Node.js Version | Status | Notes |
-|----------------|--------|-------|
-| Node.js 18.x | ✅ Fully Supported | Recommended LTS |
-| Node.js 20.x | ✅ Fully Supported | Latest LTS |
-| Node.js 22.x | ✅ Fully Supported | Current |
-| Node.js 16.x | ⚠️ Limited Support | End of life - upgrade recommended |
-| Node.js 14.x | ❌ Not Supported | End of life |
+| Node.js Version | Status             | Notes                             |
+| --------------- | ------------------ | --------------------------------- |
+| Node.js 18.x    | ✅ Fully Supported | Recommended LTS                   |
+| Node.js 20.x    | ✅ Fully Supported | Latest LTS                        |
+| Node.js 22.x    | ✅ Fully Supported | Current                           |
+| Node.js 16.x    | ⚠️ Limited Support | End of life - upgrade recommended |
+| Node.js 14.x    | ❌ Not Supported   | End of life                       |
 
 ### NestJS Versions
 
-| NestJS Version | Status | Notes |
-|---------------|--------|-------|
-| NestJS 10.x | ✅ Fully Supported | Latest version |
-| NestJS 9.x | ✅ Fully Supported | Previous LTS |
-| NestJS 8.x | ⚠️ Limited Support | Consider upgrading |
-| NestJS 7.x | ❌ Not Supported | Too old |
+| NestJS Version | Status             | Notes              |
+| -------------- | ------------------ | ------------------ |
+| NestJS 10.x    | ✅ Fully Supported | Latest version     |
+| NestJS 9.x     | ✅ Fully Supported | Previous LTS       |
+| NestJS 8.x     | ⚠️ Limited Support | Consider upgrading |
+| NestJS 7.x     | ❌ Not Supported   | Too old            |
 
 ## 🌍 Environment Variables Compatibility
 
@@ -41,30 +41,30 @@ This guide covers OpenTelemetry version compatibility, environment variable supp
 
 All standard OpenTelemetry environment variables are supported:
 
-| Variable | Spec Version | Status | Default Value |
-|----------|-------------|--------|---------------|
-| `OTEL_SERVICE_NAME` | 1.24.0+ | ✅ Full Support | `"nestjs-app"` |
-| `OTEL_SERVICE_VERSION` | 1.24.0+ | ✅ Full Support | `"1.0.0"` |
-| `OTEL_RESOURCE_ATTRIBUTES` | 1.24.0+ | ✅ Full Support | Service detection |
-| `OTEL_TRACES_EXPORTER` | 1.24.0+ | ✅ Full Support | `"console"` |
-| `OTEL_METRICS_EXPORTER` | 1.24.0+ | ✅ Full Support | `"console"` |
-| `OTEL_LOGS_EXPORTER` | 1.24.0+ | ✅ Full Support | `"console"` |
-| `OTEL_TRACES_SAMPLER` | 1.24.0+ | ✅ Full Support | `"always_on"` |
-| `OTEL_TRACES_SAMPLER_ARG` | 1.24.0+ | ✅ Full Support | N/A |
-| `OTEL_EXPORTER_OTLP_ENDPOINT` | 1.24.0+ | ✅ Full Support | N/A |
-| `OTEL_EXPORTER_OTLP_HEADERS` | 1.24.0+ | ✅ Full Support | N/A |
-| `OTEL_EXPORTER_OTLP_TIMEOUT` | 1.24.0+ | ✅ Full Support | `"10000"` |
-| `OTEL_LOG_LEVEL` | 1.24.0+ | ✅ Full Support | `"info"` |
+| Variable                      | Spec Version | Status          | Default Value     |
+| ----------------------------- | ------------ | --------------- | ----------------- |
+| `OTEL_SERVICE_NAME`           | 1.24.0+      | ✅ Full Support | `"nestjs-app"`    |
+| `OTEL_SERVICE_VERSION`        | 1.24.0+      | ✅ Full Support | `"1.0.0"`         |
+| `OTEL_RESOURCE_ATTRIBUTES`    | 1.24.0+      | ✅ Full Support | Service detection |
+| `OTEL_TRACES_EXPORTER`        | 1.24.0+      | ✅ Full Support | `"console"`       |
+| `OTEL_METRICS_EXPORTER`       | 1.24.0+      | ✅ Full Support | `"console"`       |
+| `OTEL_LOGS_EXPORTER`          | 1.24.0+      | ✅ Full Support | `"console"`       |
+| `OTEL_TRACES_SAMPLER`         | 1.24.0+      | ✅ Full Support | `"always_on"`     |
+| `OTEL_TRACES_SAMPLER_ARG`     | 1.24.0+      | ✅ Full Support | N/A               |
+| `OTEL_EXPORTER_OTLP_ENDPOINT` | 1.24.0+      | ✅ Full Support | N/A               |
+| `OTEL_EXPORTER_OTLP_HEADERS`  | 1.24.0+      | ✅ Full Support | N/A               |
+| `OTEL_EXPORTER_OTLP_TIMEOUT`  | 1.24.0+      | ✅ Full Support | `"10000"`         |
+| `OTEL_LOG_LEVEL`              | 1.24.0+      | ✅ Full Support | `"info"`          |
 
 ### Library-Specific Variables
 
 Additional variables provided by this package:
 
-| Variable | Purpose | Default | Example |
-|----------|---------|---------|---------|
-| `OTEL_METRICS_ENABLED` | Enable/disable metrics collection | `"true"` | `"false"` |
-| `OTEL_METRICS_ENDPOINT` | Custom metrics endpoint path | `"/metrics"` | `"/api/metrics"` |
-| `OTEL_SPAN_ATTRIBUTE_SANITIZATION_ENABLED` | PII sanitization | `"true"` | `"false"` |
+| Variable                                   | Purpose                           | Default      | Example          |
+| ------------------------------------------ | --------------------------------- | ------------ | ---------------- |
+| `OTEL_METRICS_ENABLED`                     | Enable/disable metrics collection | `"true"`     | `"false"`        |
+| `OTEL_METRICS_ENDPOINT`                    | Custom metrics endpoint path      | `"/metrics"` | `"/api/metrics"` |
+| `OTEL_SPAN_ATTRIBUTE_SANITIZATION_ENABLED` | PII sanitization                  | `"true"`     | `"false"`        |
 
 ## 🔧 Exporter Configurations
 
@@ -80,6 +80,7 @@ export OTEL_LOGS_EXPORTER="console"
 ```
 
 **Compatibility:**
+
 - ✅ All platforms
 - ✅ All environments
 - ✅ Human-readable output
@@ -98,6 +99,7 @@ export OTEL_EXPORTER_OTLP_HEADERS="authorization=Bearer token"
 ```
 
 **Compatibility:**
+
 - ✅ OTLP 1.0.0 specification
 - ✅ HTTP/protobuf format
 - ✅ All major observability platforms
@@ -113,6 +115,7 @@ export OTEL_EXPORTER_JAEGER_ENDPOINT="http://jaeger:14268/api/traces"
 ```
 
 **Compatibility:**
+
 - ✅ Jaeger 1.35+
 - ✅ HTTP/JSON format
 - ⚠️ Traces only (no metrics/logs)
@@ -128,6 +131,7 @@ export OTEL_EXPORTER_ZIPKIN_ENDPOINT="http://zipkin:9411/api/v2/spans"
 ```
 
 **Compatibility:**
+
 - ✅ Zipkin 2.0+
 - ✅ JSON format
 - ⚠️ Traces only (no metrics/logs)
@@ -137,6 +141,7 @@ export OTEL_EXPORTER_ZIPKIN_ENDPOINT="http://zipkin:9411/api/v2/spans"
 ### Honeycomb
 
 **Configuration:**
+
 ```bash
 export OTEL_SERVICE_NAME="my-app"
 export OTEL_TRACES_EXPORTER="otlp"
@@ -146,6 +151,7 @@ export OTEL_EXPORTER_OTLP_HEADERS="x-honeycomb-team=YOUR_API_KEY,x-honeycomb-dat
 ```
 
 **Features Supported:**
+
 - ✅ Distributed tracing
 - ✅ Custom metrics
 - ✅ Logs (via OTLP)
@@ -153,6 +159,7 @@ export OTEL_EXPORTER_OTLP_HEADERS="x-honeycomb-team=YOUR_API_KEY,x-honeycomb-dat
 - ✅ Query interface
 
 **Best Practices:**
+
 - Use dataset names for environment separation
 - Enable sampling for cost control: `OTEL_TRACES_SAMPLER_ARG="0.1"`
 - Add environment attributes: `OTEL_RESOURCE_ATTRIBUTES="deployment.environment=production"`
@@ -160,6 +167,7 @@ export OTEL_EXPORTER_OTLP_HEADERS="x-honeycomb-team=YOUR_API_KEY,x-honeycomb-dat
 ### Datadog
 
 **Configuration:**
+
 ```bash
 export OTEL_SERVICE_NAME="my-app"
 export OTEL_TRACES_EXPORTER="otlp"
@@ -169,6 +177,7 @@ export OTEL_EXPORTER_OTLP_HEADERS="dd-api-key=YOUR_API_KEY"
 ```
 
 **Features Supported:**
+
 - ✅ APM tracing
 - ✅ Custom metrics
 - ✅ Logs correlation
@@ -176,6 +185,7 @@ export OTEL_EXPORTER_OTLP_HEADERS="dd-api-key=YOUR_API_KEY"
 - ✅ Real User Monitoring
 
 **Best Practices:**
+
 - Set `service.env` tag: `OTEL_RESOURCE_ATTRIBUTES="service.env=production"`
 - Use unified service tagging
 - Configure retention settings in Datadog UI
@@ -183,6 +193,7 @@ export OTEL_EXPORTER_OTLP_HEADERS="dd-api-key=YOUR_API_KEY"
 ### New Relic
 
 **Configuration:**
+
 ```bash
 export OTEL_SERVICE_NAME="my-app"
 export OTEL_TRACES_EXPORTER="otlp"
@@ -192,6 +203,7 @@ export OTEL_EXPORTER_OTLP_HEADERS="api-key=YOUR_LICENSE_KEY"
 ```
 
 **Features Supported:**
+
 - ✅ Distributed tracing
 - ✅ Custom metrics
 - ✅ Infrastructure monitoring
@@ -199,6 +211,7 @@ export OTEL_EXPORTER_OTLP_HEADERS="api-key=YOUR_LICENSE_KEY"
 - ✅ Alerting
 
 **Best Practices:**
+
 - Use descriptive service names
 - Configure alerts for error rates and latency
 - Set up dashboards for business metrics
@@ -206,6 +219,7 @@ export OTEL_EXPORTER_OTLP_HEADERS="api-key=YOUR_LICENSE_KEY"
 ### Grafana Cloud (Tempo + Prometheus)
 
 **Configuration:**
+
 ```bash
 export OTEL_SERVICE_NAME="my-app"
 export OTEL_TRACES_EXPORTER="otlp"
@@ -221,6 +235,7 @@ export OTEL_EXPORTER_OTLP_METRICS_HEADERS="authorization=Basic YOUR_BASE64_CREDE
 ```
 
 **Features Supported:**
+
 - ✅ Distributed tracing (Tempo)
 - ✅ Metrics collection (Prometheus)
 - ✅ Grafana dashboards
@@ -229,6 +244,7 @@ export OTEL_EXPORTER_OTLP_METRICS_HEADERS="authorization=Basic YOUR_BASE64_CREDE
 ### AWS X-Ray and CloudWatch
 
 **Configuration:**
+
 ```bash
 export OTEL_SERVICE_NAME="my-app"
 export OTEL_TRACES_EXPORTER="otlp"
@@ -240,6 +256,7 @@ export AWS_REGION="us-east-1"
 ```
 
 **Features Supported:**
+
 - ✅ X-Ray tracing
 - ✅ CloudWatch metrics
 - ✅ CloudWatch logs
@@ -322,20 +339,20 @@ spec:
   template:
     spec:
       containers:
-      - name: app
-        env:
-        - name: OTEL_SERVICE_NAME
-          value: "my-app"
-        - name: OTEL_RESOURCE_ATTRIBUTES
-          value: "k8s.namespace.name=$(NAMESPACE),k8s.pod.name=$(POD_NAME)"
-        - name: NAMESPACE
-          valueFrom:
-            fieldRef:
-              fieldPath: metadata.namespace
-        - name: POD_NAME
-          valueFrom:
-            fieldRef:
-              fieldPath: metadata.name
+        - name: app
+          env:
+            - name: OTEL_SERVICE_NAME
+              value: 'my-app'
+            - name: OTEL_RESOURCE_ATTRIBUTES
+              value: 'k8s.namespace.name=$(NAMESPACE),k8s.pod.name=$(POD_NAME)'
+            - name: NAMESPACE
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.namespace
+            - name: POD_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.name
 ```
 
 ### Docker Compose
@@ -352,8 +369,8 @@ services:
   jaeger:
     image: jaegertracing/all-in-one:latest
     ports:
-      - "16686:16686"
-      - "4318:4318"
+      - '16686:16686'
+      - '4318:4318'
 ```
 
 ## 🔐 Security Considerations
@@ -361,16 +378,19 @@ services:
 ### Authentication Methods
 
 **Bearer Token:**
+
 ```bash
 export OTEL_EXPORTER_OTLP_HEADERS="authorization=Bearer YOUR_TOKEN"
 ```
 
 **API Key:**
+
 ```bash
 export OTEL_EXPORTER_OTLP_HEADERS="x-api-key=YOUR_API_KEY"
 ```
 
 **Basic Auth:**
+
 ```bash
 # Base64 encode username:password
 export OTEL_EXPORTER_OTLP_HEADERS="authorization=Basic $(echo -n 'user:pass' | base64)"
@@ -379,11 +399,13 @@ export OTEL_EXPORTER_OTLP_HEADERS="authorization=Basic $(echo -n 'user:pass' | b
 ### TLS Configuration
 
 **Custom CA Certificate:**
+
 ```bash
 export OTEL_EXPORTER_OTLP_CERTIFICATE=/path/to/ca.crt
 ```
 
 **Insecure (Development Only):**
+
 ```bash
 export OTEL_EXPORTER_OTLP_INSECURE="true"
 ```
@@ -401,12 +423,12 @@ export OTEL_SPAN_ATTRIBUTE_SANITIZATION_ENABLED="true"
 
 ### Memory Management
 
-| Configuration | Memory Impact | Recommendation |
-|--------------|---------------|----------------|
-| `always_on` sampling | High | Development only |
-| `traceidratio` 1% | Low | Production recommended |
-| Console exporters | Medium | Development only |
-| OTLP exporters | Low | Production recommended |
+| Configuration        | Memory Impact | Recommendation         |
+| -------------------- | ------------- | ---------------------- |
+| `always_on` sampling | High          | Development only       |
+| `traceidratio` 1%    | Low           | Production recommended |
+| Console exporters    | Medium        | Development only       |
+| OTLP exporters       | Low           | Production recommended |
 
 ### Network Optimization
 
@@ -425,11 +447,11 @@ export OTEL_EXPORTER_OTLP_TIMEOUT="30000"
 # Kubernetes resource limits
 resources:
   limits:
-    memory: "512Mi"
-    cpu: "500m"
+    memory: '512Mi'
+    cpu: '500m'
   requests:
-    memory: "256Mi"
-    cpu: "250m"
+    memory: '256Mi'
+    cpu: '250m'
 ```
 
 ## 🧪 Testing Configurations
@@ -475,11 +497,11 @@ export OTEL_TRACES_SAMPLER_ARG="0.001"  # 0.1% sampling
 
 ### From Other Libraries
 
-| Library | Migration Path | Compatibility |
-|---------|---------------|---------------|
-| `nestjs-opentelemetry` | Replace imports, update config | ⚠️ Manual |
-| `@nestjs/terminus` | Compatible for health checks | ✅ Compatible |
-| `winston` | LoggerService replaces winston | ⚠️ Manual |
+| Library                | Migration Path                 | Compatibility |
+| ---------------------- | ------------------------------ | ------------- |
+| `nestjs-opentelemetry` | Replace imports, update config | ⚠️ Manual     |
+| `@nestjs/terminus`     | Compatible for health checks   | ✅ Compatible |
+| `winston`              | LoggerService replaces winston | ⚠️ Manual     |
 
 ## 📅 Version Support Policy
 

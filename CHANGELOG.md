@@ -9,12 +9,14 @@
 #### 💥 Breaking Changes
 
 **Configuration System Overhaul**
+
 - **BREAKING**: Removed configuration-based setup in favor of environment variable approach
 - **BREAKING**: `ObservabilityModule.forRootAsync()` with complex configuration objects is no longer supported
 - **BREAKING**: Custom configuration interfaces (`ObservabilityConfig`, `TracingConfig`, etc.) have been removed
 - **BREAKING**: Factory-based service providers replaced with simplified dependency injection
 
 **New Zero-Configuration Architecture**
+
 - **NEW**: Simple `ObservabilityModule.forRoot()` with no parameters required
 - **NEW**: All configuration via standard OpenTelemetry environment variables (`OTEL_*`)
 - **NEW**: Register pattern initialization: `node -r @paystackhq/nestjs-observability/register`
@@ -23,6 +25,7 @@
 #### ✨ New Features
 
 **Register Pattern & Environment Variables**
+
 - ✅ **Register Module**: Initialize OpenTelemetry SDK with `-r` flag before NestJS app startup
 - ✅ **Environment Variable Control**: Full support for OpenTelemetry standard environment variables
 - ✅ **Zero Configuration**: No code changes needed, configure via environment only
@@ -30,6 +33,7 @@
 - ✅ **Resource Attributes**: Standard service identification and custom attributes
 
 **Enhanced Services Architecture**
+
 - ✅ **Simplified LoggerService**: Global OpenTelemetry logger with automatic trace context
 - ✅ **Context Isolation**: Proper request-scoped logging with trace correlation
 - ✅ **Enhanced MetricsService**: Global meter provider with business metrics API
@@ -37,6 +41,7 @@
 - ✅ **Auto-Instrumentation**: HTTP, Express, and Node.js metrics out-of-the-box
 
 **Production-Ready Features**
+
 - ✅ **Performance Optimized**: Singleton services with efficient OpenTelemetry integration
 - ✅ **Error Handling**: Graceful degradation when OpenTelemetry components fail
 - ✅ **Sensitive Data Protection**: Configurable span attribute sanitization
@@ -46,11 +51,13 @@
 #### 🔧 Environment Variables
 
 **Service Configuration**
+
 - `OTEL_SERVICE_NAME` - Service identification (default: "unknown-service")
 - `OTEL_SERVICE_VERSION` - Service version (default: "1.0.0")
 - `NODE_ENV` - Environment specification (development/production)
 
 **Exporter Configuration**
+
 - `OTEL_TRACES_EXPORTER` - Trace exporter (console/otlp/jaeger/zipkin)
 - `OTEL_METRICS_EXPORTER` - Metrics exporter (console/otlp/prometheus)
 - `OTEL_LOGS_EXPORTER` - Logs exporter (console/otlp)
@@ -58,6 +65,7 @@
 - `OTEL_EXPORTER_OTLP_HEADERS` - OTLP authentication headers
 
 **Advanced Configuration**
+
 - `OTEL_TRACES_SAMPLER` - Sampling strategy (always_on/always_off/traceidratio)
 - `OTEL_TRACES_SAMPLER_ARG` - Sampling ratio for traceidratio sampler
 - `OTEL_RESOURCE_ATTRIBUTES` - Custom resource attributes
@@ -66,6 +74,7 @@
 #### 📚 Migration Guide
 
 **Before (v0.x)**
+
 ```typescript
 @Module({
   imports: [
@@ -83,6 +92,7 @@ export class AppModule {}
 ```
 
 **After (v1.0)**
+
 ```typescript
 @Module({
   imports: [
@@ -93,6 +103,7 @@ export class AppModule {}
 ```
 
 **Startup Command**
+
 ```bash
 # Before
 node dist/main.js
@@ -111,17 +122,20 @@ node -r @paystackhq/nestjs-observability/register dist/main.js
 #### 🏗️ Technical Improvements
 
 **Build System**
+
 - ✅ Dual CJS/ESM build with proper package.json exports
 - ✅ Enhanced TypeScript compilation with register module support
 - ✅ Improved package structure with register pattern integration
 
 **Testing Infrastructure**
+
 - ✅ Comprehensive unit tests with OpenTelemetry mocking
 - ✅ Integration test suite for real-world scenarios
 - ✅ End-to-end testing framework with performance benchmarking
 - ✅ Migration validation with multiple configuration scenarios
 
 **Documentation**
+
 - ✅ Complete README overhaul with new architecture examples
 - ✅ Migration guide for v0.x to v1.0 transition
 - ✅ Troubleshooting guide with common issues and solutions
@@ -139,6 +153,7 @@ node -r @paystackhq/nestjs-observability/register dist/main.js
 #### 🙏 Acknowledgments
 
 This major release represents months of development focused on:
+
 - Aligning with OpenTelemetry 2025 best practices
 - Simplifying developer experience with zero configuration
 - Improving performance and reliability for production workloads

@@ -113,6 +113,7 @@ OTEL_TRACES_SAMPLER_ARG=0.1
 These endpoints demonstrate all observability features:
 
 #### Simple Operations
+
 - `POST /example/simple` - Basic operation with logging and tracing
   ```bash
   curl -X POST http://localhost:3000/example/simple \
@@ -121,6 +122,7 @@ These endpoints demonstrate all observability features:
   ```
 
 #### Complex Operations
+
 - `POST /example/complex/:userId` - Complex operation with metrics and manual tracing
   ```bash
   curl -X POST http://localhost:3000/example/complex/user123 \
@@ -129,6 +131,7 @@ These endpoints demonstrate all observability features:
   ```
 
 #### Concurrent Operations
+
 - `POST /example/concurrent` - Demonstrates context isolation
   ```bash
   curl -X POST http://localhost:3000/example/concurrent \
@@ -137,6 +140,7 @@ These endpoints demonstrate all observability features:
   ```
 
 #### Sensitive Operations
+
 - `POST /example/sensitive` - Demonstrates @NoTrace decorator
   ```bash
   curl -X POST http://localhost:3000/example/sensitive \
@@ -145,6 +149,7 @@ These endpoints demonstrate all observability features:
   ```
 
 #### Health Check
+
 - `GET /example/health` - Example service health check
 
 ## 📊 Observability Features Demonstrated
@@ -164,12 +169,12 @@ const operationLogger = this.logger.createChildLogger();
 operationLogger.setContext({
   operationId,
   userId,
-  operation: 'complexOperation'
+  operation: 'complexOperation',
 });
 
 operationLogger.log('Starting complex operation', {
   userId,
-  inputSize: JSON.stringify(data).length
+  inputSize: JSON.stringify(data).length,
 });
 ```
 
@@ -183,11 +188,10 @@ Business metrics are created and tracked:
 
 ```typescript
 // Metrics creation
-this.requestCounter = this.metrics.createCounter(
-  'example_requests_total',
-  'Total number of example requests',
-  ['operation', 'status']
-);
+this.requestCounter = this.metrics.createCounter('example_requests_total', 'Total number of example requests', [
+  'operation',
+  'status',
+]);
 
 // Metrics usage
 this.requestCounter.inc({ operation: 'complex', status: 'success' });
@@ -248,11 +252,13 @@ This test suite validates:
 ### Manual Testing
 
 1. **Start the application**:
+
    ```bash
    pnpm run demo:console
    ```
 
 2. **Test endpoints**:
+
    ```bash
    # Simple operation
    curl -X POST http://localhost:3000/example/simple \
@@ -297,7 +303,7 @@ services:
       - OTEL_SERVICE_NAME=my-app
       - OTEL_EXPORTER_OTLP_ENDPOINT=http://otel-collector:4317
     ports:
-      - "3000:3000"
+      - '3000:3000'
     command: node -r @paystackhq/nestjs-observability/register dist/src/main.js
     depends_on:
       - otel-collector
@@ -305,7 +311,7 @@ services:
   otel-collector:
     image: otel/opentelemetry-collector-contrib:latest
     ports:
-      - "4317:4317"
+      - '4317:4317'
 ```
 
 ## ☁️ Platform Integration Examples
@@ -347,18 +353,21 @@ node -r ../../dist/cjs/register.js dist/src/main.js
 ### Common Issues
 
 1. **Module not found error**:
+
    ```bash
    # Ensure package is built
    cd ../../ && pnpm build
    ```
 
 2. **Metrics endpoint returns 404**:
+
    ```bash
    # Check metrics are enabled
    export OTEL_METRICS_ENABLED=true
    ```
 
 3. **No traces visible**:
+
    ```bash
    # Ensure trace exporter is set
    export OTEL_TRACES_EXPORTER=console
@@ -388,7 +397,7 @@ node -r ../../dist/cjs/register.js dist/src/main.js
 This example demonstrates the modern OpenTelemetry architecture:
 
 1. **Register Module**: `node -r register.js` initializes OpenTelemetry before application code
-2. **Environment Variables**: All configuration via OTEL_* environment variables
+2. **Environment Variables**: All configuration via OTEL\_\* environment variables
 3. **Global Providers**: Services use global OpenTelemetry providers
 4. **No Configuration Objects**: Zero-config `ObservabilityModule.forRoot()`
 5. **Enhanced Features**: Context isolation, custom metrics, tracing decorators

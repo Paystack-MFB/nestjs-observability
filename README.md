@@ -103,6 +103,7 @@ export class AppModule {}
 ### Step 3: Environment Configuration
 
 **Development Environment:**
+
 ```bash
 # Service identification
 export OTEL_SERVICE_NAME="my-nestjs-app"
@@ -116,6 +117,7 @@ export OTEL_LOGS_EXPORTER="console"
 ```
 
 **Production Environment:**
+
 ```bash
 # Service identification
 export OTEL_SERVICE_NAME="my-nestjs-app"
@@ -139,6 +141,7 @@ export OTEL_TRACES_SAMPLER_ARG="0.1"
 ### Step 4: Start Your Application
 
 **Package.json scripts:**
+
 ```json
 {
   "scripts": {
@@ -150,6 +153,7 @@ export OTEL_TRACES_SAMPLER_ARG="0.1"
 ```
 
 **Manual start:**
+
 ```bash
 # Development
 node -r @paystackhq/nestjs-observability/register dist/main.js
@@ -171,9 +175,9 @@ import { LoggerService } from '@paystackhq/nestjs-observability';
 export class UserService {
   constructor(private readonly logger: LoggerService) {
     // Set service-level context
-    this.logger.setContext({ 
-      service: 'UserService', 
-      version: '1.0.0' 
+    this.logger.setContext({
+      service: 'UserService',
+      version: '1.0.0',
     });
   }
 
@@ -181,17 +185,17 @@ export class UserService {
     // Add operation-specific context
     this.logger.addContext('operation', 'createUser');
     this.logger.addContext('userId', userData.id);
-    
-    this.logger.log('Creating user', { 
+
+    this.logger.log('Creating user', {
       email: userData.email,
-      roles: userData.roles 
+      roles: userData.roles,
     });
-    
+
     // Business logic here...
-    
-    this.logger.log('User created successfully', { 
+
+    this.logger.log('User created successfully', {
       userId: userData.id,
-      duration: '245ms' 
+      duration: '245ms',
     });
   }
 }
@@ -213,37 +217,30 @@ export class PaymentService implements OnModuleInit {
 
   onModuleInit() {
     // Create custom business metrics
-    this.paymentCounter = this.metrics.createCounter(
-      'payments_total', 
-      'Total number of payment transactions'
-    );
-    
-    this.paymentDuration = this.metrics.createHistogram(
-      'payment_duration_seconds',
-      'Payment processing duration'
-    );
+    this.paymentCounter = this.metrics.createCounter('payments_total', 'Total number of payment transactions');
+
+    this.paymentDuration = this.metrics.createHistogram('payment_duration_seconds', 'Payment processing duration');
   }
 
   async processPayment(amount: number, currency: string) {
     const startTime = Date.now();
-    
+
     try {
       // Business logic here...
-      
+
       // Record successful payment
-      this.paymentCounter.add(1, { 
-        currency, 
-        status: 'success' 
+      this.paymentCounter.add(1, {
+        currency,
+        status: 'success',
       });
-      
+
       const duration = (Date.now() - startTime) / 1000;
       this.paymentDuration.record(duration, { currency });
-      
     } catch (error) {
       // Record failed payment
-      this.paymentCounter.add(1, { 
-        currency, 
-        status: 'failed' 
+      this.paymentCounter.add(1, {
+        currency,
+        status: 'failed',
       });
       throw error;
     }
@@ -261,19 +258,18 @@ import { TraceClass, Trace, NoTrace } from '@paystackhq/nestjs-observability';
 @TraceClass({ spanNamePrefix: 'OrderService' })
 @Injectable()
 export class OrderService {
-  
   @Trace() // Automatic tracing with span name "OrderService.createOrder"
   async createOrder(orderData: any) {
     // This method is automatically traced
     return this.processOrder(orderData);
   }
-  
+
   @Trace('custom-order-processing') // Custom span name
   private async processOrder(orderData: any) {
     // Custom span name: "custom-order-processing"
     return { orderId: 'order-123', status: 'created' };
   }
-  
+
   @NoTrace() // This method won't be traced (for sensitive operations)
   async validatePaymentDetails(creditCard: string) {
     // Sensitive payment validation - not traced for security
@@ -340,34 +336,34 @@ export OTEL_EXPORTER_OTLP_HEADERS="authorization=Bearer your-token"
 
 ### Core OpenTelemetry Variables
 
-| Variable | Description | Default | Example |
-|----------|-------------|---------|---------|
-| `OTEL_SERVICE_NAME` | Service identification name | `"nestjs-app"` | `"my-ecommerce-api"` |
-| `OTEL_SERVICE_VERSION` | Service version | `"1.0.0"` | `"2.1.3"` |
-| `NODE_ENV` | Environment name | `"development"` | `"production"` |
+| Variable               | Description                 | Default         | Example              |
+| ---------------------- | --------------------------- | --------------- | -------------------- |
+| `OTEL_SERVICE_NAME`    | Service identification name | `"nestjs-app"`  | `"my-ecommerce-api"` |
+| `OTEL_SERVICE_VERSION` | Service version             | `"1.0.0"`       | `"2.1.3"`            |
+| `NODE_ENV`             | Environment name            | `"development"` | `"production"`       |
 
 ### Exporter Configuration
 
-| Variable | Description | Options | Default |
-|----------|-------------|---------|---------|
-| `OTEL_TRACES_EXPORTER` | Traces exporter type | `console`, `otlp`, `jaeger`, `zipkin` | `"console"` |
-| `OTEL_METRICS_EXPORTER` | Metrics exporter type | `console`, `otlp`, `prometheus` | `"console"` |
-| `OTEL_LOGS_EXPORTER` | Logs exporter type | `console`, `otlp` | `"console"` |
+| Variable                | Description           | Options                               | Default     |
+| ----------------------- | --------------------- | ------------------------------------- | ----------- |
+| `OTEL_TRACES_EXPORTER`  | Traces exporter type  | `console`, `otlp`, `jaeger`, `zipkin` | `"console"` |
+| `OTEL_METRICS_EXPORTER` | Metrics exporter type | `console`, `otlp`, `prometheus`       | `"console"` |
+| `OTEL_LOGS_EXPORTER`    | Logs exporter type    | `console`, `otlp`                     | `"console"` |
 
 ### OTLP Configuration
 
-| Variable | Description | Example |
-|----------|-------------|---------|
-| `OTEL_EXPORTER_OTLP_ENDPOINT` | OTLP endpoint URL | `"https://api.honeycomb.io"` |
-| `OTEL_EXPORTER_OTLP_HEADERS` | OTLP headers (auth, etc.) | `"api-key=abc123,x-custom=value"` |
-| `OTEL_EXPORTER_OTLP_TIMEOUT` | Request timeout (ms) | `"30000"` |
+| Variable                      | Description               | Example                           |
+| ----------------------------- | ------------------------- | --------------------------------- |
+| `OTEL_EXPORTER_OTLP_ENDPOINT` | OTLP endpoint URL         | `"https://api.honeycomb.io"`      |
+| `OTEL_EXPORTER_OTLP_HEADERS`  | OTLP headers (auth, etc.) | `"api-key=abc123,x-custom=value"` |
+| `OTEL_EXPORTER_OTLP_TIMEOUT`  | Request timeout (ms)      | `"30000"`                         |
 
 ### Sampling Configuration
 
-| Variable | Description | Example |
-|----------|-------------|---------|
-| `OTEL_TRACES_SAMPLER` | Sampling strategy | `"always_on"`, `"traceidratio"` |
-| `OTEL_TRACES_SAMPLER_ARG` | Sampler argument | `"0.1"` (10% sampling) |
+| Variable                  | Description       | Example                         |
+| ------------------------- | ----------------- | ------------------------------- |
+| `OTEL_TRACES_SAMPLER`     | Sampling strategy | `"always_on"`, `"traceidratio"` |
+| `OTEL_TRACES_SAMPLER_ARG` | Sampler argument  | `"0.1"` (10% sampling)          |
 
 ### Resource Attributes
 
@@ -378,11 +374,11 @@ export OTEL_RESOURCE_ATTRIBUTES="deployment.environment=staging,service.namespac
 
 ### Library-Specific Variables
 
-| Variable | Description | Default |
-|----------|-------------|---------|
-| `OTEL_METRICS_ENABLED` | Enable/disable metrics collection | `"true"` |
-| `OTEL_METRICS_ENDPOINT` | Metrics HTTP endpoint path | `"/metrics"` |
-| `OTEL_SPAN_ATTRIBUTE_SANITIZATION_ENABLED` | Enable PII sanitization | `"true"` |
+| Variable                                   | Description                       | Default      |
+| ------------------------------------------ | --------------------------------- | ------------ |
+| `OTEL_METRICS_ENABLED`                     | Enable/disable metrics collection | `"true"`     |
+| `OTEL_METRICS_ENDPOINT`                    | Metrics HTTP endpoint path        | `"/metrics"` |
+| `OTEL_SPAN_ATTRIBUTE_SANITIZATION_ENABLED` | Enable PII sanitization           | `"true"`     |
 
 ## 📚 Migration Guide
 
@@ -445,6 +441,7 @@ export class AppModule {}
 ```
 
 **Environment Variables (replaces all configuration):**
+
 ```bash
 # Service identification
 export OTEL_SERVICE_NAME="my-nestjs-app"
@@ -462,6 +459,7 @@ export OTEL_EXPORTER_OTLP_HEADERS="authorization=Bearer your-token"
 ```
 
 **Application Startup (Register Pattern):**
+
 ```bash
 # ✅ NEW: Use register pattern
 node -r @paystackhq/nestjs-observability/register dist/main.js
@@ -470,6 +468,7 @@ node -r @paystackhq/nestjs-observability/register dist/main.js
 #### Migration Steps
 
 1. **Update Module Import**
+
    ```diff
    - ObservabilityModule.forRootAsync({ /* config */ })
    + ObservabilityModule.forRoot()
@@ -480,6 +479,7 @@ node -r @paystackhq/nestjs-observability/register dist/main.js
 3. **Set Environment Variables** - Convert your old configuration to environment variables
 
 4. **Update Start Scripts**
+
    ```diff
    - "start": "node dist/main.js"
    + "start": "node -r @paystackhq/nestjs-observability/register dist/main.js"
@@ -492,14 +492,14 @@ node -r @paystackhq/nestjs-observability/register dist/main.js
 
 #### Configuration Mapping
 
-| Old Configuration | New Environment Variable |
-|-------------------|---------------------------|
-| `config.serviceName` | `OTEL_SERVICE_NAME` |
-| `config.environment` | `NODE_ENV` |
+| Old Configuration                    | New Environment Variable      |
+| ------------------------------------ | ----------------------------- |
+| `config.serviceName`                 | `OTEL_SERVICE_NAME`           |
+| `config.environment`                 | `NODE_ENV`                    |
 | `config.logging.otlpExport.endpoint` | `OTEL_EXPORTER_OTLP_ENDPOINT` |
-| `config.tracing.exporter.endpoint` | `OTEL_EXPORTER_OTLP_ENDPOINT` |
-| `config.metrics.endpoint` | `OTEL_METRICS_ENDPOINT` |
-| `config.tracing.sampler.ratio` | `OTEL_TRACES_SAMPLER_ARG` |
+| `config.tracing.exporter.endpoint`   | `OTEL_EXPORTER_OTLP_ENDPOINT` |
+| `config.metrics.endpoint`            | `OTEL_METRICS_ENDPOINT`       |
+| `config.tracing.sampler.ratio`       | `OTEL_TRACES_SAMPLER_ARG`     |
 
 ## 🚀 2025 Benefits
 
@@ -523,6 +523,7 @@ node -r @paystackhq/nestjs-observability/register dist/main.js
 ### Common Issues
 
 **Problem**: App starts but no traces/metrics appear
+
 ```bash
 # Solution: Check environment variables
 echo $OTEL_SERVICE_NAME
@@ -533,6 +534,7 @@ export OTEL_LOG_LEVEL="debug"
 ```
 
 **Problem**: "Cannot resolve module" error
+
 ```bash
 # Solution: Ensure proper package installation
 npm install @paystackhq/nestjs-observability
@@ -540,6 +542,7 @@ npm run build
 ```
 
 **Problem**: TypeScript compilation errors
+
 ```bash
 # Solution: Ensure proper TypeScript configuration
 npm install --save-dev @types/node
@@ -555,6 +558,7 @@ npm install --save-dev @types/node
 ## 🤝 Contributing
 
 We welcome contributions! Please feel free to:
+
 - Open issues for bug reports or feature requests
 - Submit pull requests with improvements
 - Share feedback and suggestions

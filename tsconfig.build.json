@@ -12,5 +12,14 @@
     "noEmitOnError": true
   },
   "include": ["src/**/*"],
-  "exclude": ["node_modules", "dist", "**/*.test.ts", "**/*.spec.ts", "examples/**/*", "docs/**/*", "src/test-helpers/**/*", "src/integration/**/*"]
+  "exclude": [
+    "node_modules",
+    "dist",
+    "**/*.test.ts",
+    "**/*.spec.ts",
+    "examples/**/*",
+    "docs/**/*",
+    "src/test-helpers/**/*",
+    "src/integration/**/*"
+  ]
 }

@@ -21,7 +21,7 @@ The OpenTelemetry NestJS Observability Package uses environment variables for co
 
 ### Configuration Hierarchy
 
-1. **OpenTelemetry Standard Variables** - Core OTEL_* variables defined by the OpenTelemetry specification
+1. **OpenTelemetry Standard Variables** - Core OTEL\_\* variables defined by the OpenTelemetry specification
 2. **Library-Specific Variables** - Enhanced features specific to this NestJS package
 3. **Default Values** - Safe defaults when no environment variables are provided
 
@@ -29,13 +29,14 @@ The OpenTelemetry NestJS Observability Package uses environment variables for co
 
 ### Service Identification
 
-| Variable | Description | Default | Example |
-|----------|-------------|---------|---------|
-| `OTEL_SERVICE_NAME` | Name of the service | `unknown-service` | `user-api` |
-| `OTEL_SERVICE_VERSION` | Version of the service | `1.0.0` | `2.1.5` |
-| `NODE_ENV` | Application environment | `development` | `production` |
+| Variable               | Description             | Default           | Example      |
+| ---------------------- | ----------------------- | ----------------- | ------------ |
+| `OTEL_SERVICE_NAME`    | Name of the service     | `unknown-service` | `user-api`   |
+| `OTEL_SERVICE_VERSION` | Version of the service  | `1.0.0`           | `2.1.5`      |
+| `NODE_ENV`             | Application environment | `development`     | `production` |
 
 **Example:**
+
 ```bash
 export OTEL_SERVICE_NAME="payment-service"
 export OTEL_SERVICE_VERSION="1.2.3"
@@ -44,91 +45,92 @@ export NODE_ENV="production"
 
 ### SDK Configuration
 
-| Variable | Description | Default | Example |
-|----------|-------------|---------|---------|
-| `OTEL_SDK_DISABLED` | Disable the entire SDK | `false` | `true` |
-| `OTEL_RESOURCE_ATTRIBUTES` | Key-value pairs for resource attributes | - | `service.namespace=backend,deployment.environment=staging` |
+| Variable                   | Description                             | Default | Example                                                    |
+| -------------------------- | --------------------------------------- | ------- | ---------------------------------------------------------- |
+| `OTEL_SDK_DISABLED`        | Disable the entire SDK                  | `false` | `true`                                                     |
+| `OTEL_RESOURCE_ATTRIBUTES` | Key-value pairs for resource attributes | -       | `service.namespace=backend,deployment.environment=staging` |
 
 ## Service Configuration
 
 ### Application Settings
 
-| Variable | Description | Default | Example |
-|----------|-------------|---------|---------|
-| `PORT` | Application port | `3000` | `8080` |
-| `HOST` | Application host | `0.0.0.0` | `localhost` |
+| Variable | Description      | Default   | Example     |
+| -------- | ---------------- | --------- | ----------- |
+| `PORT`   | Application port | `3000`    | `8080`      |
+| `HOST`   | Application host | `0.0.0.0` | `localhost` |
 
 ## Exporter Configuration
 
 ### Traces Exporters
 
-| Variable | Description | Default | Options |
-|----------|-------------|---------|---------|
+| Variable               | Description         | Default   | Options                                       |
+| ---------------------- | ------------------- | --------- | --------------------------------------------- |
 | `OTEL_TRACES_EXPORTER` | Trace exporter type | `console` | `console`, `otlp`, `jaeger`, `zipkin`, `none` |
 
 #### OTLP Trace Exporter
 
-| Variable | Description | Default | Example |
-|----------|-------------|---------|---------|
-| `OTEL_EXPORTER_OTLP_ENDPOINT` | OTLP endpoint for all signals | - | `http://localhost:4317` |
-| `OTEL_EXPORTER_OTLP_TRACES_ENDPOINT` | OTLP endpoint for traces only | - | `http://jaeger:14268/api/traces` |
-| `OTEL_EXPORTER_OTLP_HEADERS` | Headers for all OTLP requests | - | `api-key=secret123` |
-| `OTEL_EXPORTER_OTLP_TRACES_HEADERS` | Headers for trace requests only | - | `authorization=Bearer token123` |
-| `OTEL_EXPORTER_OTLP_TIMEOUT` | Request timeout in milliseconds | `10000` | `30000` |
+| Variable                             | Description                     | Default | Example                          |
+| ------------------------------------ | ------------------------------- | ------- | -------------------------------- |
+| `OTEL_EXPORTER_OTLP_ENDPOINT`        | OTLP endpoint for all signals   | -       | `http://localhost:4317`          |
+| `OTEL_EXPORTER_OTLP_TRACES_ENDPOINT` | OTLP endpoint for traces only   | -       | `http://jaeger:14268/api/traces` |
+| `OTEL_EXPORTER_OTLP_HEADERS`         | Headers for all OTLP requests   | -       | `api-key=secret123`              |
+| `OTEL_EXPORTER_OTLP_TRACES_HEADERS`  | Headers for trace requests only | -       | `authorization=Bearer token123`  |
+| `OTEL_EXPORTER_OTLP_TIMEOUT`         | Request timeout in milliseconds | `10000` | `30000`                          |
 
 #### Jaeger Exporter
 
-| Variable | Description | Default | Example |
-|----------|-------------|---------|---------|
-| `OTEL_EXPORTER_JAEGER_ENDPOINT` | Jaeger collector endpoint | - | `http://jaeger:14268/api/traces` |
-| `OTEL_EXPORTER_JAEGER_USER` | Username for authentication | - | `admin` |
-| `OTEL_EXPORTER_JAEGER_PASSWORD` | Password for authentication | - | `password123` |
+| Variable                        | Description                 | Default | Example                          |
+| ------------------------------- | --------------------------- | ------- | -------------------------------- |
+| `OTEL_EXPORTER_JAEGER_ENDPOINT` | Jaeger collector endpoint   | -       | `http://jaeger:14268/api/traces` |
+| `OTEL_EXPORTER_JAEGER_USER`     | Username for authentication | -       | `admin`                          |
+| `OTEL_EXPORTER_JAEGER_PASSWORD` | Password for authentication | -       | `password123`                    |
 
 ### Metrics Exporters
 
-| Variable | Description | Default | Options |
-|----------|-------------|---------|---------|
+| Variable                | Description           | Default   | Options                                 |
+| ----------------------- | --------------------- | --------- | --------------------------------------- |
 | `OTEL_METRICS_EXPORTER` | Metrics exporter type | `console` | `console`, `otlp`, `prometheus`, `none` |
 
 #### OTLP Metrics Exporter
 
-| Variable | Description | Default | Example |
-|----------|-------------|---------|---------|
-| `OTEL_EXPORTER_OTLP_METRICS_ENDPOINT` | OTLP endpoint for metrics only | - | `http://localhost:4317/v1/metrics` |
-| `OTEL_EXPORTER_OTLP_METRICS_HEADERS` | Headers for metrics requests only | - | `x-api-key=metrics123` |
-| `OTEL_METRICS_EXPORT_INTERVAL` | Metrics export interval in milliseconds | `60000` | `30000` |
-| `OTEL_METRICS_EXPORT_TIMEOUT` | Metrics export timeout in milliseconds | `30000` | `10000` |
+| Variable                              | Description                             | Default | Example                            |
+| ------------------------------------- | --------------------------------------- | ------- | ---------------------------------- |
+| `OTEL_EXPORTER_OTLP_METRICS_ENDPOINT` | OTLP endpoint for metrics only          | -       | `http://localhost:4317/v1/metrics` |
+| `OTEL_EXPORTER_OTLP_METRICS_HEADERS`  | Headers for metrics requests only       | -       | `x-api-key=metrics123`             |
+| `OTEL_METRICS_EXPORT_INTERVAL`        | Metrics export interval in milliseconds | `60000` | `30000`                            |
+| `OTEL_METRICS_EXPORT_TIMEOUT`         | Metrics export timeout in milliseconds  | `30000` | `10000`                            |
 
 #### Prometheus Metrics
 
-| Variable | Description | Default | Example |
-|----------|-------------|---------|---------|
+| Variable                        | Description            | Default     | Example   |
+| ------------------------------- | ---------------------- | ----------- | --------- |
 | `OTEL_EXPORTER_PROMETHEUS_HOST` | Prometheus server host | `localhost` | `0.0.0.0` |
-| `OTEL_EXPORTER_PROMETHEUS_PORT` | Prometheus server port | `9464` | `9090` |
+| `OTEL_EXPORTER_PROMETHEUS_PORT` | Prometheus server port | `9464`      | `9090`    |
 
 ### Logs Exporters
 
-| Variable | Description | Default | Options |
-|----------|-------------|---------|---------|
+| Variable             | Description        | Default   | Options                   |
+| -------------------- | ------------------ | --------- | ------------------------- |
 | `OTEL_LOGS_EXPORTER` | Logs exporter type | `console` | `console`, `otlp`, `none` |
 
 #### OTLP Logs Exporter
 
-| Variable | Description | Default | Example |
-|----------|-------------|---------|---------|
-| `OTEL_EXPORTER_OTLP_LOGS_ENDPOINT` | OTLP endpoint for logs only | - | `http://localhost:4317/v1/logs` |
-| `OTEL_EXPORTER_OTLP_LOGS_HEADERS` | Headers for logs requests only | - | `x-log-key=logs123` |
+| Variable                           | Description                    | Default | Example                         |
+| ---------------------------------- | ------------------------------ | ------- | ------------------------------- |
+| `OTEL_EXPORTER_OTLP_LOGS_ENDPOINT` | OTLP endpoint for logs only    | -       | `http://localhost:4317/v1/logs` |
+| `OTEL_EXPORTER_OTLP_LOGS_HEADERS`  | Headers for logs requests only | -       | `x-log-key=logs123`             |
 
 ## Sampling Configuration
 
 ### Trace Sampling
 
-| Variable | Description | Default | Options |
-|----------|-------------|---------|---------|
-| `OTEL_TRACES_SAMPLER` | Trace sampling strategy | `always_on` | `always_off`, `always_on`, `traceidratio`, `parentbased_always_off`, `parentbased_always_on`, `parentbased_traceidratio` |
-| `OTEL_TRACES_SAMPLER_ARG` | Argument for the sampler | - | `0.1` (for ratio-based sampling) |
+| Variable                  | Description              | Default     | Options                                                                                                                  |
+| ------------------------- | ------------------------ | ----------- | ------------------------------------------------------------------------------------------------------------------------ |
+| `OTEL_TRACES_SAMPLER`     | Trace sampling strategy  | `always_on` | `always_off`, `always_on`, `traceidratio`, `parentbased_always_off`, `parentbased_always_on`, `parentbased_traceidratio` |
+| `OTEL_TRACES_SAMPLER_ARG` | Argument for the sampler | -           | `0.1` (for ratio-based sampling)                                                                                         |
 
 **Examples:**
+
 ```bash
 # Sample 10% of traces
 export OTEL_TRACES_SAMPLER="traceidratio"
@@ -147,19 +149,20 @@ Resource attributes provide metadata about your service and environment. They ca
 
 ### Standard Attributes
 
-| Attribute | Description | Example |
-|-----------|-------------|---------|
-| `service.name` | Service name (overrides OTEL_SERVICE_NAME) | `user-service` |
-| `service.version` | Service version (overrides OTEL_SERVICE_VERSION) | `1.2.3` |
-| `service.namespace` | Service namespace | `backend` |
-| `service.instance.id` | Unique service instance identifier | `instance-123` |
-| `deployment.environment` | Deployment environment | `production` |
-| `cloud.provider` | Cloud provider | `aws` |
-| `cloud.region` | Cloud region | `us-east-1` |
-| `k8s.namespace.name` | Kubernetes namespace | `default` |
-| `k8s.pod.name` | Kubernetes pod name | `user-service-abc123` |
+| Attribute                | Description                                      | Example               |
+| ------------------------ | ------------------------------------------------ | --------------------- |
+| `service.name`           | Service name (overrides OTEL_SERVICE_NAME)       | `user-service`        |
+| `service.version`        | Service version (overrides OTEL_SERVICE_VERSION) | `1.2.3`               |
+| `service.namespace`      | Service namespace                                | `backend`             |
+| `service.instance.id`    | Unique service instance identifier               | `instance-123`        |
+| `deployment.environment` | Deployment environment                           | `production`          |
+| `cloud.provider`         | Cloud provider                                   | `aws`                 |
+| `cloud.region`           | Cloud region                                     | `us-east-1`           |
+| `k8s.namespace.name`     | Kubernetes namespace                             | `default`             |
+| `k8s.pod.name`           | Kubernetes pod name                              | `user-service-abc123` |
 
 **Example:**
+
 ```bash
 export OTEL_RESOURCE_ATTRIBUTES="service.namespace=backend,deployment.environment=staging,cloud.provider=aws,cloud.region=us-west-2"
 ```
@@ -170,27 +173,28 @@ These variables control enhanced features specific to this NestJS observability 
 
 ### Enhanced Features
 
-| Variable | Description | Default | Options |
-|----------|-------------|---------|---------|
-| `OTEL_METRICS_ENABLED` | Enable/disable metrics endpoints | `true` | `true`, `false` |
-| `OTEL_METRICS_ENDPOINT` | Custom metrics endpoint path | `/metrics` | `/custom-metrics` |
-| `OTEL_SPAN_ATTRIBUTE_SANITIZATION_ENABLED` | Enable span attribute sanitization | `true` | `true`, `false` |
-| `OTEL_SPAN_ATTRIBUTE_REDACTED_PLACEHOLDER` | Placeholder for redacted values | `[REDACTED]` | `[HIDDEN]` |
+| Variable                                   | Description                        | Default      | Options           |
+| ------------------------------------------ | ---------------------------------- | ------------ | ----------------- |
+| `OTEL_METRICS_ENABLED`                     | Enable/disable metrics endpoints   | `true`       | `true`, `false`   |
+| `OTEL_METRICS_ENDPOINT`                    | Custom metrics endpoint path       | `/metrics`   | `/custom-metrics` |
+| `OTEL_SPAN_ATTRIBUTE_SANITIZATION_ENABLED` | Enable span attribute sanitization | `true`       | `true`, `false`   |
+| `OTEL_SPAN_ATTRIBUTE_REDACTED_PLACEHOLDER` | Placeholder for redacted values    | `[REDACTED]` | `[HIDDEN]`        |
 
 ### Performance Tuning
 
-| Variable | Description | Default | Example |
-|----------|-------------|---------|---------|
-| `OTEL_BSP_MAX_QUEUE_SIZE` | Batch span processor queue size | `2048` | `4096` |
-| `OTEL_BSP_MAX_EXPORT_BATCH_SIZE` | Maximum batch export size | `512` | `1024` |
-| `OTEL_BSP_EXPORT_TIMEOUT` | Export timeout in milliseconds | `30000` | `60000` |
-| `OTEL_BSP_SCHEDULE_DELAY` | Batch schedule delay in milliseconds | `5000` | `10000` |
+| Variable                         | Description                          | Default | Example |
+| -------------------------------- | ------------------------------------ | ------- | ------- |
+| `OTEL_BSP_MAX_QUEUE_SIZE`        | Batch span processor queue size      | `2048`  | `4096`  |
+| `OTEL_BSP_MAX_EXPORT_BATCH_SIZE` | Maximum batch export size            | `512`   | `1024`  |
+| `OTEL_BSP_EXPORT_TIMEOUT`        | Export timeout in milliseconds       | `30000` | `60000` |
+| `OTEL_BSP_SCHEDULE_DELAY`        | Batch schedule delay in milliseconds | `5000`  | `10000` |
 
 ## Examples by Environment
 
 ### Development Environment
 
 **File: `.env.development`**
+
 ```bash
 # Service identification
 OTEL_SERVICE_NAME=nestjs-app-dev
@@ -216,6 +220,7 @@ OTEL_RESOURCE_ATTRIBUTES=deployment.environment=development,service.namespace=lo
 ### Production Environment
 
 **File: `.env.production`**
+
 ```bash
 # Service identification
 OTEL_SERVICE_NAME=nestjs-app
@@ -246,6 +251,7 @@ OTEL_RESOURCE_ATTRIBUTES=deployment.environment=production,service.namespace=bac
 ### Staging Environment
 
 **File: `.env.staging`**
+
 ```bash
 # Service identification
 OTEL_SERVICE_NAME=nestjs-app-staging
@@ -273,6 +279,7 @@ OTEL_RESOURCE_ATTRIBUTES=deployment.environment=staging,service.namespace=backen
 ### Docker Environment
 
 **File: `docker.env`**
+
 ```bash
 # Service identification
 OTEL_SERVICE_NAME=nestjs-app
@@ -305,16 +312,16 @@ metadata:
   name: otel-config
   namespace: default
 data:
-  OTEL_SERVICE_NAME: "nestjs-app"
-  OTEL_SERVICE_VERSION: "1.2.3"
-  NODE_ENV: "production"
-  OTEL_TRACES_EXPORTER: "otlp"
-  OTEL_METRICS_EXPORTER: "otlp"
-  OTEL_LOGS_EXPORTER: "otlp"
-  OTEL_EXPORTER_OTLP_ENDPOINT: "http://otel-collector.observability:4317"
-  OTEL_TRACES_SAMPLER: "traceidratio"
-  OTEL_TRACES_SAMPLER_ARG: "0.1"
-  OTEL_RESOURCE_ATTRIBUTES: "deployment.environment=production,service.namespace=backend,k8s.cluster.name=prod-cluster"
+  OTEL_SERVICE_NAME: 'nestjs-app'
+  OTEL_SERVICE_VERSION: '1.2.3'
+  NODE_ENV: 'production'
+  OTEL_TRACES_EXPORTER: 'otlp'
+  OTEL_METRICS_EXPORTER: 'otlp'
+  OTEL_LOGS_EXPORTER: 'otlp'
+  OTEL_EXPORTER_OTLP_ENDPOINT: 'http://otel-collector.observability:4317'
+  OTEL_TRACES_SAMPLER: 'traceidratio'
+  OTEL_TRACES_SAMPLER_ARG: '0.1'
+  OTEL_RESOURCE_ATTRIBUTES: 'deployment.environment=production,service.namespace=backend,k8s.cluster.name=prod-cluster'
 ```
 
 ### Secret Example
@@ -329,7 +336,7 @@ type: Opaque
 data:
   OTEL_EXPORTER_OTLP_HEADERS: base64-encoded-headers
 stringData:
-  OTEL_EXPORTER_OTLP_HEADERS: "authorization=Bearer your-api-token"
+  OTEL_EXPORTER_OTLP_HEADERS: 'authorization=Bearer your-api-token'
 ```
 
 ### Deployment Example
@@ -343,20 +350,20 @@ spec:
   template:
     spec:
       containers:
-      - name: app
-        image: nestjs-app:latest
-        envFrom:
-        - configMapRef:
-            name: otel-config
-        - secretRef:
-            name: otel-secrets
-        env:
-        - name: OTEL_RESOURCE_ATTRIBUTES
-          value: "k8s.pod.name=$(HOSTNAME),k8s.namespace.name=$(NAMESPACE)"
-        - name: NAMESPACE
-          valueFrom:
-            fieldRef:
-              fieldPath: metadata.namespace
+        - name: app
+          image: nestjs-app:latest
+          envFrom:
+            - configMapRef:
+                name: otel-config
+            - secretRef:
+                name: otel-secrets
+          env:
+            - name: OTEL_RESOURCE_ATTRIBUTES
+              value: 'k8s.pod.name=$(HOSTNAME),k8s.namespace.name=$(NAMESPACE)'
+            - name: NAMESPACE
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.namespace
 ```
 
 ## Docker Compose Examples
@@ -383,8 +390,8 @@ services:
   jaeger:
     image: jaegertracing/all-in-one:latest
     ports:
-      - "16686:16686"
-      - "4317:4317"
+      - '16686:16686'
+      - '4317:4317'
     environment:
       - COLLECTOR_OTLP_ENABLED=true
 ```
@@ -405,12 +412,12 @@ services:
 
   otel-collector:
     image: otel/opentelemetry-collector-contrib:latest
-    command: ["--config=/etc/otel-collector-config.yaml"]
+    command: ['--config=/etc/otel-collector-config.yaml']
     volumes:
       - ./otel-collector-config.yaml:/etc/otel-collector-config.yaml
     ports:
-      - "4317:4317"
-      - "4318:4318"
+      - '4317:4317'
+      - '4318:4318'
 ```
 
 ## Observability Platform Examples
@@ -499,6 +506,7 @@ export OTEL_RESOURCE_ATTRIBUTES="service.name=override-service"
 **Problem:** Traces/metrics not appearing in your observability platform.
 
 **Solutions:**
+
 ```bash
 # Check service name is set
 export OTEL_SERVICE_NAME="my-service"
@@ -519,6 +527,7 @@ export OTEL_LOG_LEVEL="debug"
 **Problem:** Performance issues from too many traces or missing important traces.
 
 **Solutions:**
+
 ```bash
 # Reduce trace volume (sample 10%)
 export OTEL_TRACES_SAMPLER="traceidratio"
@@ -539,6 +548,7 @@ export OTEL_TRACES_SAMPLER="always_off"
 **Problem:** `/metrics` endpoint returns 404 or 500 errors.
 
 **Solutions:**
+
 ```bash
 # Enable metrics endpoint
 export OTEL_METRICS_ENABLED="true"
@@ -555,6 +565,7 @@ export OTEL_METRICS_EXPORTER="prometheus"
 **Problem:** Passwords, tokens, or sensitive data appearing in trace attributes.
 
 **Solutions:**
+
 ```bash
 # Enable attribute sanitization
 export OTEL_SPAN_ATTRIBUTE_SANITIZATION_ENABLED="true"
@@ -568,6 +579,7 @@ export OTEL_SPAN_ATTRIBUTE_REDACTED_PLACEHOLDER="[HIDDEN]"
 **Problem:** High memory usage or export delays.
 
 **Solutions:**
+
 ```bash
 # Increase batch size for efficiency
 export OTEL_BSP_MAX_EXPORT_BATCH_SIZE="1024"

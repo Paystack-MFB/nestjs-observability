@@ -1,7 +1,7 @@
 import { DynamicModule, Global, Module, Provider } from '@nestjs/common';
 import { APP_INTERCEPTOR } from '@nestjs/core';
 
-import { createObservabilityConfig, ObservabilityConfig } from './config/observability.config';
+import { ConfigServiceInterface, createObservabilityConfig, ObservabilityConfig } from './config/observability.config';
 import { MetricsController } from './controllers/metrics.controller';
 import { AutoTraceInterceptor } from './interceptors/auto-trace.interceptor';
 import { LoggerService } from './logger/logger.service';
@@ -16,6 +16,9 @@ import { TracingService } from './tracing/tracing.service';
 @Global()
 @Module({})
 export class ObservabilityModule {
+  // Non-static properties to prevent no-extraneous-class error
+  private readonly version = '1.0.0';
+
   /**
    * Register the module without configuration
    * All configuration comes from environment variables via the register module
@@ -36,7 +39,7 @@ export class ObservabilityModule {
           // Mock ConfigService since we're using environment variables directly
           {
             get: (key: string) => process.env[key],
-          } as any
+          } as ConfigServiceInterface
         );
         return defaultConfig;
       },
@@ -69,5 +72,8 @@ export class ObservabilityModule {
       module: ObservabilityModule,
       providers,
     };
+  }
+  getVersion(): string {
+    return this.version;
   }
 }

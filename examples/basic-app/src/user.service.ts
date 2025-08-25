@@ -1,5 +1,11 @@
 import { Injectable } from '@nestjs/common';
-import { addSpanAttribute, addSpanAttributes, getCurrentSpan, LoggerService, TraceClass } from '@paystackhq/nestjs-observability';
+import {
+  addSpanAttribute,
+  addSpanAttributes,
+  getCurrentSpan,
+  LoggerService,
+  TraceClass,
+} from '@paystackhq/nestjs-observability';
 
 @Injectable()
 @TraceClass()
@@ -33,10 +39,10 @@ export class UserService {
     });
 
     // Log successful operation (trace context included automatically)
-    this.logger.log('User retrieved successfully', { 
-      userId: user.id, 
+    this.logger.log('User retrieved successfully', {
+      userId: user.id,
       userName: user.name,
-      operation: 'getUserById' 
+      operation: 'getUserById',
     });
 
     return user;

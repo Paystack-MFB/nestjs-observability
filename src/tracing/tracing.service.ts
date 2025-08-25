@@ -1,4 +1,4 @@
-import type { Tracer } from '@opentelemetry/api';
+import type { Span, Tracer } from '@opentelemetry/api';
 
 import { Injectable } from '@nestjs/common';
 import { trace } from '@opentelemetry/api';
@@ -29,7 +29,7 @@ export class TracingService {
     if (span) {
       span.addEvent(name, attributes);
     } else {
-      this.logger?.debug('No active span found to add event', { context: 'TracingService' });
+      this.logger.debug('No active span found to add event', { context: 'TracingService' });
     }
   }
 
@@ -39,7 +39,7 @@ export class TracingService {
    * @param fn Function to execute within the span context
    * @returns The result of the function execution
    */
-  createSpan<T>(spanName: string, fn: (span: any) => T): T {
+  createSpan<T>(spanName: string, fn: (span: Span) => T): T {
     return this.tracer.startActiveSpan(spanName, (span) => {
       try {
         span.setAttributes({
@@ -51,14 +51,14 @@ export class TracingService {
 
         // Handle async results
         if (result && typeof result === 'object' && 'then' in result) {
-          return (result as unknown as Promise<any>)
+          return (result as unknown as Promise<T>)
             .then((value) => {
               span.setStatus({ code: 1 }); // OK
               return value;
             })
-            .catch((error) => {
-              span.setStatus({ code: 2, message: error.message }); // ERROR
-              span.recordException(error);
+            .catch((error: unknown) => {
+              span.setStatus({ code: 2, message: (error as Error).message }); // ERROR
+              span.recordException(error as Error);
               throw error;
             })
             .finally(() => {
@@ -70,9 +70,9 @@ export class TracingService {
         span.setStatus({ code: 1 }); // OK
         span.end();
         return result;
-      } catch (error) {
+      } catch (error: unknown) {
         span.setStatus({ code: 2, message: (error as Error).message }); // ERROR
-        span.recordException(error as any);
+        span.recordException(error as Error);
         span.end();
         throw error;
       }
@@ -87,7 +87,7 @@ export class TracingService {
     if (span) {
       span.end();
     } else {
-      this.logger?.debug('No active span found to end', { context: 'TracingService' });
+      this.logger.debug('No active span found to end', { context: 'TracingService' });
     }
   }
 
@@ -95,7 +95,7 @@ export class TracingService {
    * Get the currently active span
    * @returns The active span or undefined if none exists
    */
-  getActiveSpan() {
+  getActiveSpan(): Span | undefined {
     return trace.getActiveSpan();
   }
 
@@ -140,7 +140,7 @@ export class TracingService {
   isTracingEnabled(): boolean {
     try {
       const provider = trace.getTracerProvider();
-      return provider !== undefined;
+      return !!provider;
     } catch {
       return false;
     }
@@ -156,7 +156,7 @@ export class TracingService {
       span.recordException(exception);
       span.setStatus({ code: 2, message: exception.message }); // ERROR
     } else {
-      this.logger?.debug('No active span found to record exception', { context: 'TracingService' });
+      this.logger.debug('No active span found to record exception', { context: 'TracingService' });
     }
   }
 
@@ -170,7 +170,7 @@ export class TracingService {
     if (span) {
       span.setAttribute(key, value);
     } else {
-      this.logger?.debug('No active span found to set attribute', { context: 'TracingService' });
+      this.logger.debug('No active span found to set attribute', { context: 'TracingService' });
     }
   }
 
@@ -183,7 +183,7 @@ export class TracingService {
     if (span) {
       span.setAttributes(attributes);
     } else {
-      this.logger?.debug('No active span found to set attributes', { context: 'TracingService' });
+      this.logger.debug('No active span found to set attributes', { context: 'TracingService' });
     }
   }
 
@@ -202,7 +202,7 @@ export class TracingService {
         span.setStatus({ code });
       }
     } else {
-      this.logger?.debug('No active span found to set status', { context: 'TracingService' });
+      this.logger.debug('No active span found to set status', { context: 'TracingService' });
     }
   }
 
@@ -212,7 +212,7 @@ export class TracingService {
    * @param spanName Name of the span
    * @returns The created span
    */
-  startSpan(spanName: string) {
+  startSpan(spanName: string): Span {
     const span = this.tracer.startSpan(spanName);
     span.setAttributes({
       'instrumentation.type': 'manual',
@@ -241,14 +241,14 @@ export class TracingService {
 
         // Handle async results
         if (result && typeof result === 'object' && 'then' in result) {
-          return (result as unknown as Promise<any>)
+          return (result as unknown as Promise<T>)
             .then((value) => {
               span.setStatus({ code: 1 }); // OK
               return value;
             })
-            .catch((error) => {
-              span.setStatus({ code: 2, message: error.message }); // ERROR
-              span.recordException(error);
+            .catch((error: unknown) => {
+              span.setStatus({ code: 2, message: (error as Error).message }); // ERROR
+              span.recordException(error as Error);
               throw error;
             })
             .finally(() => {
@@ -260,9 +260,9 @@ export class TracingService {
         span.setStatus({ code: 1 }); // OK
         span.end();
         return result;
-      } catch (error) {
+      } catch (error: unknown) {
         span.setStatus({ code: 2, message: (error as Error).message }); // ERROR
-        span.recordException(error as any);
+        span.recordException(error as Error);
         span.end();
         throw error;
       }
@@ -274,6 +274,6 @@ export class TracingService {
    * @returns Service name
    */
   private getServiceName(): string {
-    return process.env['OTEL_SERVICE_NAME'] || 'nestjs-app';
+    return process.env['OTEL_SERVICE_NAME'] ?? 'nestjs-app';
   }
 }

@@ -9,14 +9,7 @@ export default defineConfig({
     setupFiles: ['src/test-helpers/test-setup.ts'],
     coverage: {
       reporter: ['text', 'html', 'lcov'],
-      exclude: [
-        'node_modules/**',
-        'dist/**',
-        'examples/**',
-        'src/test-helpers/**',
-        '**/*.test.ts',
-        '**/*.spec.ts',
-      ],
+      exclude: ['node_modules/**', 'dist/**', 'examples/**', 'src/test-helpers/**', '**/*.test.ts', '**/*.spec.ts'],
       thresholds: {
         global: {
           branches: 90,

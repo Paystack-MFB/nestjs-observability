@@ -192,7 +192,7 @@ export function setSpanStatus(status: 'ERROR' | 'OK', message?: string): void {
  * @returns Placeholder string for redacted values
  */
 function getRedactedPlaceholder(): string {
-  return process.env['OTEL_SPAN_ATTRIBUTE_REDACTED_PLACEHOLDER'] || '[REDACTED]';
+  return process.env['OTEL_SPAN_ATTRIBUTE_REDACTED_PLACEHOLDER'] ?? '[REDACTED]';
 }
 
 /**

@@ -40,7 +40,7 @@ function displayBuildInfo() {
     }
     console.log(`      Default: ${mainExports.default}`);
   }
-  
+
   // Show register module exports
   if (exports && exports['./register']) {
     console.log('   🔧 Register Module (./register)');
@@ -56,9 +56,9 @@ function displayBuildInfo() {
     }
     console.log(`      Default: ${registerExports.default}`);
   }
-  
+
   // Show other exports
-  Object.keys(exports).forEach(exportKey => {
+  Object.keys(exports).forEach((exportKey) => {
     if (exportKey !== '.' && exportKey !== './register') {
       console.log(`   📄 ${exportKey}: ${exports[exportKey]}`);
     }

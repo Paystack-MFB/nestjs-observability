@@ -1,11 +1,11 @@
 import { Injectable } from '@nestjs/common';
-import { 
-  LoggerService, 
-  MetricsService, 
+import {
+  LoggerService,
+  MetricsService,
   TracingService,
   TraceClass,
   Trace,
-  NoTrace
+  NoTrace,
 } from '@paystackhq/nestjs-observability';
 
 /**
@@ -28,10 +28,10 @@ export class ExampleService {
     private readonly tracing: TracingService
   ) {
     // Set service context for all logging
-    this.logger.setContext({ 
+    this.logger.setContext({
       service: 'ExampleService',
       version: '1.0.0',
-      component: 'business-logic'
+      component: 'business-logic',
     });
 
     // Initialize custom metrics
@@ -39,7 +39,7 @@ export class ExampleService {
 
     this.logger.log('ExampleService initialized', {
       metricsInitialized: true,
-      tracingEnabled: true
+      tracingEnabled: true,
     });
   }
 
@@ -48,10 +48,7 @@ export class ExampleService {
    */
   private initializeMetrics() {
     // Counter for tracking requests
-    this.requestCounter = this.metrics.createCounter(
-      'example_requests_total',
-      'Total number of example requests'
-    );
+    this.requestCounter = this.metrics.createCounter('example_requests_total', 'Total number of example requests');
 
     // Gauge for active processing
     this.processingGauge = this.metrics.createGauge(
@@ -67,8 +64,8 @@ export class ExampleService {
 
     this.logger.debug('Custom metrics initialized', {
       counter: 'example_requests_total',
-      gauge: 'example_active_operations', 
-      histogram: 'example_operation_duration_seconds'
+      gauge: 'example_active_operations',
+      histogram: 'example_operation_duration_seconds',
     });
   }
 
@@ -78,15 +75,15 @@ export class ExampleService {
   @Trace('simpleOperation')
   async simpleOperation(data: any): Promise<any> {
     const operationId = Math.random().toString(36).substring(7);
-    
+
     // Create child logger with operation context
     const operationLogger = this.logger.createChildLogger();
     operationLogger.addContext('operationId', operationId);
     operationLogger.addContext('operation', 'simpleOperation');
 
-    operationLogger.log('Starting simple operation', { 
+    operationLogger.log('Starting simple operation', {
       inputData: this.sanitizeData(data),
-      timestamp: new Date().toISOString()
+      timestamp: new Date().toISOString(),
     });
 
     // Increment request counter
@@ -95,26 +92,26 @@ export class ExampleService {
     try {
       // Simulate processing
       await this.delay(100 + Math.random() * 200);
-      
+
       const result = {
         operationId,
         status: 'completed',
         data: `Processed: ${JSON.stringify(data)}`,
-        processedAt: new Date().toISOString()
+        processedAt: new Date().toISOString(),
       };
 
       operationLogger.log('Simple operation completed', {
         result: this.sanitizeData(result),
-        duration: '~200ms'
+        duration: '~200ms',
       });
 
       this.requestCounter.add(1, { operation: 'simple', status: 'success' });
-      
+
       return result;
     } catch (error) {
       operationLogger.error('Simple operation failed', {
         error: error.message,
-        operationId
+        operationId,
       });
 
       this.requestCounter.add(1, { operation: 'simple', status: 'error' });
@@ -135,13 +132,13 @@ export class ExampleService {
       operationId,
       userId,
       operation: 'complexOperation',
-      correlationId: `complex-${operationId}`
+      correlationId: `complex-${operationId}`,
     });
 
     operationLogger.log('Starting complex operation', {
       userId,
       inputSize: JSON.stringify(data).length,
-      startTime: new Date().toISOString()
+      startTime: new Date().toISOString(),
     });
 
     // Update metrics - increment processing gauge
@@ -168,13 +165,13 @@ export class ExampleService {
       span.setAttributes({ 'business-logic.status': 'applied' });
 
       const duration = Date.now() - startTime;
-      
+
       operationLogger.log('Complex operation completed successfully', {
         operationId,
         userId,
         duration: `${duration}ms`,
         resultSize: JSON.stringify(result).length,
-        completedAt: new Date().toISOString()
+        completedAt: new Date().toISOString(),
       });
 
       // Update metrics
@@ -184,7 +181,7 @@ export class ExampleService {
       span.setAttributes({
         'operation.status': 'success',
         'operation.duration': duration,
-        'result.size': JSON.stringify(result).length
+        'result.size': JSON.stringify(result).length,
       });
 
       return {
@@ -193,18 +190,17 @@ export class ExampleService {
         result,
         duration,
         status: 'success',
-        completedAt: new Date().toISOString()
+        completedAt: new Date().toISOString(),
       };
-
     } catch (error) {
       const duration = Date.now() - startTime;
-      
+
       operationLogger.error('Complex operation failed', {
         operationId,
         userId,
         error: error.message,
         duration: `${duration}ms`,
-        failedAt: new Date().toISOString()
+        failedAt: new Date().toISOString(),
       });
 
       // Update error metrics
@@ -216,7 +212,7 @@ export class ExampleService {
       span.setAttributes({
         'operation.status': 'error',
         'operation.duration': duration,
-        'error.message': error.message
+        'error.message': error.message,
       });
 
       throw error;
@@ -230,11 +226,11 @@ export class ExampleService {
    */
   async concurrentOperations(requests: any[]): Promise<any[]> {
     const batchId = Math.random().toString(36).substring(7);
-    
+
     this.logger.log('Starting concurrent operations', {
       batchId,
       requestCount: requests.length,
-      startTime: new Date().toISOString()
+      startTime: new Date().toISOString(),
     });
 
     // Process all requests concurrently
@@ -244,35 +240,35 @@ export class ExampleService {
       operationLogger.setContext({
         batchId,
         requestIndex: index,
-        operationId: `${batchId}-${index}`
+        operationId: `${batchId}-${index}`,
       });
 
       operationLogger.log('Processing concurrent request', {
         requestIndex: index,
-        requestData: this.sanitizeData(request)
+        requestData: this.sanitizeData(request),
       });
 
       try {
         // Simulate variable processing time
         await this.delay(50 + Math.random() * 150);
-        
+
         const result = {
           index,
           batchId,
           data: `Processed: ${JSON.stringify(request)}`,
-          processedAt: new Date().toISOString()
+          processedAt: new Date().toISOString(),
         };
 
         operationLogger.log('Concurrent request completed', {
           requestIndex: index,
-          result: this.sanitizeData(result)
+          result: this.sanitizeData(result),
         });
 
         return result;
       } catch (error) {
         operationLogger.error('Concurrent request failed', {
           requestIndex: index,
-          error: error.message
+          error: error.message,
         });
         throw error;
       }
@@ -283,7 +279,7 @@ export class ExampleService {
     this.logger.log('All concurrent operations completed', {
       batchId,
       completedCount: results.length,
-      completedAt: new Date().toISOString()
+      completedAt: new Date().toISOString(),
     });
 
     return results;
@@ -297,7 +293,7 @@ export class ExampleService {
     // This operation won't be traced due to @NoTrace decorator
     this.logger.log('Processing sensitive operation', {
       note: 'This operation is not traced for security reasons',
-      dataType: typeof sensitiveData
+      dataType: typeof sensitiveData,
     });
 
     // Simulate processing
@@ -306,7 +302,7 @@ export class ExampleService {
     return {
       status: 'processed',
       message: 'Sensitive data processed securely',
-      processedAt: new Date().toISOString()
+      processedAt: new Date().toISOString(),
     };
   }
 
@@ -320,7 +316,7 @@ export class ExampleService {
     const metrics = {
       totalRequests: await this.getTotalRequestCount(),
       activeOperations: await this.getActiveOperationCount(),
-      avgResponseTime: await this.getAverageResponseTime()
+      avgResponseTime: await this.getAverageResponseTime(),
     };
 
     this.logger.debug('Health check completed', { metrics });
@@ -329,7 +325,7 @@ export class ExampleService {
       status: 'healthy',
       timestamp: new Date().toISOString(),
       service: 'ExampleService',
-      metrics
+      metrics,
     };
   }
 
@@ -337,32 +333,32 @@ export class ExampleService {
 
   private async validateComplexData(data: any, logger: LoggerService): Promise<void> {
     logger.debug('Validating complex data structure');
-    
+
     if (!data || typeof data !== 'object') {
       throw new Error('Invalid data structure');
     }
 
     // Simulate validation time
     await this.delay(50);
-    
+
     logger.debug('Data validation passed');
   }
 
   private async processComplexData(data: any, logger: LoggerService): Promise<any> {
     logger.debug('Processing complex data');
-    
+
     // Simulate complex processing
     await this.delay(100 + Math.random() * 200);
-    
+
     const processed = {
       ...data,
       processed: true,
       processedAt: new Date().toISOString(),
-      processingId: Math.random().toString(36).substring(7)
+      processingId: Math.random().toString(36).substring(7),
     };
 
     logger.debug('Data processing completed', {
-      processingId: processed.processingId
+      processingId: processed.processingId,
     });
 
     return processed;
@@ -379,12 +375,12 @@ export class ExampleService {
       businessRulesApplied: true,
       score: Math.floor(Math.random() * 100),
       category: ['A', 'B', 'C'][Math.floor(Math.random() * 3)],
-      appliedAt: new Date().toISOString()
+      appliedAt: new Date().toISOString(),
     };
 
     logger.debug('Business logic applied', {
       score: result.score,
-      category: result.category
+      category: result.category,
     });
 
     return result;
@@ -408,21 +404,21 @@ export class ExampleService {
   private sanitizeData(data: any): any {
     // Simple data sanitization for logging
     const sanitized = JSON.parse(JSON.stringify(data));
-    
+
     // Remove sensitive fields
     const sensitiveFields = ['password', 'token', 'secret', 'key'];
-    
+
     const sanitizeObject = (obj: any): any => {
       if (typeof obj !== 'object' || obj === null) return obj;
-      
+
       for (const key in obj) {
-        if (sensitiveFields.some(field => key.toLowerCase().includes(field))) {
+        if (sensitiveFields.some((field) => key.toLowerCase().includes(field))) {
           obj[key] = '[REDACTED]';
         } else if (typeof obj[key] === 'object') {
           obj[key] = sanitizeObject(obj[key]);
         }
       }
-      
+
       return obj;
     };
 
@@ -430,6 +426,6 @@ export class ExampleService {
   }
 
   private delay(ms: number): Promise<void> {
-    return new Promise(resolve => setTimeout(resolve, ms));
+    return new Promise((resolve) => setTimeout(resolve, ms));
   }
 }

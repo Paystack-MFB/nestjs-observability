@@ -8,7 +8,7 @@ async function bootstrap() {
 
   // Get the enhanced LoggerService from the app
   const logger = app.get(LoggerService);
-  
+
   // Set global context for the logger
   logger.setContext({ component: 'Bootstrap', service: 'basic-example' });
 
@@ -26,7 +26,7 @@ async function bootstrap() {
     environment,
     serviceName,
     serviceVersion,
-    port
+    port,
   });
 
   // Check observability configuration
@@ -34,13 +34,13 @@ async function bootstrap() {
   const metricsExporter = process.env.OTEL_METRICS_EXPORTER || 'console';
   const logsExporter = process.env.OTEL_LOGS_EXPORTER || 'console';
   const metricsEnabled = process.env.OTEL_METRICS_ENABLED !== 'false';
-  
+
   logger.log('Observability configuration', {
     tracesExporter,
     metricsExporter,
     logsExporter,
     metricsEnabled,
-    metricsEndpoint: process.env.OTEL_METRICS_ENDPOINT || '/metrics'
+    metricsEndpoint: process.env.OTEL_METRICS_ENDPOINT || '/metrics',
   });
 
   await app.listen(port);
@@ -49,7 +49,7 @@ async function bootstrap() {
     port,
     metricsUrl: `http://localhost:${port}${process.env.OTEL_METRICS_ENDPOINT || '/metrics'}`,
     healthUrl: `http://localhost:${port}/health`,
-    startupTime: new Date().toISOString()
+    startupTime: new Date().toISOString(),
   });
 }
 

@@ -56,13 +56,13 @@ export class MetricsService implements OnModuleInit {
     try {
       new promClient.Counter({
         help: description,
-        labelNames: Object.keys(labels || {}),
+        labelNames: Object.keys(labels ?? {}),
         name: name.replace(/[.-]/g, '_'), // Prometheus naming convention
         registers: [this.registry], // Use our specific registry
       });
-    } catch (error) {
+    } catch (_error) {
       // Ignore registry conflicts in test environments
-      this.logger?.debug('Counter already exists in registry', { context: 'MetricsService', name });
+      this.logger.debug('Counter already exists in registry', { context: 'MetricsService', name });
     }
 
     return counter;
@@ -98,9 +98,9 @@ export class MetricsService implements OnModuleInit {
         name: name.replace(/[.-]/g, '_'), // Prometheus naming convention
         registers: [this.registry], // Use our specific registry
       });
-    } catch (error) {
+    } catch (_error) {
       // Ignore registry conflicts in test environments
-      this.logger?.debug('Gauge already exists in registry', { context: 'MetricsService', name });
+      this.logger.debug('Gauge already exists in registry', { context: 'MetricsService', name });
     }
 
     return gauge;
@@ -123,14 +123,14 @@ export class MetricsService implements OnModuleInit {
     // Also create Prometheus histogram for backward compatibility
     try {
       new promClient.Histogram({
-        buckets: buckets || [0.01, 0.05, 0.1, 0.5, 1, 2, 5, 10],
+        buckets: buckets ?? [0.01, 0.05, 0.1, 0.5, 1, 2, 5, 10],
         help: description,
         name: name.replace(/[.-]/g, '_'), // Prometheus naming convention
         registers: [this.registry], // Use our specific registry
       });
-    } catch (error) {
+    } catch (_error) {
       // Ignore registry conflicts in test environments
-      this.logger?.debug('Histogram already exists in registry', { context: 'MetricsService', name });
+      this.logger.debug('Histogram already exists in registry', { context: 'MetricsService', name });
     }
 
     return histogram;
@@ -159,9 +159,9 @@ export class MetricsService implements OnModuleInit {
         percentiles,
         registers: [this.registry], // Use our specific registry
       });
-    } catch (error) {
+    } catch (_error) {
       // Ignore registry conflicts in test environments
-      this.logger?.debug('Summary already exists in registry', { context: 'MetricsService', name });
+      this.logger.debug('Summary already exists in registry', { context: 'MetricsService', name });
     }
 
     return histogram;
@@ -200,9 +200,9 @@ export class MetricsService implements OnModuleInit {
         prefix: 'node_',
         register: this.registry,
       });
-      this.logger?.log('Default metrics collection enabled', { context: 'MetricsService' });
+      this.logger.log('Default metrics collection enabled', { context: 'MetricsService' });
     } catch (error) {
-      this.logger?.warn('Failed to initialize default metrics collection', {
+      this.logger.warn('Failed to initialize default metrics collection', {
         context: 'MetricsService',
         error: error instanceof Error ? error.message : String(error),
       });
@@ -241,9 +241,9 @@ export class MetricsService implements OnModuleInit {
    */
   private getServiceLabels(): Record<string, string> {
     return {
-      environment: process.env['NODE_ENV'] || 'development',
-      service: process.env['OTEL_SERVICE_NAME'] || 'nestjs-app',
-      version: process.env['OTEL_SERVICE_VERSION'] || '1.0.0',
+      environment: process.env['NODE_ENV'] ?? 'development',
+      service: process.env['OTEL_SERVICE_NAME'] ?? 'nestjs-app',
+      version: process.env['OTEL_SERVICE_VERSION'] ?? '1.0.0',
     };
   }
 
@@ -283,7 +283,7 @@ export class MetricsService implements OnModuleInit {
       this.appInfoGauge.labels(serviceLabels['version'], serviceLabels['environment']).set(1);
     } catch (error) {
       // Create fallback metrics if the registry approach fails
-      this.logger?.warn('Failed to initialize common Prometheus metrics', {
+      this.logger.warn('Failed to initialize common Prometheus metrics', {
         context: 'MetricsService',
         error: error instanceof Error ? error.message : String(error),
       });

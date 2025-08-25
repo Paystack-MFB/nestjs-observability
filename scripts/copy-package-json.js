@@ -36,9 +36,9 @@ function copyPackageJson() {
     const esmDir = path.join(__dirname, '..', 'dist', 'esm');
     if (fs.existsSync(esmDir)) {
       const esmPackageJson = {
-        type: 'module'
+        type: 'module',
       };
-      
+
       fs.writeFileSync(esmPackagePath, JSON.stringify(esmPackageJson, null, 2));
       console.log('✅ ESM package.json created in dist/esm/');
     }

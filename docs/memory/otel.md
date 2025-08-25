@@ -213,7 +213,7 @@ Working Result: A new **src/observability.module.ts** that integrates with examp
   - Static `forRoot()` method with no parameters required
   - Providers for LoggerService, MetricsService, TracingService without complex setup
   - AutoTraceInterceptor registered as APP_INTERCEPTOR
-  - Uses environment variables (OTEL_*) for configuration
+  - Uses environment variables (OTEL\_\*) for configuration
   - Maintains @Global() decorator for service availability
   - Temporary configuration bridge until services are updated in later tasks
 
@@ -304,6 +304,7 @@ Create simplified ObservabilityModule with immediate testing:
 Status: **Completed** ✅
 
 Notes:
+
 - Updated plan to use Option 2: OpenTelemetry Trace Context approach (simpler, no CLS dependency)
 - Using global OpenTelemetry logger provider + automatic trace context inclusion
 - Singleton scope for better performance, context comes from OpenTelemetry spans
@@ -366,11 +367,12 @@ Validation:
 ### 1. NestJS Logger Provider Patterns
 
 **Direct Instantiation Pattern (Basic)**
+
 ```typescript
 @Injectable()
 class MyService {
   private readonly logger = new Logger(MyService.name);
-  
+
   doSomething() {
     this.logger.log('Processing request');
   }
@@ -378,11 +380,12 @@ class MyService {
 ```
 
 **Dependency Injection Pattern (Recommended)**
+
 ```typescript
 @Injectable()
 export class MyService {
   constructor(@Inject(LOGGER_TOKEN) private logger: LoggerService) {}
-  
+
   doSomething() {
     this.logger.log('Processing request with DI');
   }
@@ -390,6 +393,7 @@ export class MyService {
 ```
 
 **Custom Logger Interface with Tokens**
+
 ```typescript
 export const LOGGER_TOKEN = Symbol('LOGGER');
 
@@ -406,6 +410,7 @@ export interface EnhancedLogger {
 ### 2. Context Isolation Implementation Options
 
 **Option A: NestJS CLS (Recommended)**
+
 ```typescript
 import { ClsModule, CLS_ID } from 'nestjs-cls';
 
@@ -426,22 +431,23 @@ export class EnhancedLoggerService {
     @Inject(INQUIRER) private parentClass: object,
     private cls: ClsService
   ) {}
-  
+
   log(message: string, data?: any) {
     const context = this.cls.get('context') || {};
     const correlationId = this.cls.getId();
-    
+
     this.baseLogger.log(message, {
       ...data,
       ...context,
       correlationId,
-      source: this.parentClass.constructor.name
+      source: this.parentClass.constructor.name,
     });
   }
 }
 ```
 
 **Option B: AsyncLocalStorage (Alternative)**
+
 ```typescript
 import { AsyncLocalStorage } from 'async_hooks';
 
@@ -452,12 +458,12 @@ export class ContextLoggerService {
   private getContext(): Map<string, any> {
     return contextStorage.getStore() || new Map();
   }
-  
+
   setContext(key: string, value: any): void {
     const context = this.getContext();
     context.set(key, value);
   }
-  
+
   log(message: string, data?: any): void {
     const context = Object.fromEntries(this.getContext());
     this.baseLogger.log(message, { ...data, ...context });
@@ -468,18 +474,19 @@ export class ContextLoggerService {
 ### 3. OpenTelemetry Integration Patterns
 
 **Global Logger Provider Integration**
+
 ```typescript
 import { logs } from '@opentelemetry/api-logs';
 
 @Injectable()
 export class OtelLoggerService {
   private logger: Logger;
-  
+
   constructor() {
     const loggerProvider = logs.getLoggerProvider();
     this.logger = loggerProvider.getLogger('nestjs-app', '1.0.0');
   }
-  
+
   log(message: string, data?: any): void {
     this.logger.emit({
       severityText: 'INFO',
@@ -494,6 +501,7 @@ export class OtelLoggerService {
 ```
 
 **Trace Context Auto-Inclusion**
+
 ```typescript
 import { trace } from '@opentelemetry/api';
 
@@ -517,18 +525,20 @@ private enrichWithTraceContext(data: any = {}): any {
 ### 1. Simple and Obvious Design
 
 **Developer-Friendly Architecture**
+
 ```
 LoggerService (Injectable - Singleton)
-    ↓ 
+    ↓
 [Global OpenTelemetry Logger + Automatic Trace Context + Manual Context]
 ```
 
 **Developer Usage (Simple!)**
+
 ```typescript
 @Injectable()
 export class UserService {
   constructor(private logger: LoggerService) {} // That's it!
-  
+
   async createUser(userData: any) {
     this.logger.addContext('userId', userData.id);
     this.logger.log('Creating user', { email: userData.email });
@@ -544,47 +554,47 @@ export class UserService {
 export class LoggerService {
   private otelLogger: Logger;
   private persistentContext: Record<string, any> = {};
-  
+
   constructor() {
     // Get OpenTelemetry logger from global provider
     this.otelLogger = logs.getLoggerProvider().getLogger('nestjs-app', '1.0.0');
   }
-  
+
   setContext(context: Record<string, any>): void {
     Object.assign(this.persistentContext, context);
   }
-  
+
   addContext(key: string, value: any): void {
     this.persistentContext[key] = value;
   }
-  
+
   clearContext(): void {
     this.persistentContext = {};
   }
-  
+
   createChildLogger(): LoggerService {
     const childLogger = new LoggerService();
     childLogger.setContext(this.persistentContext); // Inherit context
     return childLogger;
   }
-  
+
   // Standard logging methods
   log(message: string, data?: any): void {
     this.emit('INFO', message, data);
   }
-  
+
   error(message: string | Error, data?: any): void {
     this.emit('ERROR', message, data);
   }
-  
+
   warn(message: string, data?: any): void {
     this.emit('WARN', message, data);
   }
-  
+
   debug(message: string, data?: any): void {
     this.emit('DEBUG', message, data);
   }
-  
+
   // Private helpers
   private emit(level: string, message: string | Error, data?: any): void {
     const enrichedData = {
@@ -592,7 +602,7 @@ export class LoggerService {
       ...this.persistentContext,
       ...this.getTraceContext(), // Auto-include from OpenTelemetry
     };
-    
+
     this.otelLogger.emit({
       severityText: level,
       body: message instanceof Error ? message.message : message,
@@ -600,11 +610,11 @@ export class LoggerService {
       ...(message instanceof Error && { exception: message }),
     });
   }
-  
+
   private getTraceContext(): Record<string, any> {
     const span = trace.getActiveSpan();
     if (!span) return {};
-    
+
     const spanContext = span.spanContext();
     return {
       traceId: spanContext.traceId,
@@ -629,17 +639,20 @@ export class LoggerModule {}
 ### 4. Performance and Best Practice Considerations (Updated)
 
 **Singleton Logger Performance**
+
 - Use singleton scope for better performance (no per-request instantiation)
 - Manual context management avoids overhead of CLS/AsyncLocalStorage
 - Trace context comes automatically from OpenTelemetry spans
 
 **OpenTelemetry Integration Best Practices**
+
 - Use global logger provider from register module
 - Implement async log emission for better performance
 - Auto-correlate with active trace spans
 - Support structured logging with proper attributes
 
 **Production Considerations**
+
 - Implement log level filtering based on environment
 - Add circuit breaker for external log destinations
 - Support graceful degradation when OpenTelemetry is unavailable
@@ -673,7 +686,7 @@ Implement simplified LoggerService with OpenTelemetry trace context design:
 
 3. Create **src/logger/logger.service.test.ts**:
    - Test global OpenTelemetry logger provider usage
-   - Test trace context auto-inclusion functionality  
+   - Test trace context auto-inclusion functionality
    - Test manual context management (setContext, addContext)
    - Test all logging methods with structured data
    - Mock OpenTelemetry trace API for unit testing
@@ -704,6 +717,7 @@ Implement simplified LoggerService with OpenTelemetry trace context design:
 Status: **Completed** ✅
 
 Notes:
+
 - ✅ Removed ObservabilityConfig dependency completely
 - ✅ Implemented global OpenTelemetry meter provider integration
 - ✅ Maintained backward compatibility with Prometheus registry
@@ -786,6 +800,7 @@ Refactor **src/metrics/metrics.service.ts** to remove configuration dependency:
 Status: **Completed** ✅
 
 Notes:
+
 - ✅ Removed ObservabilityConfig dependency completely
 - ✅ Implemented global OpenTelemetry tracer provider integration
 - ✅ Updated AutoTraceInterceptor to use LoggerService injection
@@ -902,6 +917,7 @@ Modernize tracing components with immediate examples app testing:
 Status: **Completed** ✅
 
 Notes:
+
 - ✅ Removed ObservabilityConfig dependency completely
 - ✅ Implemented environment variable configuration (OTEL_METRICS_ENABLED, OTEL_METRICS_ENDPOINT)
 - ✅ Added comprehensive endpoint functionality (/metrics, /metrics/health, /metrics/names)
@@ -1000,6 +1016,7 @@ Update MetricsController with immediate examples app testing:
 Status: **Completed** ✅
 
 Notes:
+
 - ✅ Created comprehensive environment variable documentation and examples
 - ✅ Updated README.md with OpenTelemetry standard environment variables
 - ✅ Replaced legacy configuration with environment variable approach
@@ -1014,7 +1031,7 @@ Working Result: Updated **README.md** with comprehensive environment variable do
 **Completed Components:**
 
 - ✅ **README.md** - Updated Environment Variables section with OpenTelemetry standard approach
-  - Replaced legacy configuration documentation with OTEL_* variables
+  - Replaced legacy configuration documentation with OTEL\_\* variables
   - Added quick start examples for development and production
   - Platform-specific examples (Datadog, New Relic, Jaeger, Honeycomb)
   - Updated Quick Start section to use register pattern
@@ -1111,6 +1128,7 @@ Create comprehensive environment variable documentation with examples app valida
 Status: **Completed** ✅
 
 Notes:
+
 - ✅ Updated build system to properly compile register module for both CJS and ESM
 - ✅ Enhanced package.json exports with register module paths
 - ✅ Created ESM package.json in dist/esm/ for proper module resolution
@@ -1219,6 +1237,7 @@ Update build system with immediate examples app validation:
 Status: **Completed** ✅
 
 Notes:
+
 - ✅ Updated basic-app example to demonstrate new register pattern and simplified module usage
 - ✅ Created comprehensive ExampleService with all observability features
 - ✅ Updated main.ts with enhanced LoggerService integration and environment variable usage
@@ -1251,7 +1270,7 @@ Working Result: Updated **examples/basic-app** that uses the new `-r` register p
 
 - ✅ **examples/basic-app/src/app.module.ts** - Updated module configuration
   - Simplified `ObservabilityModule.forRoot()` with no parameters required
-  - All configuration via environment variables (OTEL_*)
+  - All configuration via environment variables (OTEL\_\*)
   - Clean dependency injection pattern for all observability services
   - Includes ExampleService for comprehensive feature demonstration
 
@@ -1314,23 +1333,27 @@ Validation:
 
 ✅ **Register Pattern Startup**: App successfully starts with `node -r ../../dist/cjs/register.js dist/src/main.js`
 
-✅ **Environment Variable Configuration**: All OTEL_* environment variables working correctly
+✅ **Environment Variable Configuration**: All OTEL\_\* environment variables working correctly
+
 - Service identification (OTEL_SERVICE_NAME, OTEL_SERVICE_VERSION)
 - Exporter configuration (console, OTLP exporters)
 - Resource attributes and sampling configuration
 
 ✅ **Enhanced LoggerService**: Structured logging with context isolation
+
 - Automatic trace context inclusion (traceId, spanId in logs)
 - Child logger context inheritance and isolation
 - Manual context management (setContext, addContext, clearContext)
 - Service-specific context (service, version, component)
 
 ✅ **Custom Metrics Collection**: Business metrics properly collected
+
 - `example_requests_total` - Counter with operation and status labels
 - `example_operation_duration_seconds` - Histogram for operation timing
 - OpenTelemetry and Prometheus format compatibility
 
 ✅ **Distributed Tracing**: All tracing patterns working correctly
+
 - @TraceClass automatic method tracing for ExampleService
 - @Trace decorator for specific method instrumentation
 - @NoTrace decorator properly excluding sensitive operations
@@ -1338,16 +1361,19 @@ Validation:
 - AutoTraceInterceptor for controller method tracing
 
 ✅ **HTTP Auto-Instrumentation**: Automatic collection of HTTP metrics
+
 - Request counting by method, route, and status code
 - Response time histograms with proper bucketing
 - Node.js performance metrics (event loop, GC, memory)
 
 ✅ **Context Isolation**: Concurrent request handling with separate contexts
+
 - Each request maintains isolated logging context
 - Trace correlation works across concurrent operations
 - Child loggers properly inherit and isolate context
 
 ✅ **All API Endpoints Working**:
+
 - `/metrics` - Prometheus format metrics (29KB+ of comprehensive metrics)
 - `/health` - Application health checks
 - `/example/simple` - Basic operation (246ms duration logged)
@@ -1429,6 +1455,7 @@ Update example application as comprehensive validation:
 Status: **Completed** ✅
 
 Notes:
+
 - ✅ Created comprehensive OpenTelemetry mocking utilities for consistent testing
 - ✅ Implemented full-stack integration test suite validating complete workflow
 - ✅ Updated vitest configuration for OpenTelemetry testing with proper isolation
@@ -1498,32 +1525,38 @@ Validation:
 **Integration Test Results:**
 
 ✅ **Core Module Testing**: ObservabilityModule.forRoot() works without configuration
+
 - All services (LoggerService, MetricsService, TracingService) properly injected
 - Global module registration working correctly
 - Environment variable configuration respected
 
 ✅ **Service Integration Testing**: All enhanced services work with global providers
+
 - LoggerService integrates with global logger provider (17 tests passing)
-- MetricsService uses global meter provider correctly (15 tests passing) 
+- MetricsService uses global meter provider correctly (15 tests passing)
 - TracingService leverages global tracer provider (26 tests passing)
 - Context isolation working across concurrent operations
 
 ✅ **Environment Configuration Testing**: Comprehensive environment variable handling
+
 - Development, production, test, and disabled configurations tested
 - Environment variable precedence and override behavior validated
 - Missing environment variable handling with proper defaults
 
 ✅ **Error Handling Testing**: Robust error handling across all components
+
 - Graceful degradation when OpenTelemetry components fail
 - Proper error isolation preventing cascade failures
 - Service initialization errors handled without affecting other services
 
 ✅ **Performance Testing**: Efficient operation under load
+
 - High-frequency logging operations (100 logs) handled efficiently
 - Concurrent operations maintain proper context isolation
 - Resource management and cleanup working correctly
 
 ✅ **Real-world Scenario Testing**: Complete request lifecycle simulation
+
 - Request tracing with manual and automatic spans
 - Custom metrics collection throughout request lifecycle
 - Error scenarios with proper span exception recording
@@ -1617,6 +1650,7 @@ Create comprehensive integration tests building on implemented tasks:
 Status: **Completed** ✅
 
 Notes:
+
 - ✅ Updated README.md with new 2025 architecture, zero-configuration setup, and comprehensive usage examples
 - ✅ Created comprehensive migration guide (docs/migration-guide.md) with step-by-step instructions for v0.x to v1.0
 - ✅ Built migration validation script (scripts/test-migration.sh) with 7 comprehensive test scenarios
@@ -1706,6 +1740,7 @@ Create comprehensive documentation with migration validation:
 Status: **Completed** ✅
 
 Notes:
+
 - ✅ Created comprehensive end-to-end testing framework (scripts/test-e2e-complete.sh) with 9 test categories
 - ✅ Implemented performance benchmarking, environment variable validation, and real-world scenario testing
 - ✅ Validated examples/basic-app works correctly with all configurations (console, OTLP, disabled exporters)
@@ -1793,6 +1828,7 @@ Perform comprehensive end-to-end testing validating all implementations:
 Status: **Completed** ✅
 
 Notes:
+
 - ✅ Updated package.json version to 1.0.0 with enhanced metadata
 - ✅ Created comprehensive CHANGELOG.md with detailed v1.0.0 release notes
 - ✅ Built comprehensive release artifacts testing script (scripts/test-release-artifacts.sh)
@@ -1806,6 +1842,7 @@ Notes:
 - ✅ Package is production-ready for v1.0.0 release
 
 **Release Validation Results:**
+
 - ✅ Package builds and structure validation passed
 - ✅ TypeScript compilation and type definitions correct
 - ✅ Package installation from tarball successful

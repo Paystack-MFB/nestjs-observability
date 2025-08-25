@@ -16,17 +16,20 @@ This guide helps you migrate from the configuration-based architecture (v0.x) to
 ## 📊 Migration Impact Assessment
 
 ### High Impact (Breaking Changes)
+
 - Module import pattern changes
 - Application startup command changes
 - Environment variable naming changes
 - Configuration object removal
 
 ### Medium Impact (Behavioral Changes)
+
 - Automatic OpenTelemetry initialization timing
 - Default exporter behavior changes
 - Resource attribute handling
 
 ### Low Impact (Compatible Changes)
+
 - Service injection patterns remain the same
 - Decorator usage (`@Trace`, `@TraceClass`, `@NoTrace`) unchanged
 - Enhanced service APIs remain compatible
@@ -46,6 +49,7 @@ pnpm add @paystackhq/nestjs-observability@^1.0.0
 ### Step 2: Remove Configuration Code
 
 **Before (v0.x):**
+
 ```typescript
 // ❌ REMOVE: Complex configuration setup
 import { Module } from '@nestjs/common';
@@ -62,18 +66,17 @@ import { ObservabilityModule } from '@paystackhq/nestjs-observability';
         serviceName: configService.get('SERVICE_NAME', 'my-service'),
         serviceVersion: configService.get('SERVICE_VERSION', '1.0.0'),
         environment: configService.get('NODE_ENV', 'development'),
-        
+
         logging: {
           level: configService.get('LOG_LEVEL', 'info'),
           consoleOutput: true,
           otlpExport: {
             enabled: configService.get('OTLP_LOGS_ENABLED', 'false') === 'true',
             endpoint: configService.get('OTLP_LOGS_ENDPOINT'),
-            headers: configService.get('OTLP_HEADERS') ? 
-              JSON.parse(configService.get('OTLP_HEADERS')) : undefined,
+            headers: configService.get('OTLP_HEADERS') ? JSON.parse(configService.get('OTLP_HEADERS')) : undefined,
           },
         },
-        
+
         metrics: {
           enabled: configService.get('METRICS_ENABLED', 'true') === 'true',
           endpoint: configService.get('METRICS_ENDPOINT', '/metrics'),
@@ -82,14 +85,13 @@ import { ObservabilityModule } from '@paystackhq/nestjs-observability';
             region: configService.get('AWS_REGION', 'us-east-1'),
           },
         },
-        
+
         tracing: {
           enabled: configService.get('TRACING_ENABLED', 'true') === 'true',
           exporter: {
             type: 'otlp',
             endpoint: configService.get('OTLP_TRACES_ENDPOINT'),
-            headers: configService.get('OTLP_HEADERS') ? 
-              JSON.parse(configService.get('OTLP_HEADERS')) : undefined,
+            headers: configService.get('OTLP_HEADERS') ? JSON.parse(configService.get('OTLP_HEADERS')) : undefined,
           },
           sampler: {
             type: 'trace_id_ratio',
@@ -104,6 +106,7 @@ export class AppModule {}
 ```
 
 **After (v1.0):**
+
 ```typescript
 // ✅ NEW: Zero configuration needed!
 import { Module } from '@nestjs/common';
@@ -124,42 +127,43 @@ Create a comprehensive environment variable mapping from your old configuration:
 
 #### Service Configuration Mapping
 
-| Old Configuration | New Environment Variable | Example |
-|-------------------|---------------------------|---------|
-| `config.serviceName` | `OTEL_SERVICE_NAME` | `"my-ecommerce-api"` |
-| `config.serviceVersion` | `OTEL_SERVICE_VERSION` | `"2.1.3"` |
-| `config.environment` | `NODE_ENV` | `"production"` |
+| Old Configuration       | New Environment Variable | Example              |
+| ----------------------- | ------------------------ | -------------------- |
+| `config.serviceName`    | `OTEL_SERVICE_NAME`      | `"my-ecommerce-api"` |
+| `config.serviceVersion` | `OTEL_SERVICE_VERSION`   | `"2.1.3"`            |
+| `config.environment`    | `NODE_ENV`               | `"production"`       |
 
 #### Logging Configuration Mapping
 
-| Old Configuration | New Environment Variable | Example |
-|-------------------|---------------------------|---------|
-| `config.logging.level` | Use NestJS `LOG_LEVEL` | `"info"` |
-| `config.logging.otlpExport.enabled` | `OTEL_LOGS_EXPORTER` | `"otlp"` or `"console"` |
+| Old Configuration                    | New Environment Variable      | Example                      |
+| ------------------------------------ | ----------------------------- | ---------------------------- |
+| `config.logging.level`               | Use NestJS `LOG_LEVEL`        | `"info"`                     |
+| `config.logging.otlpExport.enabled`  | `OTEL_LOGS_EXPORTER`          | `"otlp"` or `"console"`      |
 | `config.logging.otlpExport.endpoint` | `OTEL_EXPORTER_OTLP_ENDPOINT` | `"https://api.honeycomb.io"` |
-| `config.logging.otlpExport.headers` | `OTEL_EXPORTER_OTLP_HEADERS` | `"x-honeycomb-team=key123"` |
+| `config.logging.otlpExport.headers`  | `OTEL_EXPORTER_OTLP_HEADERS`  | `"x-honeycomb-team=key123"`  |
 
 #### Metrics Configuration Mapping
 
-| Old Configuration | New Environment Variable | Example |
-|-------------------|---------------------------|---------|
-| `config.metrics.enabled` | `OTEL_METRICS_ENABLED` | `"true"` |
-| `config.metrics.endpoint` | `OTEL_METRICS_ENDPOINT` | `"/metrics"` |
+| Old Configuration              | New Environment Variable   | Example                               |
+| ------------------------------ | -------------------------- | ------------------------------------- |
+| `config.metrics.enabled`       | `OTEL_METRICS_ENABLED`     | `"true"`                              |
+| `config.metrics.endpoint`      | `OTEL_METRICS_ENDPOINT`    | `"/metrics"`                          |
 | `config.metrics.defaultLabels` | `OTEL_RESOURCE_ATTRIBUTES` | `"environment=prod,region=us-east-1"` |
 
 #### Tracing Configuration Mapping
 
-| Old Configuration | New Environment Variable | Example |
-|-------------------|---------------------------|---------|
-| `config.tracing.enabled` | `OTEL_TRACES_EXPORTER` | `"otlp"` or `"console"` |
+| Old Configuration                  | New Environment Variable      | Example                     |
+| ---------------------------------- | ----------------------------- | --------------------------- |
+| `config.tracing.enabled`           | `OTEL_TRACES_EXPORTER`        | `"otlp"` or `"console"`     |
 | `config.tracing.exporter.endpoint` | `OTEL_EXPORTER_OTLP_ENDPOINT` | `"https://api.datadog.com"` |
-| `config.tracing.exporter.headers` | `OTEL_EXPORTER_OTLP_HEADERS` | `"dd-api-key=abc123"` |
-| `config.tracing.sampler.ratio` | `OTEL_TRACES_SAMPLER_ARG` | `"0.1"` (10% sampling) |
-| `config.tracing.sampler.type` | `OTEL_TRACES_SAMPLER` | `"traceidratio"` |
+| `config.tracing.exporter.headers`  | `OTEL_EXPORTER_OTLP_HEADERS`  | `"dd-api-key=abc123"`       |
+| `config.tracing.sampler.ratio`     | `OTEL_TRACES_SAMPLER_ARG`     | `"0.1"` (10% sampling)      |
+| `config.tracing.sampler.type`      | `OTEL_TRACES_SAMPLER`         | `"traceidratio"`            |
 
 ### Step 4: Create Environment Files
 
 **Development Environment (.env.development):**
+
 ```bash
 # Service identification
 OTEL_SERVICE_NAME="my-app-dev"
@@ -181,6 +185,7 @@ OTEL_TRACES_SAMPLER="always_on"
 ```
 
 **Staging Environment (.env.staging):**
+
 ```bash
 # Service identification
 OTEL_SERVICE_NAME="my-app-staging"
@@ -205,6 +210,7 @@ OTEL_TRACES_SAMPLER_ARG="0.5"
 ```
 
 **Production Environment (.env.production):**
+
 ```bash
 # Service identification
 OTEL_SERVICE_NAME="my-app"
@@ -234,6 +240,7 @@ OTEL_EXPORTER_OTLP_TIMEOUT="30000"
 ### Step 5: Update Application Startup
 
 **Before (v0.x):**
+
 ```json
 {
   "scripts": {
@@ -244,6 +251,7 @@ OTEL_EXPORTER_OTLP_TIMEOUT="30000"
 ```
 
 **After (v1.0):**
+
 ```json
 {
   "scripts": {
@@ -258,6 +266,7 @@ OTEL_EXPORTER_OTLP_TIMEOUT="30000"
 ### Step 6: Update Docker Configuration
 
 **Before (v0.x):**
+
 ```dockerfile
 # Old Dockerfile
 FROM node:18
@@ -267,6 +276,7 @@ CMD ["node", "dist/main.js"]
 ```
 
 **After (v1.0):**
+
 ```dockerfile
 # New Dockerfile with register pattern
 FROM node:18
@@ -291,6 +301,7 @@ CMD ["node", "-r", "@paystackhq/nestjs-observability/register", "dist/main.js"]
 ### Step 7: Update Kubernetes Configuration
 
 **Before (v0.x):**
+
 ```yaml
 # Old deployment.yaml
 apiVersion: apps/v1
@@ -299,18 +310,19 @@ spec:
   template:
     spec:
       containers:
-      - name: app
-        image: my-app:latest
-        env:
-        - name: SERVICE_NAME
-          value: "my-app"
-        - name: LOG_LEVEL
-          value: "info"
-        - name: OTLP_TRACES_ENDPOINT
-          value: "http://jaeger:14268/api/traces"
+        - name: app
+          image: my-app:latest
+          env:
+            - name: SERVICE_NAME
+              value: 'my-app'
+            - name: LOG_LEVEL
+              value: 'info'
+            - name: OTLP_TRACES_ENDPOINT
+              value: 'http://jaeger:14268/api/traces'
 ```
 
 **After (v1.0):**
+
 ```yaml
 # New deployment.yaml with OpenTelemetry standard variables
 apiVersion: apps/v1
@@ -319,38 +331,38 @@ spec:
   template:
     spec:
       containers:
-      - name: app
-        image: my-app:latest
-        env:
-        # OpenTelemetry standard variables
-        - name: OTEL_SERVICE_NAME
-          value: "my-app"
-        - name: OTEL_SERVICE_VERSION
-          value: "1.0.0"
-        - name: NODE_ENV
-          value: "production"
-        
-        # Exporter configuration
-        - name: OTEL_TRACES_EXPORTER
-          value: "otlp"
-        - name: OTEL_METRICS_EXPORTER
-          value: "otlp"
-        - name: OTEL_LOGS_EXPORTER
-          value: "otlp"
-        
-        # Platform configuration
-        - name: OTEL_EXPORTER_OTLP_ENDPOINT
-          value: "http://jaeger:4317"
-        
-        # Resource attributes
-        - name: OTEL_RESOURCE_ATTRIBUTES
-          value: "k8s.namespace.name=$(NAMESPACE),k8s.pod.name=$(POD_NAME)"
-        
-        # Performance tuning
-        - name: OTEL_TRACES_SAMPLER
-          value: "traceidratio"
-        - name: OTEL_TRACES_SAMPLER_ARG
-          value: "0.1"
+        - name: app
+          image: my-app:latest
+          env:
+            # OpenTelemetry standard variables
+            - name: OTEL_SERVICE_NAME
+              value: 'my-app'
+            - name: OTEL_SERVICE_VERSION
+              value: '1.0.0'
+            - name: NODE_ENV
+              value: 'production'
+
+            # Exporter configuration
+            - name: OTEL_TRACES_EXPORTER
+              value: 'otlp'
+            - name: OTEL_METRICS_EXPORTER
+              value: 'otlp'
+            - name: OTEL_LOGS_EXPORTER
+              value: 'otlp'
+
+            # Platform configuration
+            - name: OTEL_EXPORTER_OTLP_ENDPOINT
+              value: 'http://jaeger:4317'
+
+            # Resource attributes
+            - name: OTEL_RESOURCE_ATTRIBUTES
+              value: 'k8s.namespace.name=$(NAMESPACE),k8s.pod.name=$(POD_NAME)'
+
+            # Performance tuning
+            - name: OTEL_TRACES_SAMPLER
+              value: 'traceidratio'
+            - name: OTEL_TRACES_SAMPLER_ARG
+              value: '0.1'
 ```
 
 ## 🔍 Validation Checklist
@@ -358,24 +370,28 @@ spec:
 After migration, verify these items work correctly:
 
 ### ✅ Basic Functionality
+
 - [ ] Application starts without errors using register pattern
 - [ ] Logs include trace correlation IDs automatically
 - [ ] HTTP auto-instrumentation metrics appear at `/metrics`
 - [ ] Custom tracing decorators still work (`@Trace`, `@NoTrace`)
 
 ### ✅ Environment Variables
+
 - [ ] `OTEL_SERVICE_NAME` appears in traces and metrics
 - [ ] Exporter configuration works (console vs OTLP)
 - [ ] Resource attributes appear in telemetry data
 - [ ] Sampling configuration affects trace volume
 
 ### ✅ Enhanced Services
+
 - [ ] `LoggerService` injection works in constructors
 - [ ] `MetricsService` creates custom counters/gauges/histograms
 - [ ] `TracingService` manual span creation works
 - [ ] Context isolation works across concurrent requests
 
 ### ✅ Platform Integration
+
 - [ ] OTLP exports reach your observability platform
 - [ ] Authentication headers work correctly
 - [ ] Trace correlation appears across services
@@ -386,11 +402,13 @@ After migration, verify these items work correctly:
 ### Issue 1: Module Import Error
 
 **Problem:**
+
 ```
 Error: Cannot resolve module '@paystackhq/nestjs-observability/register'
 ```
 
 **Solution:**
+
 ```bash
 # Ensure you have the latest version
 npm install @paystackhq/nestjs-observability@^1.0.0
@@ -405,6 +423,7 @@ npm install
 **Problem:** Application starts but no traces/metrics appear
 
 **Diagnosis:**
+
 ```bash
 # Check environment variables
 echo $OTEL_SERVICE_NAME
@@ -416,6 +435,7 @@ node -r @paystackhq/nestjs-observability/register dist/main.js
 ```
 
 **Solution:**
+
 - Verify environment variables are set correctly
 - Check exporter configuration (console vs OTLP)
 - Validate OTLP endpoint accessibility
@@ -425,6 +445,7 @@ node -r @paystackhq/nestjs-observability/register dist/main.js
 **Problem:** Application expects old configuration patterns
 
 **Solution:**
+
 - Remove all `ObservabilityModule.forRootAsync()` usage
 - Replace with `ObservabilityModule.forRoot()`
 - Convert configuration objects to environment variables
@@ -434,6 +455,7 @@ node -r @paystackhq/nestjs-observability/register dist/main.js
 **Problem:** Register module not found in Docker container
 
 **Solution:**
+
 ```dockerfile
 # Ensure proper package installation in Docker
 FROM node:18
@@ -453,6 +475,7 @@ CMD ["node", "-r", "@paystackhq/nestjs-observability/register", "dist/main.js"]
 **Problem:** TypeScript cannot find type definitions
 
 **Solution:**
+
 ```bash
 # Ensure TypeScript types are installed
 npm install --save-dev @types/node
@@ -471,11 +494,13 @@ npm install --save-dev @types/node
 If you need to rollback to v0.x:
 
 1. **Revert Package Version:**
+
    ```bash
    npm install @paystackhq/nestjs-observability@^0.1.4
    ```
 
 2. **Restore Configuration Code:**
+
    ```typescript
    // Restore ObservabilityModule.forRootAsync()
    ObservabilityModule.forRootAsync({
@@ -484,10 +509,11 @@ If you need to rollback to v0.x:
      useFactory: (configService: ConfigService) => ({
        // Your old configuration
      }),
-   })
+   });
    ```
 
 3. **Revert Startup Scripts:**
+
    ```json
    {
      "scripts": {
@@ -496,7 +522,7 @@ If you need to rollback to v0.x:
    }
    ```
 
-4. **Keep Environment Variables:** 
+4. **Keep Environment Variables:**
    - Your environment variables can stay - they won't conflict
    - Convert back to custom variables if needed
 
@@ -505,16 +531,19 @@ If you need to rollback to v0.x:
 After successful migration, you'll benefit from:
 
 ### Performance Improvements
+
 - **50% Faster Startup**: Register pattern vs factory configuration
 - **30% Less Memory**: Simplified module initialization
 - **Zero Config Overhead**: No configuration parsing at runtime
 
 ### Developer Experience
+
 - **Simpler Setup**: One-line module import
 - **Standard Compliance**: OpenTelemetry standard environment variables
 - **Better DevOps**: All configuration via environment variables
 
 ### Production Benefits
+
 - **Easier Deployment**: Environment variable configuration
 - **Better Monitoring**: Standard OpenTelemetry telemetry
 - **Platform Agnostic**: Works with any OTLP-compatible system

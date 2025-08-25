@@ -10,7 +10,7 @@ import { Logger, logs } from '@opentelemetry/api-logs';
 @Injectable()
 export class LoggerService {
   private readonly otelLogger: Logger;
-  private persistentContext: Record<string, any> = {};
+  private persistentContext: Record<string, unknown> = {};
 
   constructor() {
     // Get OpenTelemetry logger from global provider
@@ -21,7 +21,7 @@ export class LoggerService {
   /**
    * Add a single context key-value pair
    */
-  addContext(key: string, value: any): void {
+  addContext(key: string, value: unknown): void {
     this.persistentContext[key] = value;
   }
 
@@ -44,42 +44,42 @@ export class LoggerService {
   /**
    * Log debug level message
    */
-  debug(message: string, data?: Record<string, any>): void {
+  debug(message: string, data?: Record<string, unknown>): void {
     this.emit('DEBUG', message, data);
   }
 
   /**
    * Log error level message
    */
-  error(message: Error | string, data?: Record<string, any>): void {
+  error(message: Error | string, data?: Record<string, unknown>): void {
     this.emit('ERROR', message, data);
   }
 
   /**
    * Log info level message
    */
-  log(message: string, data?: Record<string, any>): void {
+  log(message: string, data?: Record<string, unknown>): void {
     this.emit('INFO', message, data);
   }
 
   /**
    * Set context that persists across log calls
    */
-  setContext(context: Record<string, any>): void {
+  setContext(context: Record<string, unknown>): void {
     Object.assign(this.persistentContext, context);
   }
 
   /**
    * Log warning level message
    */
-  warn(message: string, data?: Record<string, any>): void {
+  warn(message: string, data?: Record<string, unknown>): void {
     this.emit('WARN', message, data);
   }
 
   /**
    * Core method that emits logs to OpenTelemetry
    */
-  private emit(level: string, message: Error | string, data?: Record<string, any>): void {
+  private emit(level: string, message: Error | string, data?: Record<string, unknown>): void {
     try {
       // Prepare enriched attributes
       const enrichedData = {
@@ -93,7 +93,7 @@ export class LoggerService {
 
       // Emit structured log record
       this.otelLogger.emit({
-        attributes: enrichedData,
+        attributes: enrichedData as Record<string, boolean | number | string | string[]>,
         body,
         severityText: level,
         ...(message instanceof Error && { exception: message }),
@@ -108,7 +108,7 @@ export class LoggerService {
   /**
    * Get current OpenTelemetry trace context
    */
-  private getTraceContext(): Record<string, any> {
+  private getTraceContext(): Record<string, unknown> {
     try {
       const activeSpan = trace.getActiveSpan();
       if (activeSpan) {
@@ -119,7 +119,7 @@ export class LoggerService {
           traceId: spanContext.traceId,
         };
       }
-    } catch (error) {
+    } catch (_error) {
       // Silently ignore tracing errors to prevent affecting application flow
     }
     return {};
