@@ -101,7 +101,7 @@ export class LoggerService {
     } catch (error) {
       // Fallback to console if OpenTelemetry logging fails
       console.error('LoggerService emit failed:', error);
-      console.log(`[${level}] ${message instanceof Error ? message.message : message}`, data);
+      console.log(`[${level}]`, message instanceof Error ? message.message : message, data);
     }
   }
 
