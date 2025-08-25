@@ -1,6 +1,6 @@
 /**
  * Full-Stack Integration Tests
- * 
+ *
  * This test suite validates the complete integration between the register module
  * and the NestJS observability module, ensuring all components work together
  * correctly in various scenarios.
@@ -8,18 +8,14 @@
 
 import 'reflect-metadata';
 import { Test, TestingModule } from '@nestjs/testing';
-import { describe, expect, it, beforeEach, afterEach, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
-import { ObservabilityModule } from '../observability.module';
+import { MetricsController } from '../controllers/metrics.controller';
 import { LoggerService } from '../logger/logger.service';
 import { MetricsService } from '../metrics/metrics.service';
+import { ObservabilityModule } from '../observability.module';
+import { AsyncTestUtils, MockFactory, TestSetup } from '../test-helpers/otel-mocks';
 import { TracingService } from '../tracing/tracing.service';
-
-import { 
-  TestSetup, 
-  AsyncTestUtils, 
-  MockFactory
-} from '../test-helpers/otel-mocks';
 
 describe('Full-Stack Integration Tests', () => {
   let moduleRef: TestingModule;
@@ -76,7 +72,7 @@ describe('Full-Stack Integration Tests', () => {
       const logger = moduleRef.get<LoggerService>(LoggerService);
       const metrics = moduleRef.get<MetricsService>(MetricsService);
       const tracing = moduleRef.get<TracingService>(TracingService);
-      
+
       expect(logger).toBeDefined();
       expect(metrics).toBeDefined();
       expect(tracing).toBeDefined();
@@ -160,14 +156,14 @@ describe('Full-Stack Integration Tests', () => {
     it('should respect environment variable precedence', async () => {
       // Set base environment
       setup.environment.setEnvironment({
+        OTEL_METRICS_EXPORTER: 'console',
         OTEL_SERVICE_NAME: 'base-service',
         OTEL_TRACES_EXPORTER: 'console',
-        OTEL_METRICS_EXPORTER: 'console',
       });
 
       // Override with more specific variables
-      process.env.OTEL_SERVICE_NAME = 'override-service';
-      process.env.OTEL_TRACES_EXPORTER = 'otlp';
+      process.env['OTEL_SERVICE_NAME'] = 'override-service';
+      process.env['OTEL_TRACES_EXPORTER'] = 'otlp';
 
       moduleRef = await Test.createTestingModule({
         imports: [ObservabilityModule.forRoot()],
@@ -180,8 +176,8 @@ describe('Full-Stack Integration Tests', () => {
       expect(loggerService).toBeDefined();
 
       // Clean up the override
-      delete process.env.OTEL_SERVICE_NAME;
-      delete process.env.OTEL_TRACES_EXPORTER;
+      delete process.env['OTEL_SERVICE_NAME'];
+      delete process.env['OTEL_TRACES_EXPORTER'];
     });
   });
 
@@ -201,21 +197,21 @@ describe('Full-Stack Integration Tests', () => {
     it('should integrate logging with tracing context', async () => {
       // Create a span
       const span = tracingService.startSpan('test-operation');
-      
+
       // Log with context
-      loggerService.setContext({ operation: 'test', component: 'integration' });
+      loggerService.setContext({ component: 'integration', operation: 'test' });
       loggerService.log('Test message with trace context', { data: 'test' });
 
       // Verify logging was called
       expect(setup.otelMocks.mockLogger.emit).toHaveBeenCalledWith(
         expect.objectContaining({
-          severityText: 'INFO',
-          body: 'Test message with trace context',
           attributes: expect.objectContaining({
+            component: 'integration',
             data: 'test',
             operation: 'test',
-            component: 'integration',
           }),
+          body: 'Test message with trace context',
+          severityText: 'INFO',
         })
       );
 
@@ -244,9 +240,9 @@ describe('Full-Stack Integration Tests', () => {
     it('should create and manage spans with attributes', async () => {
       // Create spans with different methods
       const manualSpan = tracingService.startSpan('manual-span');
-      
+
       // Use withSpan method
-      const result = await tracingService.withSpan('operation-span', async () => {
+      const result = await tracingService.withSpan('operation-span', {}, async () => {
         return 'operation-result';
       });
 
@@ -265,33 +261,33 @@ describe('Full-Stack Integration Tests', () => {
           const childLogger = loggerService.createChildLogger();
           childLogger.setContext({ operationId: 'op-1', requestId: 'req-1' });
           childLogger.log('Operation 1 message');
-          
+
           const span = tracingService.startSpan('operation-1');
           await AsyncTestUtils.delay(10);
           span.end();
-          
+
           return 'result-1';
         },
         async () => {
           const childLogger = loggerService.createChildLogger();
           childLogger.setContext({ operationId: 'op-2', requestId: 'req-2' });
           childLogger.log('Operation 2 message');
-          
+
           const span = tracingService.startSpan('operation-2');
           await AsyncTestUtils.delay(15);
           span.end();
-          
+
           return 'result-2';
         },
         async () => {
           const childLogger = loggerService.createChildLogger();
           childLogger.setContext({ operationId: 'op-3', requestId: 'req-3' });
           childLogger.log('Operation 3 message');
-          
+
           const span = tracingService.startSpan('operation-3');
           await AsyncTestUtils.delay(5);
           span.end();
-          
+
           return 'result-3';
         },
       ];
@@ -302,7 +298,7 @@ describe('Full-Stack Integration Tests', () => {
 
       // Verify all logging operations were called
       expect(setup.otelMocks.mockLogger.emit).toHaveBeenCalledTimes(3);
-      
+
       // Verify all spans were created
       expect(setup.otelMocks.mockTracer.startSpan).toHaveBeenCalledWith('operation-1');
       expect(setup.otelMocks.mockTracer.startSpan).toHaveBeenCalledWith('operation-2');
@@ -450,11 +446,11 @@ describe('Full-Stack Integration Tests', () => {
       }
 
       // End all spans
-      spans.forEach(span => span.end());
+      spans.forEach((span) => span.end());
 
       // Verify all spans were created and ended
       expect(setup.otelMocks.mockTracer.startSpan).toHaveBeenCalledTimes(10);
-      spans.forEach(span => {
+      spans.forEach((span) => {
         expect(span.end).toHaveBeenCalledTimes(1);
       });
     });
@@ -525,16 +521,16 @@ describe('Full-Stack Integration Tests', () => {
 
       // Start request span
       const requestSpan = tracingService.startSpan('http-request');
-      
+
       // Create request-scoped logger
       const requestLogger = loggerService.createChildLogger();
-      requestLogger.setContext({ requestId, userId, operation: 'user-profile' });
+      requestLogger.setContext({ operation: 'user-profile', requestId, userId });
 
       // Log request start
-      requestLogger.log('Processing user profile request', { 
+      requestLogger.log('Processing user profile request', {
         method: 'GET',
         path: '/api/users/profile',
-        userId 
+        userId,
       });
 
       // Create and record request metrics
@@ -544,22 +540,22 @@ describe('Full-Stack Integration Tests', () => {
       requestCounter.add(1, { method: 'GET', route: '/api/users/profile', status: '200' });
 
       // Simulate business logic
-      await tracingService.withSpan('user-lookup', async () => {
+      await tracingService.withSpan('user-lookup', {}, async () => {
         requestLogger.log('Looking up user in database', { userId });
         await AsyncTestUtils.delay(50);
       });
 
-      await tracingService.withSpan('profile-enrichment', async () => {
+      await tracingService.withSpan('profile-enrichment', {}, async () => {
         requestLogger.log('Enriching user profile', { userId });
         await AsyncTestUtils.delay(30);
       });
 
       // Record response
       requestDuration.record(0.08, { method: 'GET', route: '/api/users/profile', status: '200' });
-      requestLogger.log('Request completed successfully', { 
-        statusCode: 200,
+      requestLogger.log('Request completed successfully', {
         duration: '80ms',
-        userId 
+        statusCode: 200,
+        userId,
       });
 
       // End request span
@@ -572,30 +568,31 @@ describe('Full-Stack Integration Tests', () => {
 
     it('should simulate error handling scenario', async () => {
       const requestId = 'req-error-123';
-      
+
       // Start request span
       const requestSpan = tracingService.startSpan('error-request');
-      
+
       // Create request-scoped logger
       const requestLogger = loggerService.createChildLogger();
-      requestLogger.setContext({ requestId, operation: 'error-test' });
+      requestLogger.setContext({ operation: 'error-test', requestId });
 
       try {
         // Simulate operation that throws error
-        await tracingService.withSpan('failing-operation', async () => {
+        await tracingService.withSpan('failing-operation', {}, async () => {
           requestLogger.log('Starting operation that will fail');
           throw new Error('Simulated business logic error');
         });
       } catch (error) {
         // Handle error
-        requestLogger.error('Operation failed', { 
-          error: error.message,
-          stack: error.stack 
+        const errorObj = error as Error;
+        requestLogger.error('Operation failed', {
+          error: errorObj.message,
+          stack: errorObj.stack,
         });
 
         // Record error span
-        requestSpan.recordException(error);
-        requestSpan.setStatus({ code: 2, message: error.message });
+        requestSpan.recordException(errorObj);
+        requestSpan.setStatus({ code: 2, message: errorObj.message });
 
         // Record error metrics
         const errorCounter = metricsService.createCounter('errors_total', 'Total errors');
@@ -607,15 +604,15 @@ describe('Full-Stack Integration Tests', () => {
       // Verify error was logged and span was recorded
       expect(setup.otelMocks.mockLogger.emit).toHaveBeenCalledWith(
         expect.objectContaining({
-          severityText: 'ERROR',
           body: 'Operation failed',
+          severityText: 'ERROR',
         })
       );
 
       expect(requestSpan.recordException).toHaveBeenCalled();
       expect(requestSpan.setStatus).toHaveBeenCalledWith({
         code: 2,
-        message: 'Simulated business logic error'
+        message: 'Simulated business logic error',
       });
     });
   });

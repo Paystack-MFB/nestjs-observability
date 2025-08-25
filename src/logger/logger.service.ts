@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { trace } from '@opentelemetry/api';
-import { logs, Logger } from '@opentelemetry/api-logs';
+import { Logger, logs } from '@opentelemetry/api-logs';
 
 /**
  * Enhanced NestJS logger that integrates with OpenTelemetry global providers
@@ -16,13 +16,6 @@ export class LoggerService {
     // Get OpenTelemetry logger from global provider
     const loggerProvider = logs.getLoggerProvider();
     this.otelLogger = loggerProvider.getLogger('nestjs-app', '1.0.0');
-  }
-
-  /**
-   * Set context that persists across log calls
-   */
-  setContext(context: Record<string, any>): void {
-    Object.assign(this.persistentContext, context);
   }
 
   /**
@@ -49,6 +42,20 @@ export class LoggerService {
   }
 
   /**
+   * Log debug level message
+   */
+  debug(message: string, data?: Record<string, any>): void {
+    this.emit('DEBUG', message, data);
+  }
+
+  /**
+   * Log error level message
+   */
+  error(message: Error | string, data?: Record<string, any>): void {
+    this.emit('ERROR', message, data);
+  }
+
+  /**
    * Log info level message
    */
   log(message: string, data?: Record<string, any>): void {
@@ -56,10 +63,10 @@ export class LoggerService {
   }
 
   /**
-   * Log error level message
+   * Set context that persists across log calls
    */
-  error(message: string | Error, data?: Record<string, any>): void {
-    this.emit('ERROR', message, data);
+  setContext(context: Record<string, any>): void {
+    Object.assign(this.persistentContext, context);
   }
 
   /**
@@ -70,16 +77,9 @@ export class LoggerService {
   }
 
   /**
-   * Log debug level message
-   */
-  debug(message: string, data?: Record<string, any>): void {
-    this.emit('DEBUG', message, data);
-  }
-
-  /**
    * Core method that emits logs to OpenTelemetry
    */
-  private emit(level: string, message: string | Error, data?: Record<string, any>): void {
+  private emit(level: string, message: Error | string, data?: Record<string, any>): void {
     try {
       // Prepare enriched attributes
       const enrichedData = {
@@ -93,9 +93,9 @@ export class LoggerService {
 
       // Emit structured log record
       this.otelLogger.emit({
-        severityText: level,
-        body,
         attributes: enrichedData,
+        body,
+        severityText: level,
         ...(message instanceof Error && { exception: message }),
       });
     } catch (error) {
@@ -114,9 +114,9 @@ export class LoggerService {
       if (activeSpan) {
         const spanContext = activeSpan.spanContext();
         return {
-          traceId: spanContext.traceId,
           spanId: spanContext.spanId,
           traceFlags: spanContext.traceFlags,
+          traceId: spanContext.traceId,
         };
       }
     } catch (error) {

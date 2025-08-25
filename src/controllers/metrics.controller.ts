@@ -28,9 +28,9 @@ export class MetricsController {
     this.metricsEndpoint = this.getMetricsEndpointFromEnv();
 
     if (this.isMetricsEnabled) {
-      this.logger?.log(`Metrics endpoint enabled at: ${this.metricsEndpoint}`, { context: 'MetricsController' });
+      this.logger.log(`Metrics endpoint enabled at: ${this.metricsEndpoint}`, { context: 'MetricsController' });
     } else {
-      this.logger?.log('Metrics endpoint disabled via OTEL_METRICS_ENABLED environment variable', {
+      this.logger.log('Metrics endpoint disabled via OTEL_METRICS_ENABLED environment variable', {
         context: 'MetricsController',
       });
     }
@@ -41,7 +41,7 @@ export class MetricsController {
    */
   @Get('names')
   @Header('Content-Type', 'application/json')
-  async getMetricNames(): Promise<{ enabled: boolean; metrics?: string[] }> {
+  getMetricNames(): Promise<{ enabled: boolean; metrics?: string[] }> {
     if (!this.isMetricsEnabled) {
       return { enabled: false };
     }
@@ -58,7 +58,7 @@ export class MetricsController {
       };
     } catch (error: unknown) {
       const metricsError = error as MetricsError;
-      this.logger?.error(`Error getting metric names: ${metricsError.message}`, {
+      this.logger.error(`Error getting metric names: ${metricsError.message}`, {
         context: 'MetricsController',
         stack: metricsError.stack,
       });
@@ -75,7 +75,7 @@ export class MetricsController {
   async getMetrics(): Promise<string> {
     // Check if metrics are disabled
     if (!this.isMetricsEnabled) {
-      this.logger?.warn('Metrics endpoint accessed but metrics are disabled', { context: 'MetricsController' });
+      this.logger.warn('Metrics endpoint accessed but metrics are disabled', { context: 'MetricsController' });
       throw new HttpException('Metrics endpoint is disabled', HttpStatus.NOT_FOUND);
     }
 
@@ -83,7 +83,7 @@ export class MetricsController {
       // Get metrics from MetricsService (uses global meter provider)
       const metrics = await this.metricsService.getMetrics();
 
-      this.logger?.debug('Metrics collected successfully', {
+      this.logger.debug('Metrics collected successfully', {
         context: 'MetricsController',
         metricsLength: metrics.length,
       });
@@ -91,7 +91,7 @@ export class MetricsController {
       return metrics;
     } catch (error: unknown) {
       const metricsError = error as MetricsError;
-      this.logger?.error(`Error collecting metrics: ${metricsError.message}`, {
+      this.logger.error(`Error collecting metrics: ${metricsError.message}`, {
         context: 'MetricsController',
         stack: metricsError.stack,
       });
@@ -111,7 +111,7 @@ export class MetricsController {
     return {
       enabled: this.isMetricsEnabled,
       endpoint: this.metricsEndpoint,
-      serviceName: process.env['OTEL_SERVICE_NAME'] || 'nestjs-app',
+      serviceName: process.env['OTEL_SERVICE_NAME'] ?? 'nestjs-app',
     };
   }
 
@@ -120,7 +120,7 @@ export class MetricsController {
    */
   @Get('health')
   @Header('Content-Type', 'application/json')
-  async getMetricsHealth(): Promise<{ enabled: boolean; endpoint: string; status: string }> {
+  getMetricsHealth(): Promise<{ enabled: boolean; endpoint: string; status: string }> {
     return {
       enabled: this.isMetricsEnabled,
       endpoint: this.metricsEndpoint,
@@ -166,6 +166,6 @@ export class MetricsController {
    * @returns Metrics endpoint path
    */
   private getMetricsEndpointFromEnv(): string {
-    return process.env['OTEL_METRICS_ENDPOINT'] || '/metrics';
+    return process.env['OTEL_METRICS_ENDPOINT'] ?? '/metrics';
   }
 }

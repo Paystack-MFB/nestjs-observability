@@ -1,8 +1,6 @@
-import { HttpException, HttpStatus } from '@nestjs/common';
+import { HttpException } from '@nestjs/common';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { LoggerService } from '../logger/logger.service';
-import { MetricsService } from '../metrics/metrics.service';
 import { MetricsController } from './metrics.controller';
 
 describe('MetricsController', () => {
@@ -14,7 +12,7 @@ describe('MetricsController', () => {
     // Clear environment variables
     delete process.env['OTEL_METRICS_ENABLED'];
     delete process.env['OTEL_METRICS_ENDPOINT'];
-    
+
     // Mock MetricsService
     mockMetricsService = {
       getMetrics: vi.fn(),
@@ -23,10 +21,10 @@ describe('MetricsController', () => {
 
     // Mock LoggerService
     mockLoggerService = {
+      debug: vi.fn(),
+      error: vi.fn(),
       log: vi.fn(),
       warn: vi.fn(),
-      error: vi.fn(),
-      debug: vi.fn(),
     };
 
     // Directly instantiate controller with mocks
@@ -58,7 +56,7 @@ describe('MetricsController', () => {
       // Create new controller instance to test environment variable
       const testController = new MetricsController(mockMetricsService, mockLoggerService);
       const config = testController.getMetricsConfig();
-      
+
       expect(config.enabled).toBe(false);
     });
 
@@ -68,7 +66,7 @@ describe('MetricsController', () => {
       // Create new controller instance to test environment variable
       const testController = new MetricsController(mockMetricsService, mockLoggerService);
       const config = testController.getMetricsConfig();
-      
+
       expect(config.endpoint).toBe('/custom-metrics');
     });
   });
@@ -101,10 +99,10 @@ describe('MetricsController', () => {
       await expect(controller.getMetrics()).rejects.toThrow(HttpException);
       await expect(controller.getMetrics()).rejects.toThrow('Error collecting metrics: Metrics collection failed');
 
-      expect(mockLoggerService.error).toHaveBeenCalledWith(
-        'Error collecting metrics: Metrics collection failed',
-        { context: 'MetricsController', stack: error.stack }
-      );
+      expect(mockLoggerService.error).toHaveBeenCalledWith('Error collecting metrics: Metrics collection failed', {
+        context: 'MetricsController',
+        stack: error.stack,
+      });
     });
 
     it('should handle errors without stack trace', async () => {
@@ -113,10 +111,10 @@ describe('MetricsController', () => {
 
       await expect(controller.getMetrics()).rejects.toThrow(HttpException);
 
-      expect(mockLoggerService.error).toHaveBeenCalledWith(
-        'Error collecting metrics: Simple error',
-        { context: 'MetricsController', stack: undefined }
-      );
+      expect(mockLoggerService.error).toHaveBeenCalledWith('Error collecting metrics: Simple error', {
+        context: 'MetricsController',
+        stack: undefined,
+      });
     });
   });
 
@@ -125,9 +123,9 @@ describe('MetricsController', () => {
       const result = await controller.getMetricsHealth();
 
       expect(result).toEqual({
-        status: 'ok',
         enabled: true,
         endpoint: '/metrics',
+        status: 'ok',
       });
     });
 
@@ -139,9 +137,9 @@ describe('MetricsController', () => {
       const result = await testController.getMetricsHealth();
 
       expect(result).toEqual({
-        status: 'ok',
         enabled: false,
         endpoint: '/metrics',
+        status: 'ok',
       });
     });
   });
@@ -149,11 +147,13 @@ describe('MetricsController', () => {
   describe('getMetricNames()', () => {
     it('should return metric names when enabled', async () => {
       const mockRegistry = {
-        getMetricsAsArray: vi.fn().mockReturnValue([
-          { name: 'http_requests_total' },
-          { name: 'http_request_duration_seconds' },
-          { name: 'app_info' },
-        ]),
+        getMetricsAsArray: vi
+          .fn()
+          .mockReturnValue([
+            { name: 'http_requests_total' },
+            { name: 'http_request_duration_seconds' },
+            { name: 'app_info' },
+          ]),
       };
       mockMetricsService.getRegistry.mockReturnValue(mockRegistry);
 
@@ -186,10 +186,10 @@ describe('MetricsController', () => {
       await expect(controller.getMetricNames()).rejects.toThrow(HttpException);
       await expect(controller.getMetricNames()).rejects.toThrow('Error getting metric names: Registry error');
 
-      expect(mockLoggerService.error).toHaveBeenCalledWith(
-        'Error getting metric names: Registry error',
-        { context: 'MetricsController', stack: error.stack }
-      );
+      expect(mockLoggerService.error).toHaveBeenCalledWith('Error getting metric names: Registry error', {
+        context: 'MetricsController',
+        stack: error.stack,
+      });
     });
   });
 
@@ -253,7 +253,7 @@ describe('MetricsController', () => {
 
       const testController = new MetricsController(mockMetricsService, mockLoggerService);
       const config = testController.getMetricsConfig();
-      
+
       expect(config.enabled).toBe(true);
     });
 
@@ -262,7 +262,7 @@ describe('MetricsController', () => {
 
       const testController = new MetricsController(mockMetricsService, mockLoggerService);
       const config = testController.getMetricsConfig();
-      
+
       expect(config.enabled).toBe(true);
     });
 
@@ -271,7 +271,7 @@ describe('MetricsController', () => {
 
       const testController = new MetricsController(mockMetricsService, mockLoggerService);
       const config = testController.getMetricsConfig();
-      
+
       expect(config.enabled).toBe(false);
     });
   });

@@ -19,26 +19,6 @@ const DEFAULT_SENSITIVE_PATTERNS = [
 ];
 
 /**
- * Check if span attribute sanitization is enabled via environment variable
- * @returns True if sanitization is enabled
- */
-function isSanitizationEnabled(): boolean {
-  const envValue = process.env['OTEL_SPAN_ATTRIBUTE_SANITIZATION_ENABLED'];
-  if (envValue === undefined) {
-    return true; // Default to enabled
-  }
-  return envValue.toLowerCase() === 'true' || envValue === '1';
-}
-
-/**
- * Get the redacted placeholder value from environment or use default
- * @returns Placeholder string for redacted values
- */
-function getRedactedPlaceholder(): string {
-  return process.env['OTEL_SPAN_ATTRIBUTE_REDACTED_PLACEHOLDER'] || '[REDACTED]';
-}
-
-/**
  * Adds a single attribute to the current active span with automatic sanitization
  * @param key - The attribute key
  * @param value - The attribute value
@@ -70,21 +50,6 @@ export function addSpanAttributes(attributes: Record<string, unknown>): void {
 }
 
 /**
- * Adds a single attribute to the current active span without sanitization
- * Use this when you're certain the attribute is safe
- * @param key - The attribute key
- * @param value - The attribute value
- */
-export function addSpanAttributeUnsafe(key: string, value: unknown): void {
-  const span = getCurrentSpan();
-  if (!span) {
-    return;
-  }
-
-  span.setAttribute(key, String(value));
-}
-
-/**
  * Adds multiple attributes to the current active span without sanitization
  * Use this when you're certain the attributes are safe
  * @param attributes - Object containing key-value pairs of attributes
@@ -101,12 +66,18 @@ export function addSpanAttributesUnsafe(attributes: Record<string, unknown>): vo
 }
 
 /**
- * Gets the current active span
- * @returns The current active span or undefined if no span is active
+ * Adds a single attribute to the current active span without sanitization
+ * Use this when you're certain the attribute is safe
+ * @param key - The attribute key
+ * @param value - The attribute value
  */
-export function getCurrentSpan(): Span | undefined {
-  const span = trace.getActiveSpan();
-  return span ?? undefined;
+export function addSpanAttributeUnsafe(key: string, value: unknown): void {
+  const span = getCurrentSpan();
+  if (!span) {
+    return;
+  }
+
+  span.setAttribute(key, String(value));
 }
 
 /**
@@ -132,6 +103,58 @@ export function addSpanEvent(name: string, attributes?: Record<string, unknown>)
 }
 
 /**
+ * Gets the current active span
+ * @returns The current active span or undefined if no span is active
+ */
+export function getCurrentSpan(): Span | undefined {
+  const span = trace.getActiveSpan();
+  return span ?? undefined;
+}
+
+/**
+ * Get the current span ID
+ * @returns Span ID string or undefined if no active span
+ */
+export function getCurrentSpanId(): string | undefined {
+  const span = getCurrentSpan();
+  if (span) {
+    const spanContext = span.spanContext();
+    return spanContext.spanId;
+  }
+  return undefined;
+}
+
+/**
+ * Get the current trace ID
+ * @returns Trace ID string or undefined if no active span
+ */
+export function getCurrentTraceId(): string | undefined {
+  const span = getCurrentSpan();
+  if (span) {
+    const spanContext = span.spanContext();
+    return spanContext.traceId;
+  }
+  return undefined;
+}
+
+/**
+ * Check if a span is currently active
+ * @returns True if there is an active span
+ */
+export function hasActiveSpan(): boolean {
+  return getCurrentSpan() !== undefined;
+}
+
+/**
+ * Check if a key would be considered sensitive
+ * @param key - The key to check
+ * @returns True if the key matches sensitive patterns
+ */
+export function isSensitiveKey(key: string): boolean {
+  return DEFAULT_SENSITIVE_PATTERNS.some((pattern) => pattern.test(key));
+}
+
+/**
  * Record an exception in the current active span
  * @param exception - The exception to record
  */
@@ -150,7 +173,7 @@ export function recordSpanException(exception: Error): void {
  * @param status - Span status ('OK' or 'ERROR')
  * @param message - Optional status message
  */
-export function setSpanStatus(status: 'OK' | 'ERROR', message?: string): void {
+export function setSpanStatus(status: 'ERROR' | 'OK', message?: string): void {
   const span = getCurrentSpan();
   if (!span) {
     return;
@@ -165,37 +188,23 @@ export function setSpanStatus(status: 'OK' | 'ERROR', message?: string): void {
 }
 
 /**
- * Get the current trace ID
- * @returns Trace ID string or undefined if no active span
+ * Get the redacted placeholder value from environment or use default
+ * @returns Placeholder string for redacted values
  */
-export function getCurrentTraceId(): string | undefined {
-  const span = getCurrentSpan();
-  if (span) {
-    const spanContext = span.spanContext();
-    return spanContext.traceId;
-  }
-  return undefined;
+function getRedactedPlaceholder(): string {
+  return process.env['OTEL_SPAN_ATTRIBUTE_REDACTED_PLACEHOLDER'] || '[REDACTED]';
 }
 
 /**
- * Get the current span ID
- * @returns Span ID string or undefined if no active span
+ * Check if span attribute sanitization is enabled via environment variable
+ * @returns True if sanitization is enabled
  */
-export function getCurrentSpanId(): string | undefined {
-  const span = getCurrentSpan();
-  if (span) {
-    const spanContext = span.spanContext();
-    return spanContext.spanId;
+function isSanitizationEnabled(): boolean {
+  const envValue = process.env['OTEL_SPAN_ATTRIBUTE_SANITIZATION_ENABLED'];
+  if (envValue === undefined) {
+    return true; // Default to enabled
   }
-  return undefined;
-}
-
-/**
- * Check if a span is currently active
- * @returns True if there is an active span
- */
-export function hasActiveSpan(): boolean {
-  return getCurrentSpan() !== undefined;
+  return envValue.toLowerCase() === 'true' || envValue === '1';
 }
 
 /**
@@ -217,13 +226,4 @@ function sanitizeAttributeValue(key: string, value: unknown): string {
   }
 
   return String(value);
-}
-
-/**
- * Check if a key would be considered sensitive
- * @param key - The key to check
- * @returns True if the key matches sensitive patterns
- */
-export function isSensitiveKey(key: string): boolean {
-  return DEFAULT_SENSITIVE_PATTERNS.some((pattern) => pattern.test(key));
 }

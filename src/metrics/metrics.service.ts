@@ -1,6 +1,7 @@
+import type { Counter, Histogram, Meter, ObservableGauge } from '@opentelemetry/api';
+
 import { Injectable, OnModuleInit } from '@nestjs/common';
 import { metrics } from '@opentelemetry/api';
-import type { Counter, Histogram, Meter, ObservableGauge } from '@opentelemetry/api';
 import * as promClient from 'prom-client';
 
 import { LoggerService } from '../logger/logger.service';
@@ -11,16 +12,16 @@ import { LoggerService } from '../logger/logger.service';
  */
 @Injectable()
 export class MetricsService implements OnModuleInit {
-  private readonly otelMeter: Meter;
-  private readonly registry: promClient.Registry;
   private appInfoGauge!: promClient.Gauge;
   private httpRequestCounter!: promClient.Counter;
   private httpRequestDurationHistogram!: promClient.Histogram;
-
   // OpenTelemetry metrics
   private otelCounters = new Map<string, Counter>();
-  private otelHistograms = new Map<string, Histogram>();
   private otelGauges = new Map<string, ObservableGauge>();
+
+  private otelHistograms = new Map<string, Histogram>();
+  private readonly otelMeter: Meter;
+  private readonly registry: promClient.Registry;
 
   constructor(private readonly logger: LoggerService) {
     // Get OpenTelemetry meter from global provider
@@ -80,9 +81,12 @@ export class MetricsService implements OnModuleInit {
     });
 
     if (callback) {
-      this.otelMeter.addBatchObservableCallback((observableResult) => {
-        observableResult.observe(gauge, callback());
-      }, [gauge]);
+      this.otelMeter.addBatchObservableCallback(
+        (observableResult) => {
+          observableResult.observe(gauge, callback());
+        },
+        [gauge]
+      );
     }
 
     this.otelGauges.set(name, gauge);
@@ -109,11 +113,7 @@ export class MetricsService implements OnModuleInit {
    * @param buckets Array of bucket boundaries
    * @returns OpenTelemetry Histogram instance
    */
-  createHistogram(
-    name: string,
-    description: string,
-    buckets?: number[]
-  ): Histogram {
+  createHistogram(name: string, description: string, buckets?: number[]): Histogram {
     const histogram = this.otelMeter.createHistogram(name, {
       description,
     });
@@ -143,11 +143,7 @@ export class MetricsService implements OnModuleInit {
    * @param percentiles Array of percentiles (not directly supported in OpenTelemetry, creates histogram instead)
    * @returns OpenTelemetry Histogram instance configured for summary-like behavior
    */
-  createSummary(
-    name: string,
-    description: string,
-    percentiles: number[] = [0.5, 0.9, 0.95, 0.99]
-  ): Histogram {
+  createSummary(name: string, description: string, percentiles: number[] = [0.5, 0.9, 0.95, 0.99]): Histogram {
     // OpenTelemetry doesn't have native summaries, use histogram with appropriate buckets
     const histogram = this.otelMeter.createHistogram(name, {
       description,
@@ -172,6 +168,14 @@ export class MetricsService implements OnModuleInit {
   }
 
   /**
+   * Get OpenTelemetry meter instance for advanced usage
+   * @returns OpenTelemetry Meter instance
+   */
+  getMeter(): Meter {
+    return this.otelMeter;
+  }
+
+  /**
    * Get Prometheus metrics in string format (for backward compatibility)
    * @returns Metrics in Prometheus exposition format
    */
@@ -187,14 +191,6 @@ export class MetricsService implements OnModuleInit {
     return this.registry;
   }
 
-  /**
-   * Get OpenTelemetry meter instance for advanced usage
-   * @returns OpenTelemetry Meter instance
-   */
-  getMeter(): Meter {
-    return this.otelMeter;
-  }
-
   onModuleInit(): void {
     // Register default Prometheus metrics for backward compatibility
     // OpenTelemetry auto-instrumentation will handle native metrics
@@ -206,9 +202,9 @@ export class MetricsService implements OnModuleInit {
       });
       this.logger?.log('Default metrics collection enabled', { context: 'MetricsService' });
     } catch (error) {
-      this.logger?.warn('Failed to initialize default metrics collection', { 
-        context: 'MetricsService', 
-        error: error instanceof Error ? error.message : String(error) 
+      this.logger?.warn('Failed to initialize default metrics collection', {
+        context: 'MetricsService',
+        error: error instanceof Error ? error.message : String(error),
       });
     }
   }
@@ -222,7 +218,7 @@ export class MetricsService implements OnModuleInit {
    */
   recordHttpRequest(method: string, route: string, statusCode: number, durationSec: number): void {
     const labels = { method, route, status_code: statusCode.toString() };
-    
+
     // Record in both systems for compatibility
     this.httpRequestDurationHistogram.observe(labels, durationSec);
     this.httpRequestCounter.inc(labels);
@@ -230,7 +226,7 @@ export class MetricsService implements OnModuleInit {
     // Also record in OpenTelemetry if available
     const otelHistogram = this.otelHistograms.get('http_request_duration_seconds');
     const otelCounter = this.otelCounters.get('http_requests_total');
-    
+
     if (otelHistogram) {
       otelHistogram.record(durationSec, labels);
     }
@@ -240,22 +236,14 @@ export class MetricsService implements OnModuleInit {
   }
 
   /**
-   * Set default labels from environment variables and resource attributes
-   */
-  private setDefaultLabels(): void {
-    const defaultLabels = this.getServiceLabels();
-    this.registry.setDefaultLabels(defaultLabels);
-  }
-
-  /**
    * Extract service labels from environment variables
    * @returns Service labels object
    */
   private getServiceLabels(): Record<string, string> {
     return {
+      environment: process.env['NODE_ENV'] || 'development',
       service: process.env['OTEL_SERVICE_NAME'] || 'nestjs-app',
       version: process.env['OTEL_SERVICE_VERSION'] || '1.0.0',
-      environment: process.env['NODE_ENV'] || 'development',
     };
   }
 
@@ -295,11 +283,11 @@ export class MetricsService implements OnModuleInit {
       this.appInfoGauge.labels(serviceLabels['version'], serviceLabels['environment']).set(1);
     } catch (error) {
       // Create fallback metrics if the registry approach fails
-      this.logger?.warn('Failed to initialize common Prometheus metrics', { 
-        context: 'MetricsService', 
-        error: error instanceof Error ? error.message : String(error) 
+      this.logger?.warn('Failed to initialize common Prometheus metrics', {
+        context: 'MetricsService',
+        error: error instanceof Error ? error.message : String(error),
       });
-      
+
       // Create minimal fallback metrics
       this.httpRequestDurationHistogram = new promClient.Histogram({
         buckets: [0.01, 0.05, 0.1, 0.5, 1, 2, 5, 10],
@@ -324,5 +312,13 @@ export class MetricsService implements OnModuleInit {
     // Create corresponding OpenTelemetry metrics
     this.createCounter('http_requests_total', 'Total number of HTTP requests');
     this.createHistogram('http_request_duration_seconds', 'Duration of HTTP requests in seconds');
+  }
+
+  /**
+   * Set default labels from environment variables and resource attributes
+   */
+  private setDefaultLabels(): void {
+    const defaultLabels = this.getServiceLabels();
+    this.registry.setDefaultLabels(defaultLabels);
   }
 }

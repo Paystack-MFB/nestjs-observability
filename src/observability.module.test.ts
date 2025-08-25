@@ -2,21 +2,21 @@
  * Unit tests for ObservabilityModule - Lightweight Version
  */
 
-import { Test, TestingModule } from '@nestjs/testing';
 import { APP_INTERCEPTOR } from '@nestjs/core';
-import { describe, expect, it, beforeEach, vi } from 'vitest';
+import { Test, TestingModule } from '@nestjs/testing';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { ObservabilityModule } from './observability.module';
+import { MetricsController } from './controllers/metrics.controller';
 import { LoggerService } from './logger/logger.service';
 import { MetricsService } from './metrics/metrics.service';
+import { ObservabilityModule } from './observability.module';
 import { TracingService } from './tracing/tracing.service';
-import { MetricsController } from './controllers/metrics.controller';
 
 // Mock environment variables
 const mockEnv = {
+  NODE_ENV: 'test',
   OTEL_SERVICE_NAME: 'test-service',
   OTEL_SERVICE_VERSION: '1.0.0',
-  NODE_ENV: 'test',
 };
 
 describe('ObservabilityModule - Lightweight', () => {
@@ -30,14 +30,14 @@ describe('ObservabilityModule - Lightweight', () => {
 
     // Mock the services to avoid actual OpenTelemetry initialization
     vi.mock('./logger/logger.service');
-    vi.mock('./metrics/metrics.service');  
+    vi.mock('./metrics/metrics.service');
     vi.mock('./tracing/tracing.service');
   });
 
   describe('forRoot()', () => {
     it('should create module without configuration parameters', async () => {
       const moduleDefinition = ObservabilityModule.forRoot();
-      
+
       expect(moduleDefinition).toBeDefined();
       expect(moduleDefinition.module).toBe(ObservabilityModule);
       expect(moduleDefinition.providers).toBeDefined();
@@ -64,12 +64,12 @@ describe('ObservabilityModule - Lightweight', () => {
 
     it('should register AutoTraceInterceptor as APP_INTERCEPTOR', async () => {
       const moduleDefinition = ObservabilityModule.forRoot();
-      
+
       // Check that APP_INTERCEPTOR provider is included
       const interceptorProvider = moduleDefinition.providers?.find(
         (provider) => typeof provider === 'object' && 'provide' in provider && provider.provide === APP_INTERCEPTOR
       );
-      
+
       expect(interceptorProvider).toBeDefined();
     });
 
@@ -111,7 +111,7 @@ describe('ObservabilityModule - Lightweight', () => {
 
     it('should export required services', async () => {
       const moduleDefinition = ObservabilityModule.forRoot();
-      
+
       expect(moduleDefinition.exports).toContain(LoggerService);
       expect(moduleDefinition.exports).toContain(MetricsService);
       expect(moduleDefinition.exports).toContain(TracingService);
@@ -119,7 +119,7 @@ describe('ObservabilityModule - Lightweight', () => {
 
     it('should include MetricsController', async () => {
       const moduleDefinition = ObservabilityModule.forRoot();
-      
+
       expect(moduleDefinition.controllers).toContain(MetricsController);
     });
   });

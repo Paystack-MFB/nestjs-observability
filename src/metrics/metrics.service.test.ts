@@ -22,10 +22,10 @@ describe('MetricsService', () => {
   beforeEach(async () => {
     // Mock OpenTelemetry meter
     mockMeter = {
+      addBatchObservableCallback: vi.fn(),
       createCounter: vi.fn().mockReturnValue({ add: vi.fn() }),
       createHistogram: vi.fn().mockReturnValue({ record: vi.fn() }),
       createObservableGauge: vi.fn().mockReturnValue({ addCallback: vi.fn() }),
-      addBatchObservableCallback: vi.fn(),
     };
 
     mockMeterProvider = {
@@ -36,10 +36,10 @@ describe('MetricsService', () => {
 
     // Mock LoggerService
     mockLoggerService = {
+      debug: vi.fn(),
+      error: vi.fn(),
       log: vi.fn(),
       warn: vi.fn(),
-      error: vi.fn(),
-      debug: vi.fn(),
     };
 
     module = await Test.createTestingModule({
@@ -159,7 +159,7 @@ describe('MetricsService', () => {
       expect(() => {
         service.onModuleInit();
       }).not.toThrow();
-      
+
       // The logger might be called during initialization if default metrics are enabled
       // This test just ensures onModuleInit completes without throwing
       expect(service).toBeDefined();
@@ -185,7 +185,7 @@ describe('MetricsService', () => {
 
     it('should maintain backward compatibility with Prometheus', () => {
       const registry = service.getRegistry();
-      
+
       // Should have standard Prometheus registry methods
       expect(typeof registry.metrics).toBe('function');
       expect(typeof registry.registerMetric).toBe('function');

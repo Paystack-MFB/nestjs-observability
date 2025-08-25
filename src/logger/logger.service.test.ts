@@ -67,27 +67,27 @@ describe('LoggerService', () => {
 
       // Check severity levels
       expect(mockOtelLogger.emit).toHaveBeenNthCalledWith(1, {
-        severityText: 'INFO',
-        body: 'Info message',
         attributes: {},
+        body: 'Info message',
+        severityText: 'INFO',
       });
 
       expect(mockOtelLogger.emit).toHaveBeenNthCalledWith(2, {
-        severityText: 'ERROR',
-        body: 'Error message',
         attributes: {},
+        body: 'Error message',
+        severityText: 'ERROR',
       });
 
       expect(mockOtelLogger.emit).toHaveBeenNthCalledWith(3, {
-        severityText: 'WARN',
-        body: 'Warning message',
         attributes: {},
+        body: 'Warning message',
+        severityText: 'WARN',
       });
 
       expect(mockOtelLogger.emit).toHaveBeenNthCalledWith(4, {
-        severityText: 'DEBUG',
-        body: 'Debug message',
         attributes: {},
+        body: 'Debug message',
+        severityText: 'DEBUG',
       });
     });
 
@@ -96,21 +96,21 @@ describe('LoggerService', () => {
       service.error(error);
 
       expect(mockOtelLogger.emit).toHaveBeenCalledWith({
-        severityText: 'ERROR',
-        body: 'Test error message',
         attributes: {},
+        body: 'Test error message',
         exception: error,
+        severityText: 'ERROR',
       });
     });
 
     it('should include additional data in attributes', () => {
-      const data = { userId: '123', requestId: 'req-456' };
+      const data = { requestId: 'req-456', userId: '123' };
       service.log('Message with data', data);
 
       expect(mockOtelLogger.emit).toHaveBeenCalledWith({
-        severityText: 'INFO',
-        body: 'Message with data',
         attributes: data,
+        body: 'Message with data',
+        severityText: 'INFO',
       });
     });
   });
@@ -126,21 +126,21 @@ describe('LoggerService', () => {
 
       // Both calls should include the persistent context
       expect(mockOtelLogger.emit).toHaveBeenNthCalledWith(1, {
-        severityText: 'INFO',
-        body: 'First message',
         attributes: {
           sessionId: 'session-123',
           userId: 'user-456',
         },
+        body: 'First message',
+        severityText: 'INFO',
       });
 
       expect(mockOtelLogger.emit).toHaveBeenNthCalledWith(2, {
-        severityText: 'WARN',
-        body: 'Second message',
         attributes: {
           sessionId: 'session-123',
           userId: 'user-456',
         },
+        body: 'Second message',
+        severityText: 'WARN',
       });
     });
 
@@ -151,12 +151,12 @@ describe('LoggerService', () => {
       service.log('Message with added context');
 
       expect(mockOtelLogger.emit).toHaveBeenCalledWith({
-        severityText: 'INFO',
-        body: 'Message with added context',
         attributes: {
           operationId: 'op-789',
           tenantId: 'tenant-abc',
         },
+        body: 'Message with added context',
+        severityText: 'INFO',
       });
     });
 
@@ -167,26 +167,26 @@ describe('LoggerService', () => {
       service.log('Message after clear');
 
       expect(mockOtelLogger.emit).toHaveBeenCalledWith({
-        severityText: 'INFO',
-        body: 'Message after clear',
         attributes: {},
+        body: 'Message after clear',
+        severityText: 'INFO',
       });
     });
 
     it('should merge context with additional data', () => {
       service.setContext({ sessionId: 'session-123' });
-      
+
       const additionalData = { requestId: 'req-456', userId: 'user-789' };
       service.log('Message with merged data', additionalData);
 
       expect(mockOtelLogger.emit).toHaveBeenCalledWith({
-        severityText: 'INFO',
-        body: 'Message with merged data',
         attributes: {
-          sessionId: 'session-123',
           requestId: 'req-456',
+          sessionId: 'session-123',
           userId: 'user-789',
         },
+        body: 'Message with merged data',
+        severityText: 'INFO',
       });
     });
   });
@@ -195,9 +195,9 @@ describe('LoggerService', () => {
     it('should include trace context when active span is available', () => {
       const mockSpan = {
         spanContext: () => ({
-          traceId: 'trace-123',
           spanId: 'span-456',
           traceFlags: 1,
+          traceId: 'trace-123',
         }),
       };
 
@@ -206,13 +206,13 @@ describe('LoggerService', () => {
       service.log('Message with trace context');
 
       expect(mockOtelLogger.emit).toHaveBeenCalledWith({
-        severityText: 'INFO',
-        body: 'Message with trace context',
         attributes: {
-          traceId: 'trace-123',
           spanId: 'span-456',
           traceFlags: 1,
+          traceId: 'trace-123',
         },
+        body: 'Message with trace context',
+        severityText: 'INFO',
       });
     });
 
@@ -222,9 +222,9 @@ describe('LoggerService', () => {
       service.log('Message without trace');
 
       expect(mockOtelLogger.emit).toHaveBeenCalledWith({
-        severityText: 'INFO',
-        body: 'Message without trace',
         attributes: {},
+        body: 'Message without trace',
+        severityText: 'INFO',
       });
     });
 
@@ -238,18 +238,18 @@ describe('LoggerService', () => {
       }).not.toThrow();
 
       expect(mockOtelLogger.emit).toHaveBeenCalledWith({
-        severityText: 'INFO',
-        body: 'Message with broken trace',
         attributes: {},
+        body: 'Message with broken trace',
+        severityText: 'INFO',
       });
     });
 
     it('should merge trace context with persistent context and additional data', () => {
       const mockSpan = {
         spanContext: () => ({
-          traceId: 'trace-123',
           spanId: 'span-456',
           traceFlags: 1,
+          traceId: 'trace-123',
         }),
       };
 
@@ -259,15 +259,15 @@ describe('LoggerService', () => {
       service.log('Complete context message', { requestId: 'req-abc' });
 
       expect(mockOtelLogger.emit).toHaveBeenCalledWith({
-        severityText: 'INFO',
-        body: 'Complete context message',
         attributes: {
           requestId: 'req-abc',
           sessionId: 'session-789',
-          traceId: 'trace-123',
           spanId: 'span-456',
           traceFlags: 1,
+          traceId: 'trace-123',
         },
+        body: 'Complete context message',
+        severityText: 'INFO',
       });
     });
   });
@@ -280,12 +280,12 @@ describe('LoggerService', () => {
       childLogger.log('Child message');
 
       expect(mockOtelLogger.emit).toHaveBeenCalledWith({
-        severityText: 'INFO',
-        body: 'Child message',
         attributes: {
           parentContext: 'parent-value',
           sessionId: 'session-123',
         },
+        body: 'Child message',
+        severityText: 'INFO',
       });
     });
 
@@ -298,22 +298,22 @@ describe('LoggerService', () => {
       // Parent should not have child context
       service.log('Parent message');
       expect(mockOtelLogger.emit).toHaveBeenLastCalledWith({
-        severityText: 'INFO',
-        body: 'Parent message',
         attributes: {
           parentContext: 'parent-value',
         },
+        body: 'Parent message',
+        severityText: 'INFO',
       });
 
       // Child should have both contexts
       childLogger.log('Child message');
       expect(mockOtelLogger.emit).toHaveBeenLastCalledWith({
-        severityText: 'INFO',
-        body: 'Child message',
         attributes: {
-          parentContext: 'parent-value',
           childContext: 'child-value',
+          parentContext: 'parent-value',
         },
+        body: 'Child message',
+        severityText: 'INFO',
       });
     });
   });
@@ -367,11 +367,11 @@ describe('LoggerService', () => {
       service2.log('Message from service2');
 
       expect(mockOtelLogger.emit).toHaveBeenCalledWith({
-        severityText: 'INFO',
-        body: 'Message from service2',
         attributes: {
           sharedContext: 'shared-value',
         },
+        body: 'Message from service2',
+        severityText: 'INFO',
       });
     });
   });

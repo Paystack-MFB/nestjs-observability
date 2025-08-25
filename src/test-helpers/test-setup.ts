@@ -1,25 +1,25 @@
 /**
  * Global Test Setup for OpenTelemetry NestJS Observability Package
- * 
+ *
  * This file is automatically run before all tests to ensure proper
  * OpenTelemetry isolation and mocking setup.
  */
 
 import 'reflect-metadata';
-import { vi, beforeEach, afterEach } from 'vitest';
+import { afterEach, beforeEach, vi } from 'vitest';
 
 // Global test environment variables
 const TEST_ENV_VARS = {
   NODE_ENV: 'test',
+  OTEL_LOGS_EXPORTER: 'console',
+  OTEL_METRICS_ENABLED: 'true',
+  OTEL_METRICS_EXPORTER: 'console',
   OTEL_SERVICE_NAME: 'test-service',
   OTEL_SERVICE_VERSION: '1.0.0-test',
-  OTEL_TRACES_EXPORTER: 'console',
-  OTEL_METRICS_EXPORTER: 'console',
-  OTEL_LOGS_EXPORTER: 'console',
-  OTEL_TRACES_SAMPLER: 'always_on',
-  OTEL_METRICS_ENABLED: 'true',
-  OTEL_SPAN_ATTRIBUTE_SANITIZATION_ENABLED: 'true',
   OTEL_SPAN_ATTRIBUTE_REDACTED_PLACEHOLDER: '[REDACTED]',
+  OTEL_SPAN_ATTRIBUTE_SANITIZATION_ENABLED: 'true',
+  OTEL_TRACES_EXPORTER: 'console',
+  OTEL_TRACES_SAMPLER: 'always_on',
 };
 
 // Store original environment variables
@@ -35,7 +35,7 @@ beforeEach(() => {
 
   // Ensure clean module state
   vi.clearAllMocks();
-  
+
   // Reset any global OpenTelemetry state
   if (global.gc) {
     global.gc();
@@ -52,7 +52,7 @@ afterEach(() => {
       process.env[key] = value;
     }
   });
-  
+
   // Clear all mocks
   vi.clearAllMocks();
   vi.resetAllMocks();
@@ -76,14 +76,14 @@ process.on('uncaughtException', (error) => {
 // Suppress console output during tests unless explicitly enabled
 if (process.env['TEST_VERBOSE'] !== 'true') {
   const originalConsole = { ...console };
-  
+
   beforeEach(() => {
     // Only suppress debug and log, keep errors and warnings
     console.log = vi.fn();
     console.debug = vi.fn();
     console.info = vi.fn();
   });
-  
+
   afterEach(() => {
     // Restore console
     Object.assign(console, originalConsole);
@@ -93,21 +93,26 @@ if (process.env['TEST_VERBOSE'] !== 'true') {
 // Export test utilities for convenience
 export const testUtils = {
   /**
-   * Set custom environment variables for a test
+   * Clear specific environment variables
    */
-  setTestEnv(env: Record<string, string>): void {
-    Object.entries(env).forEach(([key, value]) => {
-      process.env[key] = value;
+  clearTestEnv(keys: string[]): void {
+    keys.forEach((key) => {
+      delete process.env[key];
     });
   },
 
   /**
-   * Clear specific environment variables
+   * Create a resolved promise with delay
    */
-  clearTestEnv(keys: string[]): void {
-    keys.forEach(key => {
-      delete process.env[key];
-    });
+  delay(ms: number): Promise<void> {
+    return new Promise((resolve) => setTimeout(resolve, ms));
+  },
+
+  /**
+   * Wait for async operations to complete
+   */
+  async flushPromises(): Promise<void> {
+    await new Promise((resolve) => setImmediate(resolve));
   },
 
   /**
@@ -118,10 +123,12 @@ export const testUtils = {
   },
 
   /**
-   * Wait for async operations to complete
+   * Set custom environment variables for a test
    */
-  async flushPromises(): Promise<void> {
-    await new Promise(resolve => setImmediate(resolve));
+  setTestEnv(env: Record<string, string>): void {
+    Object.entries(env).forEach(([key, value]) => {
+      process.env[key] = value;
+    });
   },
 
   /**
@@ -129,15 +136,10 @@ export const testUtils = {
    */
   timeout(ms: number): Promise<never> {
     return new Promise((_, reject) => {
-      setTimeout(() => reject(new Error(`Test timeout after ${ms}ms`)), ms);
+      setTimeout(() => {
+        reject(new Error(`Test timeout after ${ms}ms`));
+      }, ms);
     });
-  },
-
-  /**
-   * Create a resolved promise with delay
-   */
-  delay(ms: number): Promise<void> {
-    return new Promise(resolve => setTimeout(resolve, ms));
   },
 };
 
