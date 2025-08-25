@@ -41,7 +41,7 @@ export class MetricsController {
    */
   @Get('names')
   @Header('Content-Type', 'application/json')
-  getMetricNames(): Promise<{ enabled: boolean; metrics?: string[] }> {
+  getMetricNames(): { enabled: boolean; metrics?: string[] } {
     if (!this.isMetricsEnabled) {
       return { enabled: false };
     }
@@ -120,7 +120,7 @@ export class MetricsController {
    */
   @Get('health')
   @Header('Content-Type', 'application/json')
-  getMetricsHealth(): Promise<{ enabled: boolean; endpoint: string; status: string }> {
+  getMetricsHealth(): { enabled: boolean; endpoint: string; status: string } {
     return {
       enabled: this.isMetricsEnabled,
       endpoint: this.metricsEndpoint,
