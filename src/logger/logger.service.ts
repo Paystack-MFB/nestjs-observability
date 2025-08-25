@@ -107,7 +107,8 @@ export class LoggerService {
       console.error('LoggerService emit failed:', error);
       // Sanitize message to prevent log injection attacks while maintaining format compatibility
       const sanitizedMessage = this.sanitizeLogMessage(message instanceof Error ? message.message : message);
-      console.log(`[${level}] ${sanitizedMessage}`, data);
+      // Use %s format specifier to prevent format string injection attacks
+      console.log('[%s] %s', level, sanitizedMessage, data);
     }
   }
 

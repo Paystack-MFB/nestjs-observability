@@ -330,7 +330,7 @@ describe('LoggerService', () => {
       service.log('Failed message', { data: 'test' });
 
       expect(consoleErrorSpy).toHaveBeenCalledWith('LoggerService emit failed:', expect.any(Error));
-      expect(consoleSpy).toHaveBeenCalledWith('[INFO] Failed message', { data: 'test' });
+      expect(consoleSpy).toHaveBeenCalledWith('[%s] %s', 'INFO', 'Failed message', { data: 'test' });
 
       consoleSpy.mockRestore();
       consoleErrorSpy.mockRestore();
@@ -348,7 +348,7 @@ describe('LoggerService', () => {
       service.error(error, { context: 'test' });
 
       expect(consoleErrorSpy).toHaveBeenCalledWith('LoggerService emit failed:', expect.any(Error));
-      expect(consoleSpy).toHaveBeenCalledWith('[ERROR] Test error', { context: 'test' });
+      expect(consoleSpy).toHaveBeenCalledWith('[%s] %s', 'ERROR', 'Test error', { context: 'test' });
 
       consoleSpy.mockRestore();
       consoleErrorSpy.mockRestore();
