@@ -1,4 +1,4 @@
-import { Controller, Get, Header, HttpException, HttpStatus } from '@nestjs/common';
+import { Controller, Get, Header, HttpException, HttpStatus, Optional } from '@nestjs/common';
 
 import { LoggerService } from '../logger/logger.service';
 import { MetricsService } from '../metrics/metrics.service';
@@ -19,7 +19,7 @@ export class MetricsController {
 
   constructor(
     private readonly metricsService: MetricsService,
-    private readonly logger: LoggerService | undefined
+    @Optional() private readonly logger: LoggerService | undefined
   ) {
     // Check if metrics are enabled via environment variable
     this.isMetricsEnabled = this.getMetricsEnabledFromEnv();

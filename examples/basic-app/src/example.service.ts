@@ -27,17 +27,19 @@ export class ExampleService {
     private readonly metrics: MetricsService,
     private readonly tracing: TracingService
   ) {
-    // Set service context for all logging
-    this.logger.setContext({
-      service: 'ExampleService',
-      version: '1.0.0',
-      component: 'business-logic',
-    });
+    // Set service context for all logging - ensure logger is available
+    if (this.logger && typeof this.logger.setContext === 'function') {
+      this.logger.setContext({
+        service: 'ExampleService',
+        version: '1.0.0',
+        component: 'business-logic',
+      });
+    }
 
     // Initialize custom metrics
     this.initializeMetrics();
 
-    this.logger.log('ExampleService initialized', {
+    this.logger?.log('ExampleService initialized', {
       metricsInitialized: true,
       tracingEnabled: true,
     });
@@ -47,26 +49,36 @@ export class ExampleService {
    * Initialize custom business metrics
    */
   private initializeMetrics() {
-    // Counter for tracking requests
-    this.requestCounter = this.metrics.createCounter('example_requests_total', 'Total number of example requests');
+    // Ensure metrics service is available before creating metrics
+    if (!this.metrics || typeof this.metrics.createCounter !== 'function') {
+      this.logger?.debug('Metrics service not available, skipping metrics initialization');
+      return;
+    }
 
-    // Gauge for active processing
-    this.processingGauge = this.metrics.createGauge(
-      'example_active_operations',
-      'Number of currently active operations'
-    );
+    try {
+      // Counter for tracking requests
+      this.requestCounter = this.metrics.createCounter('example_requests_total', 'Total number of example requests');
 
-    // Histogram for response times
-    this.responseTimeHistogram = this.metrics.createHistogram(
-      'example_operation_duration_seconds',
-      'Duration of example operations'
-    );
+      // Gauge for active processing
+      this.processingGauge = this.metrics.createGauge(
+        'example_active_operations',
+        'Number of currently active operations'
+      );
 
-    this.logger.debug('Custom metrics initialized', {
-      counter: 'example_requests_total',
-      gauge: 'example_active_operations',
-      histogram: 'example_operation_duration_seconds',
-    });
+      // Histogram for response times
+      this.responseTimeHistogram = this.metrics.createHistogram(
+        'example_operation_duration_seconds',
+        'Duration of example operations'
+      );
+
+      this.logger?.debug('Custom metrics initialized', {
+        counter: 'example_requests_total',
+        gauge: 'example_active_operations',
+        histogram: 'example_operation_duration_seconds',
+      });
+    } catch (error) {
+      this.logger?.debug('Failed to initialize metrics', { error: error.message });
+    }
   }
 
   /**
@@ -87,7 +99,7 @@ export class ExampleService {
     });
 
     // Increment request counter
-    this.requestCounter.add(1, { operation: 'simple', status: 'started' });
+    this.requestCounter?.add(1, { operation: 'simple', status: 'started' });
 
     try {
       // Simulate processing
@@ -105,7 +117,7 @@ export class ExampleService {
         duration: '~200ms',
       });
 
-      this.requestCounter.add(1, { operation: 'simple', status: 'success' });
+      this.requestCounter?.add(1, { operation: 'simple', status: 'success' });
 
       return result;
     } catch (error) {
@@ -114,7 +126,7 @@ export class ExampleService {
         operationId,
       });
 
-      this.requestCounter.add(1, { operation: 'simple', status: 'error' });
+      this.requestCounter?.add(1, { operation: 'simple', status: 'error' });
       throw error;
     }
   }
@@ -143,7 +155,7 @@ export class ExampleService {
 
     // Update metrics - increment processing gauge
     // Note: For observableGauge, we would set up a callback, but for simplicity using counter pattern
-    this.requestCounter.add(1, { operation: 'complex', status: 'started' });
+    this.requestCounter?.add(1, { operation: 'complex', status: 'started' });
 
     // Create manual span with custom attributes
     const span = this.tracing.startSpan('complex-operation');
@@ -175,8 +187,8 @@ export class ExampleService {
       });
 
       // Update metrics
-      this.requestCounter.add(1, { operation: 'complex', status: 'success' });
-      this.responseTimeHistogram.record(duration / 1000, { operation: 'complex' });
+      this.requestCounter?.add(1, { operation: 'complex', status: 'success' });
+      this.responseTimeHistogram?.record(duration / 1000, { operation: 'complex' });
 
       span.setAttributes({
         'operation.status': 'success',
@@ -204,8 +216,8 @@ export class ExampleService {
       });
 
       // Update error metrics
-      this.requestCounter.add(1, { operation: 'complex', status: 'error' });
-      this.responseTimeHistogram.record(duration / 1000, { operation: 'complex' });
+      this.requestCounter?.add(1, { operation: 'complex', status: 'error' });
+      this.responseTimeHistogram?.record(duration / 1000, { operation: 'complex' });
 
       // Record error in span
       span.recordException(error);

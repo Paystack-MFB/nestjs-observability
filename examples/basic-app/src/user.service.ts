@@ -11,11 +11,14 @@ import {
 @TraceClass()
 export class UserService {
   constructor(private readonly logger: LoggerService) {
-    this.logger.setContext({ service: 'UserService' });
+    // Ensure logger is available before setting context
+    if (this.logger && typeof this.logger.setContext === 'function') {
+      this.logger.setContext({ service: 'UserService' });
+    }
   }
   async getUserById(id: string): Promise<{ id: string; name: string; email: string }> {
     // Log the operation start with trace context (automatic via OpenTelemetry)
-    this.logger.log('Getting user by ID', { userId: id, operation: 'getUserById' });
+    this.logger?.log('Getting user by ID', { userId: id, operation: 'getUserById' });
 
     // Example: Manually add span attributes for tracking
     addSpanAttribute('user.id', id);
@@ -39,7 +42,7 @@ export class UserService {
     });
 
     // Log successful operation (trace context included automatically)
-    this.logger.log('User retrieved successfully', {
+    this.logger?.log('User retrieved successfully', {
       userId: user.id,
       userName: user.name,
       operation: 'getUserById',

@@ -6,9 +6,14 @@ export class LoggingService {
   private readonly logger: LoggerService;
 
   constructor(private readonly loggerService: LoggerService) {
-    // Create child logger and set context for this service
-    this.logger = this.loggerService.createChildLogger();
-    this.logger.setContext({ service: 'LoggingService' });
+    // Create child logger and set context for this service - ensure logger is available
+    if (this.loggerService && typeof this.loggerService.createChildLogger === 'function') {
+      this.logger = this.loggerService.createChildLogger();
+      this.logger.setContext({ service: 'LoggingService' });
+    } else {
+      // Fallback if logger service is not available
+      this.logger = this.loggerService;
+    }
   }
 
   // ==== BASIC LOGGING EXAMPLES ====

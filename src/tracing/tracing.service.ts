@@ -1,6 +1,6 @@
 import type { Span, Tracer } from '@opentelemetry/api';
 
-import { Injectable } from '@nestjs/common';
+import { Injectable, Optional } from '@nestjs/common';
 import { trace } from '@opentelemetry/api';
 
 import { LoggerService } from '../logger/logger.service';
@@ -13,7 +13,7 @@ import { LoggerService } from '../logger/logger.service';
 export class TracingService {
   private readonly tracer: Tracer;
 
-  constructor(private readonly logger: LoggerService | undefined) {
+  constructor(@Optional() private readonly logger: LoggerService | undefined) {
     // Get OpenTelemetry tracer from global provider
     const tracerProvider = typeof trace.getTracerProvider === 'function' ? trace.getTracerProvider() : undefined;
     const resolvedTracer =

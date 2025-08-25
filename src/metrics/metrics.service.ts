@@ -1,6 +1,6 @@
 import type { Counter, Histogram, Meter, ObservableGauge } from '@opentelemetry/api';
 
-import { Injectable, OnModuleInit } from '@nestjs/common';
+import { Injectable, OnModuleInit, Optional } from '@nestjs/common';
 import { metrics } from '@opentelemetry/api';
 import * as promClient from 'prom-client';
 
@@ -23,7 +23,7 @@ export class MetricsService implements OnModuleInit {
   private readonly otelMeter: Meter;
   private readonly registry: promClient.Registry;
 
-  constructor(private readonly logger: LoggerService | undefined) {
+  constructor(@Optional() private readonly logger: LoggerService | undefined) {
     // Get OpenTelemetry meter from global provider
     const meterProvider = typeof metrics.getMeterProvider === 'function' ? metrics.getMeterProvider() : undefined;
     const resolvedMeter =
