@@ -2,8 +2,30 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { trace } from '@opentelemetry/api';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { TracingService } from './tracing.service';
 import { getServiceName, getServiceVersion } from '../register';
+import { TracingService } from './tracing.service';
+
+// Test types
+interface MockSpan {
+  addEvent: ReturnType<typeof vi.fn>;
+  end: ReturnType<typeof vi.fn>;
+  recordException: ReturnType<typeof vi.fn>;
+  setAttribute: ReturnType<typeof vi.fn>;
+  setAttributes: ReturnType<typeof vi.fn>;
+  setStatus: ReturnType<typeof vi.fn>;
+  spanContext: ReturnType<typeof vi.fn>;
+}
+
+interface MockTracer {
+  startActiveSpan: ReturnType<typeof vi.fn>;
+  startSpan: ReturnType<typeof vi.fn>;
+}
+
+interface MockTracerProvider {
+  getTracer: ReturnType<typeof vi.fn>;
+}
+
+type SpanCallback<T = unknown> = (span: MockSpan) => T;
 
 // Mock OpenTelemetry API
 vi.mock('@opentelemetry/api', () => ({
@@ -14,11 +36,19 @@ vi.mock('@opentelemetry/api', () => ({
 }));
 
 describe('TracingService', () => {
+  // Helper functions to get mocked versions
+  // Store trace functions to avoid unbound method warnings
+  // eslint-disable-next-line @typescript-eslint/unbound-method
+  const { getActiveSpan, getTracerProvider } = trace;
+  const getMockedGetTracerProvider = (): ReturnType<typeof vi.mocked<typeof trace.getTracerProvider>> =>
+    vi.mocked(getTracerProvider);
+  const getMockedGetActiveSpan = (): ReturnType<typeof vi.mocked<typeof trace.getActiveSpan>> =>
+    vi.mocked(getActiveSpan);
   let service: TracingService;
   let module: TestingModule;
-  let mockTracer: any;
-  let mockTracerProvider: any;
-  let mockSpan: any;
+  let mockTracer: MockTracer;
+  let mockTracerProvider: MockTracerProvider;
+  let mockSpan: MockSpan;
 
   beforeEach(async () => {
     // Mock OpenTelemetry span
@@ -46,8 +76,10 @@ describe('TracingService', () => {
       getTracer: vi.fn().mockReturnValue(mockTracer),
     };
 
-    vi.mocked(trace.getTracerProvider).mockReturnValue(mockTracerProvider);
-    vi.mocked(trace.getActiveSpan).mockReturnValue(mockSpan);
+    getMockedGetTracerProvider().mockReturnValue(
+      mockTracerProvider as unknown as ReturnType<typeof trace.getTracerProvider>
+    );
+    getMockedGetActiveSpan().mockReturnValue(mockSpan as unknown as ReturnType<typeof trace.getActiveSpan>);
 
     module = await Test.createTestingModule({
       providers: [TracingService],
@@ -57,15 +89,13 @@ describe('TracingService', () => {
   });
 
   afterEach(async () => {
-    if (module) {
-      await module.close();
-    }
+    await module.close();
     vi.clearAllMocks();
   });
 
   describe('Initialization', () => {
     it('should initialize with OpenTelemetry global tracer provider', () => {
-      expect(trace.getTracerProvider).toHaveBeenCalled();
+      expect(getMockedGetTracerProvider()).toHaveBeenCalled();
       expect(mockTracerProvider.getTracer).toHaveBeenCalledWith(getServiceName(), getServiceVersion());
     });
 
@@ -93,7 +123,7 @@ describe('TracingService', () => {
     });
 
     it('should return undefined when no active span', () => {
-      vi.mocked(trace.getActiveSpan).mockReturnValue(undefined);
+      getMockedGetActiveSpan().mockReturnValue(undefined);
 
       const traceId = service.getTraceId();
       const spanId = service.getSpanId();
@@ -118,11 +148,11 @@ describe('TracingService', () => {
     it('should create span with function execution (sync)', () => {
       const mockFn = vi.fn().mockReturnValue('result');
 
-      mockTracer.startActiveSpan.mockImplementation((_name: string, fn: any) => {
+      mockTracer.startActiveSpan.mockImplementation((_name: string, fn: SpanCallback) => {
         return fn(mockSpan);
       });
 
-      const result = service.createSpan('test-span', mockFn);
+      const result = service.createSpan('test-span', mockFn) as string;
 
       expect(mockTracer.startActiveSpan).toHaveBeenCalledWith('test-span', expect.any(Function));
       expect(mockFn).toHaveBeenCalledWith(mockSpan);
@@ -137,11 +167,11 @@ describe('TracingService', () => {
         throw error;
       });
 
-      mockTracer.startActiveSpan.mockImplementation((_name: string, fn: any) => {
+      mockTracer.startActiveSpan.mockImplementation((_name: string, fn: SpanCallback) => {
         return fn(mockSpan);
       });
 
-      expect(() => service.createSpan('test-span', mockFn)).toThrow('Test error');
+      expect(() => service.createSpan('test-span', mockFn) as unknown).toThrow('Test error');
 
       expect(mockSpan.setStatus).toHaveBeenCalledWith({ code: 2, message: 'Test error' }); // ERROR
       expect(mockSpan.recordException).toHaveBeenCalledWith(error);
@@ -151,11 +181,11 @@ describe('TracingService', () => {
     it('should handle async function execution', async () => {
       const mockFn = vi.fn().mockResolvedValue('async-result');
 
-      mockTracer.startActiveSpan.mockImplementation((_name: string, fn: any) => {
+      mockTracer.startActiveSpan.mockImplementation((_name: string, fn: SpanCallback) => {
         return fn(mockSpan);
       });
 
-      const result = await service.createSpan('test-span', mockFn);
+      const result = (await service.createSpan('test-span', mockFn)) as string;
 
       expect(result).toBe('async-result');
       expect(mockSpan.setStatus).toHaveBeenCalledWith({ code: 1 }); // OK
@@ -183,7 +213,7 @@ describe('TracingService', () => {
     });
 
     it('should handle missing active span gracefully', () => {
-      vi.mocked(trace.getActiveSpan).mockReturnValue(undefined);
+      getMockedGetActiveSpan().mockReturnValue(undefined);
 
       // These should not throw and should handle missing span gracefully
       expect(() => {
@@ -237,11 +267,11 @@ describe('TracingService', () => {
       const mockFn = vi.fn().mockReturnValue('result');
       const attributes = { custom: 'attribute' };
 
-      mockTracer.startActiveSpan.mockImplementation((_name: string, fn: any) => {
+      mockTracer.startActiveSpan.mockImplementation((_name: string, fn: SpanCallback) => {
         return fn(mockSpan);
       });
 
-      const result = service.withSpan('test-span', attributes, mockFn);
+      const result = service.withSpan('test-span', attributes, mockFn) as string;
 
       expect(mockTracer.startActiveSpan).toHaveBeenCalledWith('test-span', expect.any(Function));
       expect(mockSpan.setAttributes).toHaveBeenCalledWith({
@@ -256,11 +286,11 @@ describe('TracingService', () => {
     it('should handle async execution in withSpan', async () => {
       const mockFn = vi.fn().mockResolvedValue('async-result');
 
-      mockTracer.startActiveSpan.mockImplementation((_name: string, fn: any) => {
+      mockTracer.startActiveSpan.mockImplementation((_name: string, fn: SpanCallback) => {
         return fn(mockSpan);
       });
 
-      const result = await service.withSpan('test-span', {}, mockFn);
+      const result = (await service.withSpan('test-span', {}, mockFn)) as string;
 
       expect(result).toBe('async-result');
       expect(mockSpan.setStatus).toHaveBeenCalledWith({ code: 1 }); // OK
@@ -319,7 +349,7 @@ describe('TracingService', () => {
     });
 
     it('should handle tracer provider errors gracefully', () => {
-      vi.mocked(trace.getTracerProvider).mockImplementation(() => {
+      getMockedGetTracerProvider().mockImplementation(() => {
         throw new Error('Provider error');
       });
 
@@ -330,7 +360,7 @@ describe('TracingService', () => {
 
   describe('Global Tracer Integration', () => {
     it('should use global tracer provider without configuration', () => {
-      expect(trace.getTracerProvider).toHaveBeenCalled();
+      expect(getMockedGetTracerProvider()).toHaveBeenCalled();
       expect(mockTracerProvider.getTracer).toHaveBeenCalledWith(getServiceName(), getServiceVersion());
     });
 

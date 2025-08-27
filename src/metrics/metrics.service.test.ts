@@ -3,8 +3,27 @@ import { metrics } from '@opentelemetry/api';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { LoggerService } from '../logger/logger.service';
-import { MetricsService } from './metrics.service';
 import { getServiceName, getServiceVersion } from '../register';
+import { MetricsService } from './metrics.service';
+
+interface MockLoggerService {
+  debug: ReturnType<typeof vi.fn>;
+  error: ReturnType<typeof vi.fn>;
+  log: ReturnType<typeof vi.fn>;
+  warn: ReturnType<typeof vi.fn>;
+}
+
+// Test types
+interface MockMeter {
+  addBatchObservableCallback: ReturnType<typeof vi.fn>;
+  createCounter: ReturnType<typeof vi.fn>;
+  createHistogram: ReturnType<typeof vi.fn>;
+  createObservableGauge: ReturnType<typeof vi.fn>;
+}
+
+interface MockMeterProvider {
+  getMeter: ReturnType<typeof vi.fn>;
+}
 
 // Mock OpenTelemetry API
 vi.mock('@opentelemetry/api', () => ({
@@ -16,9 +35,20 @@ vi.mock('@opentelemetry/api', () => ({
 describe('MetricsService', () => {
   let service: MetricsService;
   let module: TestingModule;
-  let mockMeter: any;
-  let mockMeterProvider: any;
-  let mockLoggerService: any;
+  let mockMeter: MockMeter;
+  let mockMeterProvider: MockMeterProvider;
+  let mockLoggerService: MockLoggerService;
+
+  // Helper function to avoid unbound method warnings
+  const getMockedGetMeterProvider = (): ReturnType<typeof vi.mocked<typeof metrics.getMeterProvider>> =>
+    // eslint-disable-next-line @typescript-eslint/unbound-method
+    vi.mocked(metrics.getMeterProvider);
+
+  // Helper functions to access mock methods safely
+  const getMockMeterMethod = (method: keyof MockMeter): ReturnType<typeof vi.fn> =>
+    (mockMeter as unknown as Record<string, ReturnType<typeof vi.fn>>)[method];
+  const getMockMeterProviderMethod = (method: keyof MockMeterProvider): ReturnType<typeof vi.fn> =>
+    (mockMeterProvider as unknown as Record<string, ReturnType<typeof vi.fn>>)[method];
 
   beforeEach(async () => {
     // Mock OpenTelemetry meter
@@ -33,7 +63,9 @@ describe('MetricsService', () => {
       getMeter: vi.fn().mockReturnValue(mockMeter),
     };
 
-    vi.mocked(metrics.getMeterProvider).mockReturnValue(mockMeterProvider);
+    getMockedGetMeterProvider().mockReturnValue(
+      mockMeterProvider as unknown as ReturnType<typeof metrics.getMeterProvider>
+    );
 
     // Mock LoggerService
     mockLoggerService = {
@@ -57,16 +89,14 @@ describe('MetricsService', () => {
   });
 
   afterEach(async () => {
-    if (module) {
-      await module.close();
-    }
+    await module.close();
     vi.clearAllMocks();
   });
 
   describe('Initialization', () => {
     it('should initialize with OpenTelemetry global meter provider', () => {
-      expect(metrics.getMeterProvider).toHaveBeenCalled();
-      expect(mockMeterProvider.getMeter).toHaveBeenCalledWith(getServiceName(), getServiceVersion());
+      expect(getMockedGetMeterProvider()).toHaveBeenCalled();
+      expect(getMockMeterProviderMethod('getMeter')).toHaveBeenCalledWith(getServiceName(), getServiceVersion());
     });
 
     it('should initialize without throwing errors', () => {
@@ -79,7 +109,7 @@ describe('MetricsService', () => {
     it('should create OpenTelemetry counter with correct parameters', () => {
       const counter = service.createCounter('test_counter', 'Test counter description');
 
-      expect(mockMeter.createCounter).toHaveBeenCalledWith('test_counter', {
+      expect(getMockMeterMethod('createCounter')).toHaveBeenCalledWith('test_counter', {
         description: 'Test counter description',
       });
       expect(counter).toBeDefined();
@@ -90,7 +120,7 @@ describe('MetricsService', () => {
     it('should create OpenTelemetry histogram with correct parameters', () => {
       const histogram = service.createHistogram('test_histogram', 'Test histogram description');
 
-      expect(mockMeter.createHistogram).toHaveBeenCalledWith('test_histogram', {
+      expect(getMockMeterMethod('createHistogram')).toHaveBeenCalledWith('test_histogram', {
         description: 'Test histogram description',
       });
       expect(histogram).toBeDefined();
@@ -101,7 +131,7 @@ describe('MetricsService', () => {
     it('should create OpenTelemetry observable gauge with correct parameters', () => {
       const gauge = service.createGauge('test_gauge', 'Test gauge description');
 
-      expect(mockMeter.createObservableGauge).toHaveBeenCalledWith('test_gauge', {
+      expect(getMockMeterMethod('createObservableGauge')).toHaveBeenCalledWith('test_gauge', {
         description: 'Test gauge description',
       });
       expect(gauge).toBeDefined();
@@ -111,10 +141,10 @@ describe('MetricsService', () => {
       const callback = vi.fn().mockReturnValue(42);
       service.createGauge('test_gauge', 'Test gauge', callback);
 
-      expect(mockMeter.createObservableGauge).toHaveBeenCalledWith('test_gauge', {
+      expect(getMockMeterMethod('createObservableGauge')).toHaveBeenCalledWith('test_gauge', {
         description: 'Test gauge',
       });
-      expect(mockMeter.addBatchObservableCallback).toHaveBeenCalled();
+      expect(getMockMeterMethod('addBatchObservableCallback')).toHaveBeenCalled();
     });
   });
 
@@ -122,7 +152,7 @@ describe('MetricsService', () => {
     it('should create histogram for summary (OpenTelemetry does not have native summaries)', () => {
       const summary = service.createSummary('test_summary', 'Test summary description');
 
-      expect(mockMeter.createHistogram).toHaveBeenCalledWith('test_summary', {
+      expect(getMockMeterMethod('createHistogram')).toHaveBeenCalledWith('test_summary', {
         description: 'Test summary description',
       });
       expect(summary).toBeDefined();
@@ -169,8 +199,8 @@ describe('MetricsService', () => {
 
   describe('Global OpenTelemetry Integration', () => {
     it('should use global meter provider', () => {
-      expect(metrics.getMeterProvider).toHaveBeenCalled();
-      expect(mockMeterProvider.getMeter).toHaveBeenCalledWith(getServiceName(), getServiceVersion());
+      expect(getMockedGetMeterProvider()).toHaveBeenCalled();
+      expect(getMockMeterProviderMethod('getMeter')).toHaveBeenCalledWith(getServiceName(), getServiceVersion());
     });
 
     it('should create metrics without configuration dependency', () => {

@@ -32,7 +32,7 @@ describe('Full-Stack Integration Tests', () => {
   let metricsController: MetricsController;
   let setup: TestSetup;
 
-  beforeEach(async () => {
+  beforeEach(() => {
     setup = new TestSetup();
     setup.setupDefault();
 
@@ -41,9 +41,7 @@ describe('Full-Stack Integration Tests', () => {
   });
 
   afterEach(async () => {
-    if (moduleRef) {
-      await moduleRef.close();
-    }
+    await moduleRef.close();
     setup.cleanup();
   });
 
@@ -66,9 +64,9 @@ describe('Full-Stack Integration Tests', () => {
       expect(tracingService).toBeDefined();
 
       // Verify services are working
-      expect(loggerService.log).toBeDefined();
-      expect(metricsService.createCounter).toBeDefined();
-      expect(tracingService.startSpan).toBeDefined();
+      expect(typeof loggerService.log).toBe('function');
+      expect(typeof metricsService.createCounter).toBe('function');
+      expect(typeof tracingService.startSpan).toBe('function');
     });
 
     it('should provide all required services', async () => {
@@ -125,7 +123,9 @@ describe('Full-Stack Integration Tests', () => {
       expect(tracingService).toBeDefined();
 
       // Verify services can handle method calls gracefully (they use hardened constructors)
-      expect(() => loggerService.log('test message')).not.toThrow();
+      expect(() => {
+        loggerService.log('test message');
+      }).not.toThrow();
       expect(() => metricsService.getMeter()).not.toThrow();
       expect(() => tracingService.getActiveSpan()).not.toThrow();
     });
@@ -209,7 +209,7 @@ describe('Full-Stack Integration Tests', () => {
       tracingService = moduleRef.get<TracingService>(TracingService);
     });
 
-    it('should integrate logging with tracing context', async () => {
+    it('should integrate logging with tracing context', () => {
       // Verify services can work together without throwing errors
       expect(() => {
         // Create a span using the hardened tracing service
@@ -230,7 +230,7 @@ describe('Full-Stack Integration Tests', () => {
       expect(tracingService).toBeDefined();
     });
 
-    it('should create and record custom metrics', async () => {
+    it('should create and record custom metrics', () => {
       // Verify metrics service can create and use metrics without throwing errors
       expect(() => {
         // Create custom metrics using hardened metrics service
@@ -256,6 +256,7 @@ describe('Full-Stack Integration Tests', () => {
       }).not.toThrow();
 
       // Use withSpan method - this should work with hardened implementation
+      // eslint-disable-next-line @typescript-eslint/require-await
       const result = await tracingService.withSpan('operation-span', {}, async () => {
         return 'operation-result';
       });
@@ -324,7 +325,7 @@ describe('Full-Stack Integration Tests', () => {
       tracingService = moduleRef.get<TracingService>(TracingService);
     });
 
-    it('should handle logging errors gracefully', async () => {
+    it('should handle logging errors gracefully', () => {
       // Verify hardened logger service handles errors gracefully
       expect(() => {
         loggerService.log('Test message');
@@ -337,7 +338,7 @@ describe('Full-Stack Integration Tests', () => {
       expect(loggerService).toBeDefined();
     });
 
-    it('should handle metrics creation errors gracefully', async () => {
+    it('should handle metrics creation errors gracefully', () => {
       // Mock meter to throw error
       setup.otelMocks.mockMeter.createCounter.mockImplementationOnce(() => {
         throw new Error('Metrics error');
@@ -349,7 +350,7 @@ describe('Full-Stack Integration Tests', () => {
       }).not.toThrow();
     });
 
-    it('should handle tracing errors gracefully', async () => {
+    it('should handle tracing errors gracefully', () => {
       // Mock tracer to throw error
       setup.otelMocks.mockTracer.startSpan.mockImplementationOnce(() => {
         throw new Error('Tracing error');
@@ -403,14 +404,14 @@ describe('Full-Stack Integration Tests', () => {
       tracingService = moduleRef.get<TracingService>(TracingService);
     });
 
-    it('should handle high-frequency logging efficiently', async () => {
+    it('should handle high-frequency logging efficiently', () => {
       const startTime = Date.now();
       const logCount = 100;
 
       // Verify hardened logger service handles high-frequency logging
       expect(() => {
         for (let i = 0; i < logCount; i++) {
-          loggerService.log(`High frequency log ${i}`, { iteration: i });
+          loggerService.log(`High frequency log ${i.toString()}`, { iteration: i });
         }
       }).not.toThrow();
 
@@ -427,8 +428,8 @@ describe('Full-Stack Integration Tests', () => {
       const histogram = metricsService.createHistogram('concurrent_histogram', 'Concurrent histogram');
 
       const operations = Array.from({ length: 50 }, (_, i) => async () => {
-        counter.add(1, { operation: `concurrent-${i}` });
-        histogram.record(Math.random(), { operation: `concurrent-${i}` });
+        counter.add(1, { operation: `concurrent-${i.toString()}` });
+        histogram.record(Math.random(), { operation: `concurrent-${i.toString()}` });
         await AsyncTestUtils.delay(1);
       });
 
@@ -440,19 +441,21 @@ describe('Full-Stack Integration Tests', () => {
       expect(endTime - startTime).toBeLessThan(1000);
     });
 
-    it('should handle span lifecycle correctly', async () => {
+    it('should handle span lifecycle correctly', () => {
       // Verify hardened tracing service handles span lifecycle without errors
       expect(() => {
-        const spans: any[] = [];
+        const spans: unknown[] = [];
 
         // Create multiple spans using hardened tracing service
         for (let i = 0; i < 10; i++) {
-          const span = tracingService.startSpan(`test-span-${i}`);
+          const span = tracingService.startSpan(`test-span-${i.toString()}`);
           spans.push(span);
         }
 
         // End all spans
-        spans.forEach((span) => span.end());
+        spans.forEach((span) => {
+          (span as { end: () => void }).end();
+        });
       }).not.toThrow();
 
       expect(tracingService).toBeDefined();
@@ -583,6 +586,7 @@ describe('Full-Stack Integration Tests', () => {
 
       try {
         // Simulate operation that throws error
+        // eslint-disable-next-line @typescript-eslint/require-await
         await tracingService.withSpan('failing-operation', {}, async () => {
           requestLogger.log('Starting operation that will fail');
           throw new Error('Simulated business logic error');

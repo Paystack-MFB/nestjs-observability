@@ -1,17 +1,33 @@
 import { HttpException } from '@nestjs/common';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
+import type { LoggerService } from '../logger/logger.service';
+import type { MetricsService } from '../metrics/metrics.service';
+
 import { MetricsController } from './metrics.controller';
+
+interface MockLoggerService {
+  debug: ReturnType<typeof vi.fn>;
+  error: ReturnType<typeof vi.fn>;
+  log: ReturnType<typeof vi.fn>;
+  warn: ReturnType<typeof vi.fn>;
+}
+
+// Mock types
+interface MockMetricsService {
+  getMetrics: ReturnType<typeof vi.fn>;
+  getRegistry: ReturnType<typeof vi.fn>;
+}
 
 describe('MetricsController', () => {
   let controller: MetricsController;
-  let mockMetricsService: any;
-  let mockLoggerService: any;
+  let mockMetricsService: MockMetricsService;
+  let mockLoggerService: MockLoggerService;
 
   beforeEach(() => {
     // Clear environment variables
-    delete process.env['OTEL_METRICS_ENABLED'];
-    delete process.env['OTEL_METRICS_ENDPOINT'];
+    Reflect.deleteProperty(process.env, 'OTEL_METRICS_ENABLED');
+    Reflect.deleteProperty(process.env, 'OTEL_METRICS_ENDPOINT');
 
     // Mock MetricsService
     mockMetricsService = {
@@ -28,14 +44,17 @@ describe('MetricsController', () => {
     };
 
     // Directly instantiate controller with mocks
-    controller = new MetricsController(mockMetricsService, mockLoggerService);
+    controller = new MetricsController(
+      mockMetricsService as unknown as MetricsService,
+      mockLoggerService as unknown as LoggerService
+    );
   });
 
   afterEach(() => {
     vi.clearAllMocks();
     // Reset environment variables
-    delete process.env['OTEL_METRICS_ENABLED'];
-    delete process.env['OTEL_METRICS_ENDPOINT'];
+    Reflect.deleteProperty(process.env, 'OTEL_METRICS_ENABLED');
+    Reflect.deleteProperty(process.env, 'OTEL_METRICS_ENDPOINT');
   });
 
   describe('Initialization', () => {
@@ -54,7 +73,10 @@ describe('MetricsController', () => {
       process.env['OTEL_METRICS_ENABLED'] = 'false';
 
       // Create new controller instance to test environment variable
-      const testController = new MetricsController(mockMetricsService, mockLoggerService);
+      const testController = new MetricsController(
+        mockMetricsService as unknown as MetricsService,
+        mockLoggerService as unknown as LoggerService
+      );
       const config = testController.getMetricsConfig();
 
       expect(config.enabled).toBe(false);
@@ -64,7 +86,10 @@ describe('MetricsController', () => {
       process.env['OTEL_METRICS_ENDPOINT'] = '/custom-metrics';
 
       // Create new controller instance to test environment variable
-      const testController = new MetricsController(mockMetricsService, mockLoggerService);
+      const testController = new MetricsController(
+        mockMetricsService as unknown as MetricsService,
+        mockLoggerService as unknown as LoggerService
+      );
       const config = testController.getMetricsConfig();
 
       expect(config.endpoint).toBe('/custom-metrics');
@@ -86,7 +111,10 @@ describe('MetricsController', () => {
       process.env['OTEL_METRICS_ENABLED'] = 'false';
 
       // Create new controller with metrics disabled
-      const testController = new MetricsController(mockMetricsService, mockLoggerService);
+      const testController = new MetricsController(
+        mockMetricsService as unknown as MetricsService,
+        mockLoggerService as unknown as LoggerService
+      );
 
       await expect(testController.getMetrics()).rejects.toThrow(HttpException);
       await expect(testController.getMetrics()).rejects.toThrow('Metrics endpoint is disabled');
@@ -119,8 +147,8 @@ describe('MetricsController', () => {
   });
 
   describe('getMetricsHealth()', () => {
-    it('should return health status with metrics enabled', async () => {
-      const result = await controller.getMetricsHealth();
+    it('should return health status with metrics enabled', () => {
+      const result = controller.getMetricsHealth();
 
       expect(result).toEqual({
         enabled: true,
@@ -129,12 +157,15 @@ describe('MetricsController', () => {
       });
     });
 
-    it('should return health status with metrics disabled', async () => {
+    it('should return health status with metrics disabled', () => {
       process.env['OTEL_METRICS_ENABLED'] = 'false';
 
       // Create new controller with metrics disabled
-      const testController = new MetricsController(mockMetricsService, mockLoggerService);
-      const result = await testController.getMetricsHealth();
+      const testController = new MetricsController(
+        mockMetricsService as unknown as MetricsService,
+        mockLoggerService as unknown as LoggerService
+      );
+      const result = testController.getMetricsHealth();
 
       expect(result).toEqual({
         enabled: false,
@@ -145,7 +176,7 @@ describe('MetricsController', () => {
   });
 
   describe('getMetricNames()', () => {
-    it('should return metric names when enabled', async () => {
+    it('should return metric names when enabled', () => {
       const mockRegistry = {
         getMetricsAsArray: vi
           .fn()
@@ -157,7 +188,7 @@ describe('MetricsController', () => {
       };
       mockMetricsService.getRegistry.mockReturnValue(mockRegistry);
 
-      const result = await controller.getMetricNames();
+      const result = controller.getMetricNames();
 
       expect(result).toEqual({
         enabled: true,
@@ -166,12 +197,15 @@ describe('MetricsController', () => {
       expect(mockMetricsService.getRegistry).toHaveBeenCalledOnce();
     });
 
-    it('should return disabled status when metrics are disabled', async () => {
+    it('should return disabled status when metrics are disabled', () => {
       process.env['OTEL_METRICS_ENABLED'] = 'false';
 
       // Create new controller with metrics disabled
-      const testController = new MetricsController(mockMetricsService, mockLoggerService);
-      const result = await testController.getMetricNames();
+      const testController = new MetricsController(
+        mockMetricsService as unknown as MetricsService,
+        mockLoggerService as unknown as LoggerService
+      );
+      const result = testController.getMetricNames();
 
       expect(result).toEqual({ enabled: false });
       expect(mockMetricsService.getRegistry).not.toHaveBeenCalled();
@@ -207,7 +241,10 @@ describe('MetricsController', () => {
       process.env['OTEL_METRICS_ENABLED'] = 'false';
 
       // Create new controller with metrics disabled
-      const testController = new MetricsController(mockMetricsService, mockLoggerService);
+      const testController = new MetricsController(
+        mockMetricsService as unknown as MetricsService,
+        mockLoggerService as unknown as LoggerService
+      );
       const result = await testController.isMetricsWorking();
 
       expect(result).toBe(false);
@@ -251,7 +288,10 @@ describe('MetricsController', () => {
     it('should parse OTEL_METRICS_ENABLED=true', () => {
       process.env['OTEL_METRICS_ENABLED'] = 'true';
 
-      const testController = new MetricsController(mockMetricsService, mockLoggerService);
+      const testController = new MetricsController(
+        mockMetricsService as unknown as MetricsService,
+        mockLoggerService as unknown as LoggerService
+      );
       const config = testController.getMetricsConfig();
 
       expect(config.enabled).toBe(true);
@@ -260,7 +300,10 @@ describe('MetricsController', () => {
     it('should parse OTEL_METRICS_ENABLED=1', () => {
       process.env['OTEL_METRICS_ENABLED'] = '1';
 
-      const testController = new MetricsController(mockMetricsService, mockLoggerService);
+      const testController = new MetricsController(
+        mockMetricsService as unknown as MetricsService,
+        mockLoggerService as unknown as LoggerService
+      );
       const config = testController.getMetricsConfig();
 
       expect(config.enabled).toBe(true);
@@ -269,7 +312,10 @@ describe('MetricsController', () => {
     it('should parse OTEL_METRICS_ENABLED=false', () => {
       process.env['OTEL_METRICS_ENABLED'] = 'FALSE';
 
-      const testController = new MetricsController(mockMetricsService, mockLoggerService);
+      const testController = new MetricsController(
+        mockMetricsService as unknown as MetricsService,
+        mockLoggerService as unknown as LoggerService
+      );
       const config = testController.getMetricsConfig();
 
       expect(config.enabled).toBe(false);

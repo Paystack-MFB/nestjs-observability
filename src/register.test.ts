@@ -5,6 +5,7 @@
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
+// Test types
 // Mock the NodeSDK and other OpenTelemetry imports before importing register
 vi.mock('@opentelemetry/sdk-node', () => ({
   NodeSDK: vi.fn().mockImplementation(() => ({
@@ -87,7 +88,7 @@ describe('Register Module', () => {
       'OTEL_SPAN_ATTRIBUTE_REDACTED_PLACEHOLDER',
       'OTEL_SPAN_ATTRIBUTE_SANITIZATION_ENABLED',
     ];
-    keysToClear.forEach((k) => delete process.env[k]);
+    keysToClear.forEach((k) => Reflect.deleteProperty(process.env, k));
 
     // Set default exporters per test case to ensure deterministic behavior
     process.env['OTEL_TRACES_EXPORTER'] = 'console';
@@ -208,7 +209,7 @@ describe('Register Module', () => {
           ({
             shutdown: vi.fn().mockResolvedValue(undefined),
             start: mockStart,
-          }) as any
+          }) as unknown as InstanceType<typeof NodeSDK>
       );
 
       await import('./register');
@@ -249,7 +250,7 @@ describe('Register Module', () => {
           ({
             shutdown: mockShutdown,
             start: vi.fn(),
-          }) as any
+          }) as unknown as InstanceType<typeof NodeSDK>
       );
 
       const { sdk } = await import('./register');

@@ -3,8 +3,17 @@ import { trace } from '@opentelemetry/api';
 import { logs } from '@opentelemetry/api-logs';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { LoggerService } from './logger.service';
 import { getServiceName, getServiceVersion } from '../register';
+import { LoggerService } from './logger.service';
+
+interface MockLoggerProvider {
+  getLogger: ReturnType<typeof vi.fn>;
+}
+
+// Test types
+interface MockOtelLogger {
+  emit: ReturnType<typeof vi.fn>;
+}
 
 // Mock OpenTelemetry APIs
 vi.mock('@opentelemetry/api', () => ({
@@ -22,8 +31,18 @@ vi.mock('@opentelemetry/api-logs', () => ({
 describe('LoggerService', () => {
   let service: LoggerService;
   let module: TestingModule;
-  let mockOtelLogger: any;
-  let mockLoggerProvider: any;
+  let mockOtelLogger: MockOtelLogger;
+  let mockLoggerProvider: MockLoggerProvider;
+
+  // Helper function to get typed mock emit
+  const getMockEmit = (): ReturnType<typeof vi.fn> => mockOtelLogger.emit;
+
+  // Helper functions to avoid unbound method warnings
+  const getMockedGetLoggerProvider = (): ReturnType<typeof vi.mocked<typeof logs.getLoggerProvider>> =>
+    // eslint-disable-next-line @typescript-eslint/unbound-method
+    vi.mocked(logs.getLoggerProvider);
+  const getMockedGetActiveSpan = (): ReturnType<typeof vi.mocked<typeof trace.getActiveSpan>> =>
+    vi.mocked(trace.getActiveSpan);
 
   beforeEach(async () => {
     // Mock OpenTelemetry logger
@@ -35,8 +54,10 @@ describe('LoggerService', () => {
       getLogger: vi.fn().mockReturnValue(mockOtelLogger),
     };
 
-    vi.mocked(logs.getLoggerProvider).mockReturnValue(mockLoggerProvider);
-    vi.mocked(trace.getActiveSpan).mockReturnValue(undefined);
+    getMockedGetLoggerProvider().mockReturnValue(
+      mockLoggerProvider as unknown as ReturnType<typeof logs.getLoggerProvider>
+    );
+    getMockedGetActiveSpan().mockReturnValue(undefined);
 
     module = await Test.createTestingModule({
       providers: [LoggerService],
@@ -52,7 +73,7 @@ describe('LoggerService', () => {
 
   describe('Initialization', () => {
     it('should initialize with OpenTelemetry global logger provider', () => {
-      expect(logs.getLoggerProvider).toHaveBeenCalled();
+      expect(getMockedGetLoggerProvider()).toHaveBeenCalled();
       expect(mockLoggerProvider.getLogger).toHaveBeenCalledWith(getServiceName(), getServiceVersion());
     });
   });
@@ -64,28 +85,28 @@ describe('LoggerService', () => {
       service.warn('Warning message');
       service.debug('Debug message');
 
-      expect(mockOtelLogger.emit).toHaveBeenCalledTimes(4);
+      expect(getMockEmit()).toHaveBeenCalledTimes(4);
 
       // Check severity levels
-      expect(mockOtelLogger.emit).toHaveBeenNthCalledWith(1, {
+      expect(getMockEmit()).toHaveBeenNthCalledWith(1, {
         attributes: {},
         body: 'Info message',
         severityText: 'INFO',
       });
 
-      expect(mockOtelLogger.emit).toHaveBeenNthCalledWith(2, {
+      expect(getMockEmit()).toHaveBeenNthCalledWith(2, {
         attributes: {},
         body: 'Error message',
         severityText: 'ERROR',
       });
 
-      expect(mockOtelLogger.emit).toHaveBeenNthCalledWith(3, {
+      expect(getMockEmit()).toHaveBeenNthCalledWith(3, {
         attributes: {},
         body: 'Warning message',
         severityText: 'WARN',
       });
 
-      expect(mockOtelLogger.emit).toHaveBeenNthCalledWith(4, {
+      expect(getMockEmit()).toHaveBeenNthCalledWith(4, {
         attributes: {},
         body: 'Debug message',
         severityText: 'DEBUG',
@@ -96,7 +117,7 @@ describe('LoggerService', () => {
       const error = new Error('Test error message');
       service.error(error);
 
-      expect(mockOtelLogger.emit).toHaveBeenCalledWith({
+      expect(getMockEmit()).toHaveBeenCalledWith({
         attributes: {},
         body: 'Test error message',
         exception: error,
@@ -108,7 +129,7 @@ describe('LoggerService', () => {
       const data = { requestId: 'req-456', userId: '123' };
       service.log('Message with data', data);
 
-      expect(mockOtelLogger.emit).toHaveBeenCalledWith({
+      expect(getMockEmit()).toHaveBeenCalledWith({
         attributes: data,
         body: 'Message with data',
         severityText: 'INFO',
@@ -123,10 +144,10 @@ describe('LoggerService', () => {
       service.log('First message');
       service.warn('Second message');
 
-      expect(mockOtelLogger.emit).toHaveBeenCalledTimes(2);
+      expect(getMockEmit()).toHaveBeenCalledTimes(2);
 
       // Both calls should include the persistent context
-      expect(mockOtelLogger.emit).toHaveBeenNthCalledWith(1, {
+      expect(getMockEmit()).toHaveBeenNthCalledWith(1, {
         attributes: {
           sessionId: 'session-123',
           userId: 'user-456',
@@ -135,7 +156,7 @@ describe('LoggerService', () => {
         severityText: 'INFO',
       });
 
-      expect(mockOtelLogger.emit).toHaveBeenNthCalledWith(2, {
+      expect(getMockEmit()).toHaveBeenNthCalledWith(2, {
         attributes: {
           sessionId: 'session-123',
           userId: 'user-456',
@@ -151,7 +172,7 @@ describe('LoggerService', () => {
 
       service.log('Message with added context');
 
-      expect(mockOtelLogger.emit).toHaveBeenCalledWith({
+      expect(getMockEmit()).toHaveBeenCalledWith({
         attributes: {
           operationId: 'op-789',
           tenantId: 'tenant-abc',
@@ -167,7 +188,7 @@ describe('LoggerService', () => {
 
       service.log('Message after clear');
 
-      expect(mockOtelLogger.emit).toHaveBeenCalledWith({
+      expect(getMockEmit()).toHaveBeenCalledWith({
         attributes: {},
         body: 'Message after clear',
         severityText: 'INFO',
@@ -180,7 +201,7 @@ describe('LoggerService', () => {
       const additionalData = { requestId: 'req-456', userId: 'user-789' };
       service.log('Message with merged data', additionalData);
 
-      expect(mockOtelLogger.emit).toHaveBeenCalledWith({
+      expect(getMockEmit()).toHaveBeenCalledWith({
         attributes: {
           requestId: 'req-456',
           sessionId: 'session-123',
@@ -202,11 +223,11 @@ describe('LoggerService', () => {
         }),
       };
 
-      vi.mocked(trace.getActiveSpan).mockReturnValue(mockSpan as any);
+      getMockedGetActiveSpan().mockReturnValue(mockSpan as unknown as ReturnType<typeof trace.getActiveSpan>);
 
       service.log('Message with trace context');
 
-      expect(mockOtelLogger.emit).toHaveBeenCalledWith({
+      expect(getMockEmit()).toHaveBeenCalledWith({
         attributes: {
           spanId: 'span-456',
           traceFlags: 1,
@@ -222,7 +243,7 @@ describe('LoggerService', () => {
 
       service.log('Message without trace');
 
-      expect(mockOtelLogger.emit).toHaveBeenCalledWith({
+      expect(getMockEmit()).toHaveBeenCalledWith({
         attributes: {},
         body: 'Message without trace',
         severityText: 'INFO',
@@ -238,7 +259,7 @@ describe('LoggerService', () => {
         service.log('Message with broken trace');
       }).not.toThrow();
 
-      expect(mockOtelLogger.emit).toHaveBeenCalledWith({
+      expect(getMockEmit()).toHaveBeenCalledWith({
         attributes: {},
         body: 'Message with broken trace',
         severityText: 'INFO',
@@ -254,12 +275,12 @@ describe('LoggerService', () => {
         }),
       };
 
-      vi.mocked(trace.getActiveSpan).mockReturnValue(mockSpan as any);
+      getMockedGetActiveSpan().mockReturnValue(mockSpan as unknown as ReturnType<typeof trace.getActiveSpan>);
 
       service.setContext({ sessionId: 'session-789' });
       service.log('Complete context message', { requestId: 'req-abc' });
 
-      expect(mockOtelLogger.emit).toHaveBeenCalledWith({
+      expect(getMockEmit()).toHaveBeenCalledWith({
         attributes: {
           requestId: 'req-abc',
           sessionId: 'session-789',
@@ -280,7 +301,7 @@ describe('LoggerService', () => {
       const childLogger = service.createChildLogger();
       childLogger.log('Child message');
 
-      expect(mockOtelLogger.emit).toHaveBeenCalledWith({
+      expect(getMockEmit()).toHaveBeenCalledWith({
         attributes: {
           parentContext: 'parent-value',
           sessionId: 'session-123',
@@ -298,7 +319,7 @@ describe('LoggerService', () => {
 
       // Parent should not have child context
       service.log('Parent message');
-      expect(mockOtelLogger.emit).toHaveBeenLastCalledWith({
+      expect(getMockEmit()).toHaveBeenLastCalledWith({
         attributes: {
           parentContext: 'parent-value',
         },
@@ -308,7 +329,7 @@ describe('LoggerService', () => {
 
       // Child should have both contexts
       childLogger.log('Child message');
-      expect(mockOtelLogger.emit).toHaveBeenLastCalledWith({
+      expect(getMockEmit()).toHaveBeenLastCalledWith({
         attributes: {
           childContext: 'child-value',
           parentContext: 'parent-value',
@@ -321,10 +342,14 @@ describe('LoggerService', () => {
 
   describe('Error Handling', () => {
     it('should fallback to console logging when OpenTelemetry fails', () => {
-      const consoleSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
-      const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+      const consoleSpy = vi.spyOn(console, 'log').mockImplementation(() => {
+        // Mock implementation
+      });
+      const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {
+        // Mock implementation
+      });
 
-      mockOtelLogger.emit.mockImplementation(() => {
+      getMockEmit().mockImplementation(() => {
         throw new Error('OpenTelemetry failure');
       });
 
@@ -338,10 +363,14 @@ describe('LoggerService', () => {
     });
 
     it('should handle Error object fallback correctly', () => {
-      const consoleSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
-      const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+      const consoleSpy = vi.spyOn(console, 'log').mockImplementation(() => {
+        // Mock implementation
+      });
+      const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {
+        // Mock implementation
+      });
 
-      mockOtelLogger.emit.mockImplementation(() => {
+      getMockEmit().mockImplementation(() => {
         throw new Error('OpenTelemetry failure');
       });
 
@@ -357,7 +386,7 @@ describe('LoggerService', () => {
   });
 
   describe('Singleton Behavior', () => {
-    it('should maintain context across multiple service instances from DI', async () => {
+    it('should maintain context across multiple service instances from DI', () => {
       const service1 = module.get<LoggerService>(LoggerService);
       const service2 = module.get<LoggerService>(LoggerService);
 
@@ -367,7 +396,7 @@ describe('LoggerService', () => {
       service1.setContext({ sharedContext: 'shared-value' });
       service2.log('Message from service2');
 
-      expect(mockOtelLogger.emit).toHaveBeenCalledWith({
+      expect(getMockEmit()).toHaveBeenCalledWith({
         attributes: {
           sharedContext: 'shared-value',
         },

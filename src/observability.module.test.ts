@@ -2,10 +2,16 @@ import 'reflect-metadata';
 /**
  * Unit tests for ObservabilityModule - Lightweight Version
  */
-
 import { APP_INTERCEPTOR } from '@nestjs/core';
 import { Test, TestingModule } from '@nestjs/testing';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+
+// Test types
+interface TestObservabilityConfig {
+  environment: string;
+  serviceName: string;
+  serviceVersion: string;
+}
 
 // Mock OpenTelemetry modules
 vi.mock('@opentelemetry/api', () => ({
@@ -23,18 +29,18 @@ vi.mock('@opentelemetry/api', () => ({
     getTracer: vi.fn().mockReturnValue({
       startSpan: vi.fn().mockReturnValue({
         end: vi.fn(),
+        recordException: vi.fn(),
         setAttributes: vi.fn(),
         setStatus: vi.fn(),
-        recordException: vi.fn(),
       }),
     }),
     getTracerProvider: vi.fn().mockReturnValue({
       getTracer: vi.fn().mockReturnValue({
         startSpan: vi.fn().mockReturnValue({
           end: vi.fn(),
+          recordException: vi.fn(),
           setAttributes: vi.fn(),
           setStatus: vi.fn(),
-          recordException: vi.fn(),
         }),
       }),
     }),
@@ -67,7 +73,7 @@ const mockEnv = {
 describe('ObservabilityModule - Lightweight', () => {
   let module: TestingModule;
 
-  beforeEach(async () => {
+  beforeEach(() => {
     // Set up environment variables
     Object.entries(mockEnv).forEach(([key, value]) => {
       process.env[key] = value;
@@ -75,7 +81,7 @@ describe('ObservabilityModule - Lightweight', () => {
   });
 
   describe('forRoot()', () => {
-    it('should create module without configuration parameters', async () => {
+    it('should create module without configuration parameters', () => {
       const moduleDefinition = ObservabilityModule.forRoot();
 
       expect(moduleDefinition).toBeDefined();
@@ -102,7 +108,7 @@ describe('ObservabilityModule - Lightweight', () => {
       expect(tracingService).toBeDefined();
     });
 
-    it('should register AutoTraceInterceptor as APP_INTERCEPTOR', async () => {
+    it('should register AutoTraceInterceptor as APP_INTERCEPTOR', () => {
       const moduleDefinition = ObservabilityModule.forRoot();
 
       // Check that APP_INTERCEPTOR provider is included
@@ -118,7 +124,7 @@ describe('ObservabilityModule - Lightweight', () => {
         imports: [ObservabilityModule.forRoot()],
       }).compile();
 
-      const config = module.get('OBSERVABILITY_CONFIG');
+      const config = module.get<TestObservabilityConfig>('OBSERVABILITY_CONFIG');
       expect(config).toBeDefined();
       expect(config.serviceName).toBe('test-service');
       expect(config.serviceVersion).toBe('1.0.0');
@@ -135,7 +141,7 @@ describe('ObservabilityModule - Lightweight', () => {
         imports: [ObservabilityModule.forRoot()],
       }).compile();
 
-      const config = module.get('OBSERVABILITY_CONFIG');
+      const config = module.get<TestObservabilityConfig>('OBSERVABILITY_CONFIG');
       expect(config).toBeDefined();
       expect(config.serviceName).toBe('unknown-service');
       expect(config.serviceVersion).toBe('1.0.0');
@@ -145,11 +151,11 @@ describe('ObservabilityModule - Lightweight', () => {
 
   describe('Module Registration', () => {
     it('should be marked as Global', () => {
-      const moduleMetadata = Reflect.getMetadata('__module:global__', ObservabilityModule);
+      const moduleMetadata = Reflect.getMetadata('__module:global__', ObservabilityModule) as boolean;
       expect(moduleMetadata).toBe(true);
     });
 
-    it('should export required services', async () => {
+    it('should export required services', () => {
       const moduleDefinition = ObservabilityModule.forRoot();
 
       expect(moduleDefinition.exports).toContain(LoggerService);
@@ -157,7 +163,7 @@ describe('ObservabilityModule - Lightweight', () => {
       expect(moduleDefinition.exports).toContain(TracingService);
     });
 
-    it('should include MetricsController', async () => {
+    it('should include MetricsController', () => {
       const moduleDefinition = ObservabilityModule.forRoot();
 
       expect(moduleDefinition.controllers).toContain(MetricsController);
