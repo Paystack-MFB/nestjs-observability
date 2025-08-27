@@ -54,7 +54,7 @@ afterEach(() => {
   // Restore original environment variables
   Object.entries(originalEnv).forEach(([key, value]) => {
     if (value === undefined) {
-      delete process.env[key];
+      Reflect.deleteProperty(process.env, key);
     } else {
       process.env[key] = value;
     }
@@ -104,7 +104,7 @@ export const testUtils = {
    */
   clearTestEnv(keys: string[]): void {
     keys.forEach((key) => {
-      delete process.env[key];
+      Reflect.deleteProperty(process.env, key);
     });
   },
 
@@ -144,7 +144,7 @@ export const testUtils = {
   timeout(ms: number): Promise<never> {
     return new Promise((_, reject) => {
       setTimeout(() => {
-        reject(new Error(`Test timeout after ${ms}ms`));
+        reject(new Error(`Test timeout after ${ms.toString()}ms`));
       }, ms);
     });
   },

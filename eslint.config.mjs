@@ -16,8 +16,6 @@ export default tseslint.config(
       'vitest.config.ts',
       '**/*.test.ts',
       '**/*.test.js',
-      'src/test-helpers/**',
-      'src/integration/**',
     ],
   },
   eslint.configs.recommended,

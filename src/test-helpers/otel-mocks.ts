@@ -66,49 +66,54 @@ export interface MockTracerProvider {
   getTracer: ReturnType<typeof vi.fn>;
 }
 
+interface MockFunction {
+  mockClear?: () => void;
+  mockReset?: () => void;
+}
+
 /**
  * Async operation utilities for testing
  */
-export class AsyncTestUtils {
+export const AsyncTestUtils = {
   /**
    * Execute multiple operations concurrently and wait for completion
    */
-  static async concurrent<T>(operations: (() => Promise<T>)[]): Promise<T[]> {
+  async concurrent<T>(operations: (() => Promise<T>)[]): Promise<T[]> {
     return Promise.all(operations.map((op) => op()));
-  }
+  },
 
   /**
    * Wait for a specified number of milliseconds
    */
-  static async delay(ms: number): Promise<void> {
+  async delay(ms: number): Promise<void> {
     return new Promise((resolve) => setTimeout(resolve, ms));
-  }
+  },
 
   /**
    * Wait for a condition to be true with timeout
    */
-  static async waitFor(condition: () => boolean | Promise<boolean>, timeoutMs = 5000, intervalMs = 100): Promise<void> {
+  async waitFor(condition: () => boolean | Promise<boolean>, timeoutMs = 5000, intervalMs = 100): Promise<void> {
     const startTime = Date.now();
 
     while (Date.now() - startTime < timeoutMs) {
       if (await condition()) {
         return;
       }
-      await this.delay(intervalMs);
+      await AsyncTestUtils.delay(intervalMs);
     }
 
-    throw new Error(`Condition not met within ${timeoutMs}ms`);
-  }
-}
+    throw new Error(`Condition not met within ${timeoutMs.toString()}ms`);
+  },
+} as const;
 
 /**
  * Mock factory for creating standardized mocks
  */
-export class MockFactory {
+export const MockFactory = {
   /**
    * Create mock environment variables for different scenarios
    */
-  static createEnvironment(scenario: 'development' | 'disabled' | 'production' | 'test'): Record<string, string> {
+  createEnvironment(scenario: 'development' | 'disabled' | 'production' | 'test'): Record<string, string> {
     const base = {
       NODE_ENV: scenario === 'production' ? 'production' : 'test',
       OTEL_SERVICE_NAME: `test-service-${scenario}`,
@@ -161,43 +166,43 @@ export class MockFactory {
       default:
         return base;
     }
-  }
+  },
 
   /**
    * Create a mock counter with standard methods
    */
-  static createMockCounter(): MockCounter {
+  createMockCounter(): MockCounter {
     return {
       add: vi.fn(),
     };
-  }
+  },
 
   /**
    * Create a mock gauge with standard methods
    */
-  static createMockGauge(): MockGauge {
+  createMockGauge(): MockGauge {
     return {
       addCallback: vi.fn(),
     };
-  }
+  },
 
   /**
    * Create a mock histogram with standard methods
    */
-  static createMockHistogram(): MockHistogram {
+  createMockHistogram(): MockHistogram {
     return {
       record: vi.fn(),
     };
-  }
+  },
 
   /**
    * Create a mock span with comprehensive methods
    */
-  static createMockSpan(options: Partial<MockSpanContext> = {}): MockSpan {
+  createMockSpan(options: Partial<MockSpanContext> = {}): MockSpan {
     const spanContext: MockSpanContext = {
-      spanId: options.spanId || 'mock-span-id-abc',
-      traceFlags: options.traceFlags || 1,
-      traceId: options.traceId || 'mock-trace-id-123',
+      spanId: options.spanId ?? 'mock-span-id-abc',
+      traceFlags: options.traceFlags ?? 1,
+      traceId: options.traceId ?? 'mock-trace-id-123',
     };
 
     return {
@@ -208,8 +213,8 @@ export class MockFactory {
       setStatus: vi.fn(),
       spanContext: vi.fn().mockReturnValue(spanContext),
     };
-  }
-}
+  },
+} as const;
 
 /**
  * OpenTelemetry Global Provider Mocks
@@ -273,11 +278,11 @@ export class OtelProviderMocks {
   clearMocks(): void {
     Object.values(this).forEach((mock) => {
       if (mock && typeof mock === 'object' && 'mockClear' in mock) {
-        mock.mockClear();
+        (mock as MockFunction).mockClear?.();
       } else if (mock && typeof mock === 'object') {
-        Object.values(mock).forEach((nestedMock) => {
+        Object.values(mock as Record<string, unknown>).forEach((nestedMock) => {
           if (nestedMock && typeof nestedMock === 'object' && 'mockClear' in nestedMock) {
-            (nestedMock as any).mockClear();
+            (nestedMock as MockFunction).mockClear?.();
           }
         });
       }
@@ -290,11 +295,11 @@ export class OtelProviderMocks {
   resetMocks(): void {
     Object.values(this).forEach((mock) => {
       if (mock && typeof mock === 'object' && 'mockReset' in mock) {
-        mock.mockReset();
+        (mock as MockFunction).mockReset?.();
       } else if (mock && typeof mock === 'object') {
-        Object.values(mock).forEach((nestedMock) => {
+        Object.values(mock as Record<string, unknown>).forEach((nestedMock) => {
           if (nestedMock && typeof nestedMock === 'object' && 'mockReset' in nestedMock) {
-            (nestedMock as any).mockReset();
+            (nestedMock as MockFunction).mockReset?.();
           }
         });
       }
@@ -392,7 +397,7 @@ export class TestEnvironment {
   clearEnvironment(keys: string[]): void {
     keys.forEach((key) => {
       this.originalEnv[key] = process.env[key];
-      delete process.env[key];
+      Reflect.deleteProperty(process.env, key);
     });
   }
 
@@ -402,7 +407,7 @@ export class TestEnvironment {
   restoreEnvironment(): void {
     Object.entries(this.originalEnv).forEach(([key, value]) => {
       if (value === undefined) {
-        delete process.env[key];
+        Reflect.deleteProperty(process.env, key);
       } else {
         process.env[key] = value;
       }
