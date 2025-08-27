@@ -2,6 +2,7 @@ import { Controller, Get, Header, HttpException, HttpStatus, Optional } from '@n
 
 import { LoggerService } from '../logger/logger.service';
 import { MetricsService } from '../metrics/metrics.service';
+import { getServiceName } from '../register';
 
 interface MetricsError extends Error {
   message: string;
@@ -111,7 +112,7 @@ export class MetricsController {
     return {
       enabled: this.isMetricsEnabled,
       endpoint: this.metricsEndpoint,
-      serviceName: process.env['OTEL_SERVICE_NAME'] ?? 'nestjs-app',
+      serviceName: getServiceName(),
     };
   }
 

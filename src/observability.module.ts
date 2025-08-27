@@ -6,6 +6,7 @@ import { MetricsController } from './controllers/metrics.controller';
 import { AutoTraceInterceptor } from './interceptors/auto-trace.interceptor';
 import { LoggerService } from './logger/logger.service';
 import { MetricsService } from './metrics/metrics.service';
+import { getServiceName, getServiceVersion } from './register';
 import { TracingService } from './tracing/tracing.service';
 
 /**
@@ -15,10 +16,8 @@ import { TracingService } from './tracing/tracing.service';
  */
 @Global()
 @Module({})
+// eslint-disable-next-line @typescript-eslint/no-extraneous-class
 export class ObservabilityModule {
-  // Non-static properties to prevent no-extraneous-class error
-  private readonly version = '1.0.0';
-
   /**
    * Register the module without configuration
    * All configuration comes from environment variables via the register module
@@ -33,8 +32,8 @@ export class ObservabilityModule {
         const defaultConfig = createObservabilityConfig(
           {
             environment: process.env['NODE_ENV'] ?? 'development',
-            serviceName: process.env['OTEL_SERVICE_NAME'] ?? 'nestjs-app',
-            serviceVersion: process.env['OTEL_SERVICE_VERSION'] ?? '1.0.0',
+            serviceName: getServiceName(),
+            serviceVersion: getServiceVersion(),
           },
           // Mock ConfigService since we're using environment variables directly
           {
@@ -72,8 +71,5 @@ export class ObservabilityModule {
       module: ObservabilityModule,
       providers,
     };
-  }
-  getVersion(): string {
-    return this.version;
   }
 }

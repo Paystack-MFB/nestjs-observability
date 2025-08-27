@@ -1,9 +1,9 @@
 import type { Span, Tracer } from '@opentelemetry/api';
 
-import { Injectable, Optional } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 import { trace } from '@opentelemetry/api';
 
-import { LoggerService } from '../logger/logger.service';
+import { getServiceName, getServiceVersion } from '../register';
 
 /**
  * Enhanced tracing service that integrates with OpenTelemetry global tracer provider
@@ -13,12 +13,12 @@ import { LoggerService } from '../logger/logger.service';
 export class TracingService {
   private readonly tracer: Tracer;
 
-  constructor(@Optional() private readonly logger: LoggerService | undefined) {
+  constructor() {
     // Get OpenTelemetry tracer from global provider
     const tracerProvider = typeof trace.getTracerProvider === 'function' ? trace.getTracerProvider() : undefined;
     const resolvedTracer =
       tracerProvider && typeof tracerProvider.getTracer === 'function'
-        ? tracerProvider.getTracer('nestjs-app', '1.0.0')
+        ? tracerProvider.getTracer(getServiceName(), getServiceVersion())
         : ({
             startActiveSpan: (_name: string, fn: (span: unknown) => unknown) => {
               const noOpSpan = {
@@ -52,11 +52,11 @@ export class TracingService {
    */
   addSpanEvent(name: string, attributes?: Record<string, boolean | number | string>): void {
     const span = this.getActiveSpan();
-    if (span) {
-      span.addEvent(name, attributes);
-    } else {
-      this.logger?.debug('No active span found to add event', { context: 'TracingService' });
+    if (!span) {
+      return;
     }
+
+    span.addEvent(name, attributes);
   }
 
   /**
@@ -70,7 +70,7 @@ export class TracingService {
       try {
         span.setAttributes({
           'instrumentation.type': 'manual',
-          'service.name': this.getServiceName(),
+          'service.name': getServiceName(),
         });
 
         const result = fn(span);
@@ -110,11 +110,11 @@ export class TracingService {
    */
   endActiveSpan(): void {
     const span = this.getActiveSpan();
-    if (span) {
-      span.end();
-    } else {
-      this.logger?.debug('No active span found to end', { context: 'TracingService' });
+    if (!span) {
+      return;
     }
+
+    span.end();
   }
 
   /**
@@ -131,11 +131,12 @@ export class TracingService {
    */
   getSpanId(): string | undefined {
     const span = this.getActiveSpan();
-    if (span) {
-      const spanContext = span.spanContext();
-      return spanContext.spanId;
+    if (!span) {
+      return;
     }
-    return undefined;
+
+    const spanContext = span.spanContext();
+    return spanContext.spanId;
   }
 
   /**
@@ -144,11 +145,12 @@ export class TracingService {
    */
   getTraceId(): string | undefined {
     const span = this.getActiveSpan();
-    if (span) {
-      const spanContext = span.spanContext();
-      return spanContext.traceId;
+    if (!span) {
+      return;
     }
-    return undefined;
+
+    const spanContext = span.spanContext();
+    return spanContext.traceId;
   }
 
   /**
@@ -178,12 +180,12 @@ export class TracingService {
    */
   recordException(exception: Error): void {
     const span = this.getActiveSpan();
-    if (span) {
-      span.recordException(exception);
-      span.setStatus({ code: 2, message: exception.message }); // ERROR
-    } else {
-      this.logger?.debug('No active span found to record exception', { context: 'TracingService' });
+    if (!span) {
+      return;
     }
+
+    span.recordException(exception);
+    span.setStatus({ code: 2, message: exception.message }); // ERROR
   }
 
   /**
@@ -193,11 +195,11 @@ export class TracingService {
    */
   setSpanAttribute(key: string, value: boolean | number | string): void {
     const span = this.getActiveSpan();
-    if (span) {
-      span.setAttribute(key, value);
-    } else {
-      this.logger?.debug('No active span found to set attribute', { context: 'TracingService' });
+    if (!span) {
+      return;
     }
+
+    span.setAttribute(key, value);
   }
 
   /**
@@ -206,11 +208,11 @@ export class TracingService {
    */
   setSpanAttributes(attributes: Record<string, boolean | number | string>): void {
     const span = this.getActiveSpan();
-    if (span) {
-      span.setAttributes(attributes);
-    } else {
-      this.logger?.debug('No active span found to set attributes', { context: 'TracingService' });
+    if (!span) {
+      return;
     }
+
+    span.setAttributes(attributes);
   }
 
   /**
@@ -220,15 +222,15 @@ export class TracingService {
    */
   setSpanStatus(status: 'ERROR' | 'OK', message?: string): void {
     const span = this.getActiveSpan();
-    if (span) {
-      const code = status === 'OK' ? 1 : 2;
-      if (message) {
-        span.setStatus({ code, message });
-      } else {
-        span.setStatus({ code });
-      }
+    if (!span) {
+      return;
+    }
+
+    const code = status === 'OK' ? 1 : 2;
+    if (message) {
+      span.setStatus({ code, message });
     } else {
-      this.logger?.debug('No active span found to set status', { context: 'TracingService' });
+      span.setStatus({ code });
     }
   }
 
@@ -242,7 +244,7 @@ export class TracingService {
     const span = this.tracer.startSpan(spanName);
     span.setAttributes({
       'instrumentation.type': 'manual',
-      'service.name': this.getServiceName(),
+      'service.name': getServiceName(),
     });
     return span;
   }
@@ -258,7 +260,7 @@ export class TracingService {
       // Set initial attributes
       span.setAttributes({
         'instrumentation.type': 'manual',
-        'service.name': this.getServiceName(),
+        'service.name': getServiceName(),
         ...attributes,
       });
 
@@ -293,13 +295,5 @@ export class TracingService {
         throw error;
       }
     });
-  }
-
-  /**
-   * Get service name from environment variables
-   * @returns Service name
-   */
-  private getServiceName(): string {
-    return process.env['OTEL_SERVICE_NAME'] ?? 'nestjs-app';
   }
 }

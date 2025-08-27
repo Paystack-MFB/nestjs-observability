@@ -4,6 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { LoggerService } from '../logger/logger.service';
 import { MetricsService } from './metrics.service';
+import { getServiceName, getServiceVersion } from '../register';
 
 // Mock OpenTelemetry API
 vi.mock('@opentelemetry/api', () => ({
@@ -65,7 +66,7 @@ describe('MetricsService', () => {
   describe('Initialization', () => {
     it('should initialize with OpenTelemetry global meter provider', () => {
       expect(metrics.getMeterProvider).toHaveBeenCalled();
-      expect(mockMeterProvider.getMeter).toHaveBeenCalledWith('nestjs-app', '1.0.0');
+      expect(mockMeterProvider.getMeter).toHaveBeenCalledWith(getServiceName(), getServiceVersion());
     });
 
     it('should initialize without throwing errors', () => {
@@ -169,7 +170,7 @@ describe('MetricsService', () => {
   describe('Global OpenTelemetry Integration', () => {
     it('should use global meter provider', () => {
       expect(metrics.getMeterProvider).toHaveBeenCalled();
-      expect(mockMeterProvider.getMeter).toHaveBeenCalledWith('nestjs-app', '1.0.0');
+      expect(mockMeterProvider.getMeter).toHaveBeenCalledWith(getServiceName(), getServiceVersion());
     });
 
     it('should create metrics without configuration dependency', () => {

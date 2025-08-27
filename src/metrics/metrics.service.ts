@@ -5,6 +5,7 @@ import { metrics } from '@opentelemetry/api';
 import * as promClient from 'prom-client';
 
 import { LoggerService } from '../logger/logger.service';
+import { getServiceName, getServiceVersion } from '../register';
 
 /**
  * Enhanced metrics service that integrates with OpenTelemetry global meter provider
@@ -28,7 +29,7 @@ export class MetricsService implements OnModuleInit {
     const meterProvider = typeof metrics.getMeterProvider === 'function' ? metrics.getMeterProvider() : undefined;
     const resolvedMeter =
       meterProvider && typeof meterProvider.getMeter === 'function'
-        ? meterProvider.getMeter('nestjs-app', '1.0.0')
+        ? meterProvider.getMeter(getServiceName(), getServiceVersion())
         : ({
             createCounter: () => ({ add: (_v: number, _attrs?: Record<string, string>) => undefined }),
             createHistogram: () => ({ record: (_v: number, _attrs?: Record<string, string>) => undefined }),
@@ -250,8 +251,8 @@ export class MetricsService implements OnModuleInit {
   private getServiceLabels(): Record<string, string> {
     return {
       environment: process.env['NODE_ENV'] ?? 'development',
-      service: process.env['OTEL_SERVICE_NAME'] ?? 'nestjs-app',
-      version: process.env['OTEL_SERVICE_VERSION'] ?? '1.0.0',
+      service: getServiceName(),
+      version: getServiceVersion(),
     };
   }
 

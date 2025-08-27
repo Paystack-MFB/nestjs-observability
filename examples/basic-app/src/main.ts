@@ -29,20 +29,6 @@ async function bootstrap() {
     port,
   });
 
-  // Check observability configuration
-  const tracesExporter = process.env.OTEL_TRACES_EXPORTER || 'console';
-  const metricsExporter = process.env.OTEL_METRICS_EXPORTER || 'console';
-  const logsExporter = process.env.OTEL_LOGS_EXPORTER || 'console';
-  const metricsEnabled = process.env.OTEL_METRICS_ENABLED !== 'false';
-
-  logger.log('Observability configuration', {
-    tracesExporter,
-    metricsExporter,
-    logsExporter,
-    metricsEnabled,
-    metricsEndpoint: process.env.OTEL_METRICS_ENDPOINT || '/metrics',
-  });
-
   await app.listen(port);
 
   logger.log('Application started successfully', {

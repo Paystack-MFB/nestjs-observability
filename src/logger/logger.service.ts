@@ -2,6 +2,8 @@ import { Injectable } from '@nestjs/common';
 import { trace } from '@opentelemetry/api';
 import { Logger, logs } from '@opentelemetry/api-logs';
 
+import { getServiceName, getServiceVersion } from '../register';
+
 /**
  * Enhanced NestJS logger that integrates with OpenTelemetry global providers
  * Provides structured logging with automatic trace context correlation
@@ -17,7 +19,7 @@ export class LoggerService {
     const loggerProvider = typeof logs.getLoggerProvider === 'function' ? logs.getLoggerProvider() : undefined;
     const resolved =
       loggerProvider && typeof loggerProvider.getLogger === 'function'
-        ? loggerProvider.getLogger('nestjs-app', '1.0.0')
+        ? loggerProvider.getLogger(getServiceName(), getServiceVersion())
         : undefined;
     this.otelLogger = resolved ?? ({ emit: (_r: unknown) => undefined } as unknown as Logger);
   }

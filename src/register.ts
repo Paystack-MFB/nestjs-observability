@@ -24,6 +24,20 @@ import { ATTR_SERVICE_NAME, ATTR_SERVICE_VERSION } from '@opentelemetry/semantic
 let sdk: NodeSDK | null = null;
 
 /**
+ * Get service name from environment variables
+ */
+export function getServiceName(): string {
+  return process.env['OTEL_SERVICE_NAME'] ?? 'unknown-service';
+}
+
+/**
+ * Get service version from environment variables
+ */
+export function getServiceVersion(): string {
+  return process.env['OTEL_SERVICE_VERSION'] ?? '1.0.0';
+}
+
+/**
  * Create log processor based on environment variables
  */
 function createLogProcessor(): BatchLogRecordProcessor | undefined {
@@ -165,20 +179,6 @@ function createTraceExporter():
 }
 
 /**
- * Get service name from environment variables
- */
-function getServiceName(): string {
-  return process.env['OTEL_SERVICE_NAME'] ?? 'unknown-service';
-}
-
-/**
- * Get service version from environment variables
- */
-function getServiceVersion(): string {
-  return process.env['OTEL_SERVICE_VERSION'] ?? '1.0.0';
-}
-
-/**
  * Graceful shutdown handler
  */
 async function gracefulShutdown(signal: string): Promise<void> {
@@ -220,10 +220,10 @@ function initializeSDK(): NodeSDK {
   const instrumentations = getNodeAutoInstrumentations({
     // Disable some instrumentations that might be noisy in development
     '@opentelemetry/instrumentation-dns': {
-      enabled: false,
+      enabled: true,
     },
     '@opentelemetry/instrumentation-net': {
-      enabled: false,
+      enabled: true,
     },
   });
 
@@ -293,11 +293,6 @@ function start(): void {
     if (typeof candidate.start === 'function') {
       candidate.start();
     }
-
-    console.log('OpenTelemetry SDK initialized successfully');
-    console.log(`Service: ${getServiceName()}`);
-    console.log(`Version: ${getServiceVersion()}`);
-    console.log(`Environment: ${process.env['NODE_ENV'] ?? 'development'}`);
 
     // Register graceful shutdown handlers
     process.on('SIGTERM', () => {

@@ -4,6 +4,7 @@ import { logs } from '@opentelemetry/api-logs';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { LoggerService } from './logger.service';
+import { getServiceName, getServiceVersion } from '../register';
 
 // Mock OpenTelemetry APIs
 vi.mock('@opentelemetry/api', () => ({
@@ -52,7 +53,7 @@ describe('LoggerService', () => {
   describe('Initialization', () => {
     it('should initialize with OpenTelemetry global logger provider', () => {
       expect(logs.getLoggerProvider).toHaveBeenCalled();
-      expect(mockLoggerProvider.getLogger).toHaveBeenCalledWith('nestjs-app', '1.0.0');
+      expect(mockLoggerProvider.getLogger).toHaveBeenCalledWith(getServiceName(), getServiceVersion());
     });
   });
 

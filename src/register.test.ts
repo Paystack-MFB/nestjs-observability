@@ -190,8 +190,8 @@ describe('Register Module', () => {
       );
 
       expect(getNodeAutoInstrumentations).toHaveBeenCalledWith({
-        '@opentelemetry/instrumentation-dns': { enabled: false },
-        '@opentelemetry/instrumentation-net': { enabled: false },
+        '@opentelemetry/instrumentation-dns': { enabled: true },
+        '@opentelemetry/instrumentation-net': { enabled: true },
       });
 
       expect(PeriodicExportingMetricReader).toHaveBeenCalledWith({
@@ -274,26 +274,6 @@ describe('Register Module', () => {
     it('should export SDK instance', async () => {
       const { sdk } = await import('./register');
       expect(sdk).toBeDefined();
-    });
-  });
-
-  describe('Console Output', () => {
-    it('should log initialization success message', async () => {
-      // eslint-disable-next-line @typescript-eslint/no-empty-function
-      const consoleSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
-
-      process.env['OTEL_SERVICE_NAME'] = 'test-service';
-      process.env['OTEL_SERVICE_VERSION'] = '1.2.3';
-      process.env['NODE_ENV'] = 'test';
-
-      await import('./register');
-
-      expect(consoleSpy).toHaveBeenCalledWith('OpenTelemetry SDK initialized successfully');
-      expect(consoleSpy).toHaveBeenCalledWith('Service: test-service');
-      expect(consoleSpy).toHaveBeenCalledWith('Version: 1.2.3');
-      expect(consoleSpy).toHaveBeenCalledWith('Environment: test');
-
-      consoleSpy.mockRestore();
     });
   });
 

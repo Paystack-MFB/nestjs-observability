@@ -2,8 +2,8 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { trace } from '@opentelemetry/api';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { LoggerService } from '../logger/logger.service';
 import { TracingService } from './tracing.service';
+import { getServiceName, getServiceVersion } from '../register';
 
 // Mock OpenTelemetry API
 vi.mock('@opentelemetry/api', () => ({
@@ -18,7 +18,6 @@ describe('TracingService', () => {
   let module: TestingModule;
   let mockTracer: any;
   let mockTracerProvider: any;
-  let mockLoggerService: any;
   let mockSpan: any;
 
   beforeEach(async () => {
@@ -50,22 +49,8 @@ describe('TracingService', () => {
     vi.mocked(trace.getTracerProvider).mockReturnValue(mockTracerProvider);
     vi.mocked(trace.getActiveSpan).mockReturnValue(mockSpan);
 
-    // Mock LoggerService
-    mockLoggerService = {
-      debug: vi.fn(),
-      error: vi.fn(),
-      log: vi.fn(),
-      warn: vi.fn(),
-    };
-
     module = await Test.createTestingModule({
-      providers: [
-        TracingService,
-        {
-          provide: LoggerService,
-          useValue: mockLoggerService,
-        },
-      ],
+      providers: [TracingService],
     }).compile();
 
     service = module.get<TracingService>(TracingService);
@@ -81,7 +66,7 @@ describe('TracingService', () => {
   describe('Initialization', () => {
     it('should initialize with OpenTelemetry global tracer provider', () => {
       expect(trace.getTracerProvider).toHaveBeenCalled();
-      expect(mockTracerProvider.getTracer).toHaveBeenCalledWith('nestjs-app', '1.0.0');
+      expect(mockTracerProvider.getTracer).toHaveBeenCalledWith(getServiceName(), getServiceVersion());
     });
 
     it('should provide access to the tracer instance', () => {
@@ -289,7 +274,7 @@ describe('TracingService', () => {
       process.env['OTEL_SERVICE_NAME'] = 'test-service-env';
 
       // Create new service instance to test environment variable usage
-      const testService = new TracingService(mockLoggerService);
+      const testService = new TracingService();
       testService.startSpan('test');
 
       expect(mockSpan.setAttributes).toHaveBeenCalledWith(
@@ -311,12 +296,12 @@ describe('TracingService', () => {
       delete process.env['OTEL_SERVICE_NAME'];
 
       // Create new service instance to test fallback
-      const testService = new TracingService(mockLoggerService);
+      const testService = new TracingService();
       testService.startSpan('test');
 
       expect(mockSpan.setAttributes).toHaveBeenCalledWith(
         expect.objectContaining({
-          'service.name': 'nestjs-app',
+          'service.name': getServiceName(),
         })
       );
 
@@ -346,7 +331,7 @@ describe('TracingService', () => {
   describe('Global Tracer Integration', () => {
     it('should use global tracer provider without configuration', () => {
       expect(trace.getTracerProvider).toHaveBeenCalled();
-      expect(mockTracerProvider.getTracer).toHaveBeenCalledWith('nestjs-app', '1.0.0');
+      expect(mockTracerProvider.getTracer).toHaveBeenCalledWith(getServiceName(), getServiceVersion());
     });
 
     it('should work without dependencies on ObservabilityConfig', () => {

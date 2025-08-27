@@ -137,7 +137,7 @@ describe('ObservabilityModule - Lightweight', () => {
 
       const config = module.get('OBSERVABILITY_CONFIG');
       expect(config).toBeDefined();
-      expect(config.serviceName).toBe('nestjs-app');
+      expect(config.serviceName).toBe('unknown-service');
       expect(config.serviceVersion).toBe('1.0.0');
       expect(config.environment).toBe('development');
     });
