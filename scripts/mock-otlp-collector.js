@@ -101,12 +101,16 @@ function logData(type, headers, body) {
 function handleRequest(req, res) {
   const parsedUrl = url.parse(req.url, true);
   const pathname = parsedUrl.pathname;
-  // Sanitize pathname for logging to prevent log injection
+
+  // Sanitize all user-controlled inputs for logging to prevent log injection
+  const safeMethod = sanitizeForLogging(String(req.method));
   const safePathname = sanitizeForLogging(String(pathname));
+  const rawContentType = req.headers['content-type'] || 'no content-type';
+  const safeContentType = sanitizeForLogging(String(rawContentType));
 
   stats.requests++;
 
-  console.log(`\n🌐 ${req.method} ${safePathname} - ${req.headers['content-type'] || 'no content-type'}`);
+  console.log(`\n🌐 ${safeMethod} ${safePathname} - ${safeContentType}`);
 
   // Set CORS headers for browser requests
   res.setHeader('Access-Control-Allow-Origin', '*');

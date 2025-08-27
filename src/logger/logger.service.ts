@@ -86,31 +86,30 @@ export class LoggerService {
    * Core method that emits logs to OpenTelemetry
    */
   private emit(level: string, message: Error | string, data?: Record<string, unknown>): void {
+    // Prepare enriched attributes
+    const enrichedData = {
+      ...data,
+      ...this.persistentContext,
+      ...this.getTraceContext(),
+    };
+
+    // Determine the log body and sanitize it to prevent log injection
+    const rawBody = message instanceof Error ? message.message : message;
+    const sanitizedBody = this.sanitizeLogMessage(rawBody);
+
     try {
-      // Prepare enriched attributes
-      const enrichedData = {
-        ...data,
-        ...this.persistentContext,
-        ...this.getTraceContext(),
-      };
-
-      // Determine the log body
-      const body = message instanceof Error ? message.message : message;
-
       // Emit structured log record
       this.otelLogger.emit({
         attributes: enrichedData as Record<string, boolean | number | string | string[]>,
-        body,
+        body: sanitizedBody,
         severityText: level,
         ...(message instanceof Error && { exception: message }),
       });
     } catch (error) {
       // Fallback to console if OpenTelemetry logging fails
       console.error('LoggerService emit failed:', error);
-      // Sanitize message to prevent log injection attacks while maintaining format compatibility
-      const sanitizedMessage = this.sanitizeLogMessage(message instanceof Error ? message.message : message);
-      // Use %s format specifier to prevent format string injection attacks
-      console.log('[%s] %s', level, sanitizedMessage, data);
+      // Use already sanitized body for console fallback and %s format specifier to prevent format string injection attacks
+      console.log('[%s] %s', level, sanitizedBody, data);
     }
   }
 
