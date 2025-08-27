@@ -22,6 +22,24 @@ let stats = {
 };
 
 /**
+ * Sanitize string for safe logging by removing/escaping potentially dangerous characters
+ * @param {string} str - The string to sanitize
+ * @returns {string} - The sanitized string
+ */
+function sanitizeForLogging(str) {
+  return (
+    str
+      // Remove null bytes and other control characters except tabs and spaces
+      .replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g, '')
+      // Replace newlines and carriage returns with escaped versions
+      .replace(/\n/g, '\\n')
+      .replace(/\r/g, '\\r')
+      // Replace tabs with escaped version for clarity
+      .replace(/\t/g, '\\t')
+  );
+}
+
+/**
  * Log received data with headers
  */
 function logData(type, headers, body) {
@@ -55,12 +73,22 @@ function logData(type, headers, body) {
       const bodyStr = body.toString('utf8');
       if (bodyStr.startsWith('{') || bodyStr.startsWith('[')) {
         const parsed = JSON.parse(bodyStr);
-        console.log(`📄 JSON data: ${JSON.stringify(parsed, null, 2).substring(0, 500)}...`);
+        // JSON.stringify already handles escaping, but sanitize for extra safety
+        const jsonStr = JSON.stringify(parsed, null, 2);
+        const sanitizedJson = sanitizeForLogging(jsonStr).substring(0, 500);
+        console.log(`📄 JSON data: ${sanitizedJson}...`);
       } else {
-        console.log(`📄 Raw data (first 200 chars): ${bodyStr.substring(0, 200)}...`);
+        // Sanitize raw data before logging to prevent log injection
+        const sanitizedData = sanitizeForLogging(bodyStr).substring(0, 200);
+        console.log(`📄 Raw data (first 200 chars): ${sanitizedData}...`);
       }
     } catch (error) {
-      console.log(`📄 Binary data: ${body.toString('hex').substring(0, 100)}...`);
+      // Sanitize the logged hex string to remove any unexpected newlines (defensive, for comprehensive security)
+      const sanitizedHex = body
+        .toString('hex')
+        .substring(0, 100)
+        .replace(/[\r\n]/g, '');
+      console.log(`📄 Binary data [user input]: ${sanitizedHex}...`);
     }
   }
 
@@ -73,10 +101,12 @@ function logData(type, headers, body) {
 function handleRequest(req, res) {
   const parsedUrl = url.parse(req.url, true);
   const pathname = parsedUrl.pathname;
+  // Sanitize pathname for logging to prevent log injection
+  const safePathname = sanitizeForLogging(String(pathname));
 
   stats.requests++;
 
-  console.log(`\n🌐 ${req.method} ${pathname} - ${req.headers['content-type'] || 'no content-type'}`);
+  console.log(`\n🌐 ${req.method} ${safePathname} - ${req.headers['content-type'] || 'no content-type'}`);
 
   // Set CORS headers for browser requests
   res.setHeader('Access-Control-Allow-Origin', '*');
@@ -162,7 +192,7 @@ function handleRequest(req, res) {
         break;
 
       default:
-        console.log(`❓ Unknown endpoint: ${pathname}`);
+        console.log(`❓ Unknown endpoint [user input]: ${safePathname}`);
         res.writeHead(404, { 'Content-Type': 'application/json' });
         res.end(
           JSON.stringify({
