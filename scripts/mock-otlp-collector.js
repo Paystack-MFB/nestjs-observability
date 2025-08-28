@@ -102,7 +102,7 @@ function logData(type, headers, body) {
       // Further restrict to hex digits only, as strict defense-in-depth
       hexStr = hexStr.replace(/[^a-f0-9]/g, '');
       const sanitizedHex = sanitizeForLogging(hexStr);
-      console.log(`📄 Binary data: ${sanitizedHex}...`);
+      console.log(`📄 Binary data: "${sanitizedHex}..."`);
     }
   }
 
