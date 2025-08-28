@@ -23,19 +23,28 @@ let stats = {
 
 /**
  * Sanitize string for safe logging by removing/escaping potentially dangerous characters
+ * This prevents log injection attacks by ensuring user input cannot forge log entries
  * @param {string} str - The string to sanitize
- * @returns {string} - The sanitized string
+ * @returns {string} - The sanitized string safe for logging
  */
 function sanitizeForLogging(str) {
+  if (typeof str !== 'string') {
+    str = String(str);
+  }
+
   return (
     str
-      // Remove null bytes and other control characters except tabs and spaces
+      // Remove null bytes and other dangerous control characters
       .replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g, '')
-      // Replace newlines and carriage returns with escaped versions
+      // Replace newlines and carriage returns with escaped versions to prevent log forging
       .replace(/\n/g, '\\n')
       .replace(/\r/g, '\\r')
       // Replace tabs with escaped version for clarity
       .replace(/\t/g, '\\t')
+      // Remove any remaining sequences that could be interpreted as log formatting
+      .replace(/\x1b\[[0-9;]*m/g, '') // ANSI escape sequences
+      // Limit length to prevent log flooding
+      .substring(0, 1000)
   );
 }
 
@@ -47,7 +56,7 @@ function logData(type, headers, body) {
   console.log(`⏰ Timestamp: ${new Date().toISOString()}`);
   console.log(`📊 Stats: ${JSON.stringify(stats)}`);
 
-  // Log relevant headers
+  // Log relevant headers with sanitization to prevent log injection
   const relevantHeaders = {};
   for (const [key, value] of Object.entries(headers)) {
     if (
@@ -56,7 +65,10 @@ function logData(type, headers, body) {
       key.toLowerCase().includes('content') ||
       key.toLowerCase().includes('user-agent')
     ) {
-      relevantHeaders[key] = value;
+      // SECURITY: Sanitize both header names and values as they are user-controlled
+      const safeKey = sanitizeForLogging(String(key));
+      const safeValue = sanitizeForLogging(String(value));
+      relevantHeaders[safeKey] = safeValue;
     }
   }
 
@@ -73,22 +85,22 @@ function logData(type, headers, body) {
       const bodyStr = body.toString('utf8');
       if (bodyStr.startsWith('{') || bodyStr.startsWith('[')) {
         const parsed = JSON.parse(bodyStr);
-        // JSON.stringify already handles escaping, but sanitize for extra safety
+        // SECURITY: JSON.stringify handles escaping, but sanitize for comprehensive safety
         const jsonStr = JSON.stringify(parsed, null, 2);
-        const sanitizedJson = sanitizeForLogging(jsonStr).substring(0, 500);
-        console.log(`📄 JSON data: ${sanitizedJson}...`);
+        const sanitizedJson = sanitizeForLogging(jsonStr);
+        console.log(`📄 JSON data: ${sanitizedJson.substring(0, 500)}...`);
       } else {
-        // Sanitize raw data before logging to prevent log injection
-        const sanitizedData = sanitizeForLogging(bodyStr).substring(0, 200);
-        console.log(`📄 Raw data (first 200 chars): ${sanitizedData}...`);
+        // SECURITY: Sanitize user-controlled raw data to prevent log injection attacks
+        // This ensures malicious input cannot forge log entries or inject control sequences
+        const sanitizedData = sanitizeForLogging(bodyStr);
+        console.log(`📄 Raw data (first 200 chars): ${sanitizedData.substring(0, 200)}...`);
       }
     } catch (error) {
-      // Sanitize the logged hex string to remove any unexpected newlines (defensive, for comprehensive security)
-      const sanitizedHex = body
-        .toString('hex')
-        .substring(0, 100)
-        .replace(/[\r\n]/g, '');
-      console.log(`📄 Binary data [user input]: ${sanitizedHex}...`);
+      // SECURITY: Sanitize hex representation of binary data to prevent log injection
+      // Even hex should be sanitized as a defensive measure against unexpected content
+      const hexStr = body.toString('hex').substring(0, 100);
+      const sanitizedHex = sanitizeForLogging(hexStr);
+      console.log(`📄 Binary data: ${sanitizedHex}...`);
     }
   }
 
