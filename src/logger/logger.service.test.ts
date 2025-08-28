@@ -340,6 +340,32 @@ describe('LoggerService', () => {
     });
   });
 
+  describe('Security Features', () => {
+    it('should sanitize log messages by removing control characters', () => {
+      // Test data with various control characters
+      const maliciousMessage = 'Hello\nWorld\r\nWith\tTabs\0AndNulls\x01\x1F\x7F';
+
+      getMockEmit().mockImplementation(() => {
+        throw new Error('OpenTelemetry failure');
+      });
+
+      const consoleSpy = vi.spyOn(console, 'log').mockImplementation(() => {
+        // Mock implementation
+      });
+      const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {
+        // Mock implementation
+      });
+
+      service.log(maliciousMessage);
+
+      // Should have sanitized the message by removing all control characters
+      expect(consoleSpy).toHaveBeenCalledWith('[%s] [USER DATA] %s', 'INFO', 'HelloWorldWithTabsAndNulls');
+
+      consoleSpy.mockRestore();
+      consoleErrorSpy.mockRestore();
+    });
+  });
+
   describe('Error Handling', () => {
     it('should fallback to console logging when OpenTelemetry fails', () => {
       const consoleSpy = vi.spyOn(console, 'log').mockImplementation(() => {
@@ -356,7 +382,7 @@ describe('LoggerService', () => {
       service.log('Failed message', { data: 'test' });
 
       expect(consoleErrorSpy).toHaveBeenCalledWith('LoggerService emit failed:', expect.any(Error));
-      expect(consoleSpy).toHaveBeenCalledWith('[%s] %s %s', 'INFO', 'Failed message', '{"data":"test"}');
+      expect(consoleSpy).toHaveBeenCalledWith('[%s] [USER DATA] %s %s', 'INFO', 'Failed message', '{"data":"test"}');
 
       consoleSpy.mockRestore();
       consoleErrorSpy.mockRestore();
@@ -378,7 +404,7 @@ describe('LoggerService', () => {
       service.error(error, { context: 'test' });
 
       expect(consoleErrorSpy).toHaveBeenCalledWith('LoggerService emit failed:', expect.any(Error));
-      expect(consoleSpy).toHaveBeenCalledWith('[%s] %s %s', 'ERROR', 'Test error', '{"context":"test"}');
+      expect(consoleSpy).toHaveBeenCalledWith('[%s] [USER DATA] %s %s', 'ERROR', 'Test error', '{"context":"test"}');
 
       consoleSpy.mockRestore();
       consoleErrorSpy.mockRestore();

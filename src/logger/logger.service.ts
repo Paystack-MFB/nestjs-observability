@@ -111,9 +111,9 @@ export class LoggerService {
       // Sanitize data before console fallback to prevent log injection and unwanted formatting
       const sanitizedDataString = data ? this.sanitizeLogMessage(JSON.stringify(this.sanitizeLogData(data))) : '';
       if (sanitizedDataString) {
-        console.log('[%s] %s %s', level, sanitizedBody, sanitizedDataString);
+        console.log('[%s] [USER DATA] %s %s', level, sanitizedBody, sanitizedDataString);
       } else {
-        console.log('[%s] %s', level, sanitizedBody);
+        console.log('[%s] [USER DATA] %s', level, sanitizedBody);
       }
     }
   }
@@ -166,37 +166,26 @@ export class LoggerService {
 
   /**
    * Sanitize log message to prevent log injection attacks
-   * Removes newlines and control characters that could be used to forge log entries
+   * Removes all control characters that could be used to forge log entries
    */
   private sanitizeLogMessage(message: string): string {
     if (typeof message !== 'string') {
       return String(message);
     }
 
-    // Replace dangerous characters that could be used for log injection
-    // Use a safer approach that avoids ESLint control character warnings
-    let sanitized = message;
-
-    // Replace various line endings and control characters
-    sanitized = sanitized.replace(/\r\n/g, ' [CRLF] '); // Windows line endings
-    sanitized = sanitized.replace(/\n/g, ' [LF] '); // Unix line endings
-    sanitized = sanitized.replace(/\r/g, ' [CR] '); // Mac line endings
-    sanitized = sanitized.replace(/\t/g, ' [TAB] '); // Tabs
-
-    // Replace null bytes and other problematic characters using char codes
-    // This avoids ESLint control character warnings
-    sanitized = sanitized.replace(/\0/g, ' [NULL] ');
-
-    // Replace other control characters by checking character codes
-    sanitized = sanitized.replace(/./g, (char) => {
-      const code = char.charCodeAt(0);
-      // Replace control characters (0x01-0x1F excluding already handled ones, and 0x7F)
-      if ((code >= 1 && code <= 8) || (code >= 11 && code <= 12) || (code >= 14 && code <= 31) || code === 127) {
-        return ' [CTRL] ';
-      }
-      return char;
-    });
-
-    return sanitized;
+    // Remove all line endings, tabs, nulls, and other control characters, replacing with nothing
+    // Covers: \r, \n, \t, \0, ASCII 0x01-0x1F, and 0x7F (DEL)
+    // For further safety, also trim whitespace at the ends
+    // Use character code filtering to avoid ESLint control-regex warnings
+    return message
+      .replace(/[\r\n\t\0]/g, '') // Remove common control chars
+      .split('')
+      .filter((char) => {
+        const code = char.charCodeAt(0);
+        // Keep all characters except control characters (0x01-0x1F and 0x7F)
+        return !(code >= 1 && code <= 31) && code !== 127;
+      })
+      .join('')
+      .trim();
   }
 }
