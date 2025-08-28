@@ -484,121 +484,114 @@ export class BusinessMetricsService {
 
 ### Environment-Specific Configuration
 
-#### ✅ **DO: Use Environment-Specific Settings**
+#### ✅ **DO: Use Environment Variables for Configuration**
 
-```typescript
-// config/observability.config.ts
-export const createObservabilityConfig = (env: string) => {
-  const baseConfig = {
-    serviceName: process.env.SERVICE_NAME || 'my-service',
-    serviceVersion: process.env.SERVICE_VERSION || '1.0.0',
-    environment: env,
-  };
+As of v1.0.0, the library uses **environment-driven configuration** following OpenTelemetry standards. No configuration objects are needed - just set the appropriate environment variables:
 
-  switch (env) {
-    case 'production':
-      return {
-        ...baseConfig,
-        logging: {
-          level: 'info',
-          consoleOutput: false, // Use structured logging in production
-          otlpExport: {
-            enabled: true,
-            endpoint: process.env.OTLP_LOGS_ENDPOINT,
-          },
-        },
-        tracing: {
-          enabled: true,
-          sampler: {
-            type: 'trace_id_ratio',
-            ratio: 0.1, // Sample 10% in production
-          },
-        },
-        metrics: {
-          enabled: true,
-          defaultLabels: {
-            datacenter: process.env.DATACENTER,
-            region: process.env.AWS_REGION,
-          },
-        },
-      };
+```bash
+# Production Environment
+OTEL_SERVICE_NAME=my-service
+OTEL_SERVICE_VERSION=1.0.0
+OTEL_RESOURCE_ATTRIBUTES=environment=production
 
-    case 'staging':
-      return {
-        ...baseConfig,
-        logging: {
-          level: 'debug',
-          consoleOutput: true,
-        },
-        tracing: {
-          enabled: true,
-          sampler: {
-            type: 'trace_id_ratio',
-            ratio: 0.5, // Sample 50% in staging
-          },
-        },
-      };
+# Logging Configuration
+OTEL_LOGS_EXPORTER=otlp
+OTEL_EXPORTER_OTLP_LOGS_ENDPOINT=https://your-otlp-logs-endpoint
 
-    case 'development':
-      return {
-        ...baseConfig,
-        logging: {
-          level: 'debug',
-          consoleOutput: true,
-        },
-        tracing: {
-          enabled: true,
-          sampler: {
-            type: 'always_on', // Trace everything in development
-          },
-        },
-      };
+# Tracing Configuration
+OTEL_TRACES_EXPORTER=otlp
+OTEL_EXPORTER_OTLP_TRACES_ENDPOINT=https://your-otlp-traces-endpoint
+OTEL_TRACES_SAMPLER=traceidratio
+OTEL_TRACES_SAMPLER_ARG=0.1  # Sample 10% in production
 
-    default:
-      return baseConfig;
-  }
-};
+# Metrics Configuration
+OTEL_METRICS_EXPORTER=otlp
+OTEL_EXPORTER_OTLP_METRICS_ENDPOINT=https://your-otlp-metrics-endpoint
+
+# Development vs Production
+NODE_ENV=production  # This affects default behaviors
 ```
 
-### Configuration Validation
-
-#### ✅ **DO: Validate Configuration**
+**NestJS Module Usage (No changes needed):**
 
 ```typescript
-import { IsString, IsEnum, IsOptional, IsNumber, Min, Max } from 'class-validator';
-import { plainToClass, Transform } from 'class-transformer';
+// app.module.ts
+@Module({
+  imports: [
+    ObservabilityModule.forRoot(), // No configuration needed!
+  ],
+})
+export class AppModule {}
+```
 
-export class ObservabilityConfigDto {
-  @IsString()
-  serviceName: string;
+**Environment-specific examples:**
 
-  @IsString()
-  serviceVersion: string;
+```bash
+# Development Environment
+NODE_ENV=development
+OTEL_SERVICE_NAME=my-service
+OTEL_SERVICE_VERSION=1.0.0
+OTEL_LOGS_EXPORTER=console
+OTEL_TRACES_EXPORTER=console
+OTEL_METRICS_EXPORTER=console
+OTEL_TRACES_SAMPLER=always_on  # Trace everything in development
 
-  @IsEnum(['development', 'staging', 'production'])
-  environment: string;
+# Staging Environment
+NODE_ENV=staging
+OTEL_SERVICE_NAME=my-service-staging
+OTEL_SERVICE_VERSION=1.0.0
+OTEL_TRACES_SAMPLER=traceidratio
+OTEL_TRACES_SAMPLER_ARG=0.5  # Sample 50% in staging
+OTEL_EXPORTER_OTLP_ENDPOINT=https://staging-otlp-endpoint
+```
 
-  @IsOptional()
-  @IsNumber()
-  @Min(0)
-  @Max(1)
-  @Transform(({ value }) => parseFloat(value))
-  samplingRatio?: number;
+### Environment Variable Validation
 
-  @IsOptional()
-  @IsEnum(['debug', 'info', 'warn', 'error'])
-  logLevel?: string;
-}
+#### ✅ **DO: Validate Environment Variables**
 
-export function validateObservabilityConfig(config: any): ObservabilityConfigDto {
-  const configDto = plainToClass(ObservabilityConfigDto, config);
-  const errors = validate(configDto);
+Since v1.0.0 uses environment-driven configuration, you can validate environment variables at startup:
 
-  if (errors.length > 0) {
-    throw new Error(`Invalid observability configuration: ${errors.join(', ')}`);
+```typescript
+// config-validator.ts
+export function validateEnvironmentConfig(): void {
+  const requiredVars = ['OTEL_SERVICE_NAME', 'OTEL_SERVICE_VERSION'];
+  const missingVars = requiredVars.filter((varName) => !process.env[varName]);
+
+  if (missingVars.length > 0) {
+    throw new Error(`Missing required environment variables: ${missingVars.join(', ')}`);
   }
 
-  return configDto;
+  // Validate sampling ratio if provided
+  const samplingArg = process.env.OTEL_TRACES_SAMPLER_ARG;
+  if (samplingArg) {
+    const ratio = parseFloat(samplingArg);
+    if (isNaN(ratio) || ratio < 0 || ratio > 1) {
+      throw new Error('OTEL_TRACES_SAMPLER_ARG must be a number between 0 and 1');
+    }
+  }
+
+  // Validate endpoints if provided
+  const endpoints = [
+    'OTEL_EXPORTER_OTLP_ENDPOINT',
+    'OTEL_EXPORTER_OTLP_TRACES_ENDPOINT',
+    'OTEL_EXPORTER_OTLP_METRICS_ENDPOINT',
+    'OTEL_EXPORTER_OTLP_LOGS_ENDPOINT',
+  ];
+
+  endpoints.forEach((envVar) => {
+    const value = process.env[envVar];
+    if (value && !value.startsWith('http')) {
+      throw new Error(`${envVar} must be a valid HTTP(S) URL`);
+    }
+  });
+}
+
+// main.ts
+async function bootstrap() {
+  validateEnvironmentConfig(); // Validate before app starts
+
+  const app = await NestFactory.create(AppModule);
+  await app.listen(3000);
 }
 ```
 
@@ -608,28 +601,33 @@ export function validateObservabilityConfig(config: any): ObservabilityConfigDto
 
 #### ✅ **DO: Use Appropriate Sampling**
 
-```typescript
-// Environment-based sampling
-const getSamplingRatio = (environment: string): number => {
-  switch (environment) {
-    case 'production':
-      return 0.01; // 1% sampling in production
-    case 'staging':
-      return 0.1; // 10% sampling in staging
-    case 'development':
-      return 1.0; // 100% sampling in development
-    default:
-      return 0.01;
-  }
-};
+Configure sampling using environment variables based on your environment:
 
-// Load-based sampling
-const getLoadBasedSampling = (currentLoad: number): number => {
-  if (currentLoad > 0.8) return 0.01; // 1% under high load
-  if (currentLoad > 0.5) return 0.05; // 5% under medium load
-  return 0.1; // 10% under normal load
-};
+```bash
+# Production: 1% sampling for high-traffic services
+OTEL_TRACES_SAMPLER=traceidratio
+OTEL_TRACES_SAMPLER_ARG=0.01
+
+# Staging: 10% sampling for better testing coverage
+OTEL_TRACES_SAMPLER=traceidratio
+OTEL_TRACES_SAMPLER_ARG=0.1
+
+# Development: 100% sampling for debugging
+OTEL_TRACES_SAMPLER=always_on
+
+# Custom sampling for specific needs
+OTEL_TRACES_SAMPLER=parentbased_traceidratio  # Respects parent decisions
+OTEL_TRACES_SAMPLER_ARG=0.05  # 5% sampling
 ```
+
+**Available sampler types:**
+
+- `always_on` - Sample all traces (development)
+- `always_off` - Sample no traces (disabled)
+- `traceidratio` - Sample based on trace ID ratio
+- `parentbased_always_on` - Respect parent sampling, default to always_on
+- `parentbased_always_off` - Respect parent sampling, default to always_off
+- `parentbased_traceidratio` - Respect parent sampling, default to ratio
 
 ### Avoiding Performance Bottlenecks
 

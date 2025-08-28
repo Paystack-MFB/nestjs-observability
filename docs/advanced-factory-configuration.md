@@ -1,6 +1,16 @@
 # Advanced Factory Configuration
 
-This guide covers advanced patterns for configuring the `ObservabilityModule` using the factory pattern for complex scenarios.
+> **⚠️ DEPRECATED as of v1.0.0**
+>
+> This guide covers the **deprecated factory pattern** from v0.x.
+>
+> **For v1.0.0+, use environment variables instead of factory configuration.**
+>
+> See the [migration section](#migration-to-v1.0.0) below for updated patterns.
+
+## ⚠️ Legacy Content (v0.x only)
+
+This guide covers advanced patterns for configuring the `ObservabilityModule` using the factory pattern for complex scenarios. **This approach is deprecated in v1.0.0.**
 
 ## Advanced Factory Pattern
 
@@ -390,39 +400,75 @@ ObservabilityModule.forRootAsync({
 
 ## Common Advanced Patterns
 
-### 1. Multi-Environment Support with Shared Config
+### 1. Multi-Environment Support with Environment Variables
+
+**⚠️ IMPORTANT: As of v1.0.0, this package uses environment-driven configuration following OpenTelemetry standards. No configuration objects or factory functions are needed.**
+
+**Updated Approach (Recommended):**
 
 ```typescript
-// shared-config.ts
-export const createObservabilityConfig = (
-  configService: ConfigService,
-  overrides: Partial<SimpleObservabilityConfig> = {}
-) => {
-  const baseConfig = {
-    serviceName: configService.get('SERVICE_NAME', 'my-service'),
-    serviceVersion: configService.get('SERVICE_VERSION', '1.0.0'),
-    environment: configService.get('NODE_ENV', 'development'),
-  };
+// app.module.ts - Simple and clean!
+@Module({
+  imports: [
+    ObservabilityModule.forRoot(), // No configuration needed!
+  ],
+})
+export class AppModule {}
+```
 
-  return {
-    ...baseConfig,
-    ...overrides,
-  };
-};
+**Environment Configuration:**
+
+```bash
+# .env.production
+OTEL_SERVICE_NAME=my-service
+OTEL_SERVICE_VERSION=1.0.0
+OTEL_RESOURCE_ATTRIBUTES=environment=production
+OTEL_TRACES_EXPORTER=otlp
+OTEL_METRICS_EXPORTER=otlp
+OTEL_LOGS_EXPORTER=otlp
+
+# .env.development
+OTEL_SERVICE_NAME=my-service-dev
+OTEL_SERVICE_VERSION=1.0.0
+OTEL_RESOURCE_ATTRIBUTES=environment=development
+OTEL_TRACES_EXPORTER=console
+OTEL_METRICS_EXPORTER=console
+OTEL_LOGS_EXPORTER=console
+```
+
+**If you need dynamic environment loading with NestJS ConfigService:**
+
+```typescript
+// config.service.ts
+@Injectable()
+export class ConfigService {
+  private setOpenTelemetryEnvVars(): void {
+    // Only set if not already defined
+    if (!process.env.OTEL_SERVICE_NAME) {
+      process.env.OTEL_SERVICE_NAME = this.get('SERVICE_NAME', 'my-service');
+    }
+    if (!process.env.OTEL_SERVICE_VERSION) {
+      process.env.OTEL_SERVICE_VERSION = this.get('SERVICE_VERSION', '1.0.0');
+    }
+    if (!process.env.OTEL_RESOURCE_ATTRIBUTES) {
+      const env = this.get('NODE_ENV', 'development');
+      process.env.OTEL_RESOURCE_ATTRIBUTES = `environment=${env}`;
+    }
+  }
+
+  onModuleInit() {
+    this.setOpenTelemetryEnvVars();
+  }
+}
 
 // app.module.ts
-ObservabilityModule.forRootAsync({
-  imports: [ConfigModule],
-  inject: [ConfigService],
-  useFactory: (configService: ConfigService) => {
-    return createObservabilityConfig(configService, {
-      // Environment-specific overrides
-      tracing: {
-        enabled: configService.get('NODE_ENV') === 'production',
-      },
-    });
-  },
-});
+@Module({
+  imports: [
+    ConfigModule.forRoot({ isGlobal: true }),
+    ObservabilityModule.forRoot(), // Called after ConfigService sets env vars
+  ],
+})
+export class AppModule {}
 ```
 
 ### 2. Conditional Module Loading
@@ -511,3 +557,79 @@ ObservabilityModule.forRootAsync({
   },
 });
 ```
+
+---
+
+## Migration to v1.0.0
+
+### ✅ New Approach: Environment-Driven Configuration
+
+**All the complex factory patterns above are replaced by simple environment variables:**
+
+```typescript
+// v1.0.0: Simple module registration
+@Module({
+  imports: [
+    ObservabilityModule.forRoot(), // No configuration needed!
+  ],
+})
+export class AppModule {}
+```
+
+### Environment Variable Mapping
+
+| Old Factory Pattern              | New Environment Variable                          |
+| -------------------------------- | ------------------------------------------------- |
+| `serviceName: 'my-service'`      | `OTEL_SERVICE_NAME=my-service`                    |
+| `serviceVersion: '1.0.0'`        | `OTEL_SERVICE_VERSION=1.0.0`                      |
+| `environment: 'production'`      | `OTEL_RESOURCE_ATTRIBUTES=environment=production` |
+| `tracing.enabled: true`          | `OTEL_TRACES_EXPORTER=otlp`                       |
+| `tracing.endpoint: 'http://...'` | `OTEL_EXPORTER_OTLP_TRACES_ENDPOINT=http://...`   |
+| `metrics.enabled: true`          | `OTEL_METRICS_EXPORTER=otlp`                      |
+| `metrics.endpoint: 'http://...'` | `OTEL_EXPORTER_OTLP_METRICS_ENDPOINT=http://...`  |
+| `logging.enabled: true`          | `OTEL_LOGS_EXPORTER=otlp`                         |
+| `logging.endpoint: 'http://...'` | `OTEL_EXPORTER_OTLP_LOGS_ENDPOINT=http://...`     |
+
+### Advanced Patterns in v1.0.0
+
+**Dynamic environment variables with ConfigService:**
+
+```typescript
+// config.service.ts
+@Injectable()
+export class ObservabilityConfigService implements OnModuleInit {
+  constructor(private configService: ConfigService) {}
+
+  onModuleInit() {
+    // Set OpenTelemetry environment variables from your configuration
+    process.env.OTEL_SERVICE_NAME = this.configService.get('SERVICE_NAME', 'my-service');
+    process.env.OTEL_SERVICE_VERSION = this.configService.get('SERVICE_VERSION', '1.0.0');
+
+    const environment = this.configService.get('NODE_ENV', 'development');
+    process.env.OTEL_RESOURCE_ATTRIBUTES = `environment=${environment}`;
+
+    // Conditional configuration
+    if (environment === 'production') {
+      process.env.OTEL_TRACES_SAMPLER = 'traceidratio';
+      process.env.OTEL_TRACES_SAMPLER_ARG = '0.01'; // 1% in production
+    } else {
+      process.env.OTEL_TRACES_SAMPLER = 'always_on'; // 100% in development
+    }
+  }
+}
+
+// app.module.ts
+@Module({
+  imports: [ConfigModule.forRoot({ isGlobal: true }), ObservabilityModule.forRoot()],
+  providers: [ObservabilityConfigService], // Will set env vars before OpenTelemetry initializes
+})
+export class AppModule {}
+```
+
+**Benefits of v1.0.0 approach:**
+
+- ✅ **Simpler**: No complex factory functions
+- ✅ **Standards-compliant**: Uses OpenTelemetry environment variables
+- ✅ **Performance**: No async factory resolution during module initialization
+- ✅ **Debugging**: Standard OpenTelemetry debugging applies
+- ✅ **Tooling**: Works with all OpenTelemetry tools and dashboards
