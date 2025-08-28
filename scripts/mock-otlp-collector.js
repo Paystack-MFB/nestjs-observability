@@ -98,7 +98,9 @@ function logData(type, headers, body) {
     } catch (error) {
       // SECURITY: Sanitize hex representation of binary data to prevent log injection
       // Even hex should be sanitized as a defensive measure against unexpected content
-      const hexStr = body.toString('hex').substring(0, 100);
+      let hexStr = body.toString('hex').substring(0, 100);
+      // Further restrict to hex digits only, as strict defense-in-depth
+      hexStr = hexStr.replace(/[^a-f0-9]/g, '');
       const sanitizedHex = sanitizeForLogging(hexStr);
       console.log(`📄 Binary data: ${sanitizedHex}...`);
     }

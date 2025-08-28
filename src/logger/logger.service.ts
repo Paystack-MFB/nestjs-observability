@@ -108,8 +108,13 @@ export class LoggerService {
     } catch (error) {
       // Fallback to console if OpenTelemetry logging fails
       console.error('LoggerService emit failed:', error);
-      // Use already sanitized body for console fallback and %s format specifier to prevent format string injection attacks
-      console.log('[%s] %s', level, sanitizedBody, data);
+      // Sanitize data before console fallback to prevent log injection and unwanted formatting
+      const sanitizedDataString = data ? this.sanitizeLogMessage(JSON.stringify(this.sanitizeLogData(data))) : '';
+      if (sanitizedDataString) {
+        console.log('[%s] %s %s', level, sanitizedBody, sanitizedDataString);
+      } else {
+        console.log('[%s] %s', level, sanitizedBody);
+      }
     }
   }
 
@@ -131,6 +136,32 @@ export class LoggerService {
       // Silently ignore tracing errors to prevent affecting application flow
     }
     return {};
+  }
+
+  /**
+   * Recursively sanitize all string values in an object to prevent log injection
+   * This ensures that any user-provided data in the logging context is safe
+   */
+  private sanitizeLogData(obj: unknown): unknown {
+    if (obj === null || obj === undefined) {
+      return obj;
+    }
+    if (typeof obj === 'string') {
+      return this.sanitizeLogMessage(obj);
+    }
+    if (Array.isArray(obj)) {
+      return obj.map((item) => this.sanitizeLogData(item));
+    }
+    if (typeof obj === 'object') {
+      const sanitizedObj: Record<string, unknown> = {};
+      for (const [key, value] of Object.entries(obj as Record<string, unknown>)) {
+        // Sanitize both keys and values to be extra safe
+        const sanitizedKey = typeof key === 'string' ? this.sanitizeLogMessage(key) : key;
+        sanitizedObj[sanitizedKey] = this.sanitizeLogData(value);
+      }
+      return sanitizedObj;
+    }
+    return obj; // number, boolean, etc.
   }
 
   /**
