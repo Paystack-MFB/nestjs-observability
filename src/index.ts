@@ -1,6 +1,5 @@
-// Note: Configuration is now handled via environment variables
-// The ObservabilityModule.forRoot() method uses OTEL_* environment variables
-// Legacy configuration exports deprecated - will be removed in next major version
+// Core observability module with OpenTelemetry integration
+// Configuration via OTEL_* environment variables
 // Controllers
 export { MetricsController } from './controllers/metrics.controller';
 // Decorators
@@ -29,4 +28,24 @@ export { ObservabilityModule } from './observability.module';
 export { TracingService } from './tracing/tracing.service';
 
 // Span attribute utilities
-export { addSpanAttribute, addSpanAttributes, getCurrentSpan } from './utils/span-attributes';
+export {
+  addSpanAttribute,
+  addSpanAttributes,
+  addSpanAttributesUnsafe,
+  addSpanAttributeUnsafe,
+  getCurrentSpan,
+  getCurrentSpanId,
+  getCurrentTraceId,
+  hasActiveSpan,
+  isSensitiveKey,
+} from './utils/span-attributes';
+
+// Extensible sanitization configuration (NEW in v1.0.0)
+export {
+  addSensitivePatterns,
+  clearAdditionalSensitivePatterns,
+  configureAttributeSanitization,
+  getSanitizationConfig,
+} from './utils/span-attributes';
+
+export type { AttributeSanitizationConfig } from './utils/span-attributes';

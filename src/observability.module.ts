@@ -1,12 +1,10 @@
 import { DynamicModule, Global, Module, Provider } from '@nestjs/common';
 import { APP_INTERCEPTOR } from '@nestjs/core';
 
-import { ConfigServiceInterface, createObservabilityConfig, ObservabilityConfig } from './config/observability.config';
 import { MetricsController } from './controllers/metrics.controller';
 import { AutoTraceInterceptor } from './interceptors/auto-trace.interceptor';
 import { LoggerService } from './logger/logger.service';
 import { MetricsService } from './metrics/metrics.service';
-import { getServiceName, getServiceVersion } from './register';
 import { TracingService } from './tracing/tracing.service';
 
 /**
@@ -19,43 +17,20 @@ import { TracingService } from './tracing/tracing.service';
 // eslint-disable-next-line @typescript-eslint/no-extraneous-class
 export class ObservabilityModule {
   /**
-   * Register the module without configuration
+   * Register the module with core observability services
    * All configuration comes from environment variables via the register module
+   * No configuration objects needed - everything is environment-driven
    */
   static forRoot(): DynamicModule {
-    // Create a default configuration based on environment variables
-    // This will be removed once services are updated to use global OpenTelemetry providers
-    const defaultConfigProvider: Provider = {
-      provide: 'OBSERVABILITY_CONFIG',
-      useFactory: (): ObservabilityConfig => {
-        // Create configuration from environment variables only
-        const defaultConfig = createObservabilityConfig(
-          {
-            environment: process.env['NODE_ENV'] ?? 'development',
-            serviceName: getServiceName(),
-            serviceVersion: getServiceVersion(),
-          },
-          // Mock ConfigService since we're using environment variables directly
-          {
-            get: (key: string) => process.env[key],
-          } as ConfigServiceInterface
-        );
-        return defaultConfig;
-      },
-    };
-
-    // Core providers - simplified without complex dependencies
+    // Core providers - clean and simple, no configuration objects
     const providers: Provider[] = [
-      // Default configuration provider (temporary until services are updated)
-      defaultConfigProvider,
-
-      // LoggerService - uses global OpenTelemetry logger provider (Task 4 completed)
+      // LoggerService - uses global OpenTelemetry logger provider
       LoggerService,
 
-      // MetricsService - uses global OpenTelemetry meter provider (Task 5 completed)
+      // MetricsService - uses global OpenTelemetry meter provider
       MetricsService,
 
-      // TracingService - uses global OpenTelemetry tracer provider (Task 6 completed)
+      // TracingService - uses global OpenTelemetry tracer provider
       TracingService,
 
       // AutoTraceInterceptor as global interceptor

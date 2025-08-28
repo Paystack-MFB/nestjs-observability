@@ -6,13 +6,6 @@ import { APP_INTERCEPTOR } from '@nestjs/core';
 import { Test, TestingModule } from '@nestjs/testing';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-// Test types
-interface TestObservabilityConfig {
-  environment: string;
-  serviceName: string;
-  serviceVersion: string;
-}
-
 // Mock OpenTelemetry modules
 vi.mock('@opentelemetry/api', () => ({
   metrics: {
@@ -117,35 +110,6 @@ describe('ObservabilityModule - Lightweight', () => {
       );
 
       expect(interceptorProvider).toBeDefined();
-    });
-
-    it('should provide default configuration from environment variables', async () => {
-      module = await Test.createTestingModule({
-        imports: [ObservabilityModule.forRoot()],
-      }).compile();
-
-      const config = module.get<TestObservabilityConfig>('OBSERVABILITY_CONFIG');
-      expect(config).toBeDefined();
-      expect(config.serviceName).toBe('test-service');
-      expect(config.serviceVersion).toBe('1.0.0');
-      expect(config.environment).toBe('test');
-    });
-
-    it('should use default values when environment variables are not set', async () => {
-      // Clear environment variables
-      delete process.env['OTEL_SERVICE_NAME'];
-      delete process.env['OTEL_SERVICE_VERSION'];
-      delete process.env['NODE_ENV'];
-
-      module = await Test.createTestingModule({
-        imports: [ObservabilityModule.forRoot()],
-      }).compile();
-
-      const config = module.get<TestObservabilityConfig>('OBSERVABILITY_CONFIG');
-      expect(config).toBeDefined();
-      expect(config.serviceName).toBe('unknown-service');
-      expect(config.serviceVersion).toBe('1.0.0');
-      expect(config.environment).toBe('development');
     });
   });
 
