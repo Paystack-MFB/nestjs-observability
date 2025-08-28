@@ -19,6 +19,38 @@ const DEFAULT_SENSITIVE_PATTERNS = [
 ];
 
 /**
+ * Configuration interface for attribute sanitization
+ */
+export interface AttributeSanitizationConfig {
+  /**
+   * Additional sensitive patterns that users can configure
+   * These will be combined with the default patterns
+   */
+  additionalSensitivePatterns: RegExp[];
+  /**
+   * Custom redacted placeholder (overrides environment variable)
+   */
+  customRedactedPlaceholder?: string;
+  /**
+   * Whether to enable sanitization (overrides environment variable)
+   */
+  enableSanitization?: boolean;
+}
+
+// Global configuration for attribute sanitization
+let globalSanitizationConfig: AttributeSanitizationConfig = {
+  additionalSensitivePatterns: [],
+};
+
+/**
+ * Add additional sensitive patterns to the global configuration
+ * @param patterns - Array of regex patterns to add
+ */
+export function addSensitivePatterns(patterns: RegExp[]): void {
+  globalSanitizationConfig.additionalSensitivePatterns.push(...patterns);
+}
+
+/**
  * Adds a single attribute to the current active span with automatic sanitization
  * @param key - The attribute key
  * @param value - The attribute value
@@ -103,6 +135,24 @@ export function addSpanEvent(name: string, attributes?: Record<string, unknown>)
 }
 
 /**
+ * Clear all additional sensitive patterns (resets to defaults only)
+ */
+export function clearAdditionalSensitivePatterns(): void {
+  globalSanitizationConfig.additionalSensitivePatterns = [];
+}
+
+/**
+ * Configure attribute sanitization settings
+ * @param config - Sanitization configuration
+ */
+export function configureAttributeSanitization(config: Partial<AttributeSanitizationConfig>): void {
+  globalSanitizationConfig = {
+    ...globalSanitizationConfig,
+    ...config,
+  };
+}
+
+/**
  * Gets the current active span
  * @returns The current active span or undefined if no span is active
  */
@@ -138,6 +188,14 @@ export function getCurrentTraceId(): string | undefined {
 }
 
 /**
+ * Get the current sanitization configuration
+ * @returns Current configuration (read-only copy)
+ */
+export function getSanitizationConfig(): Readonly<AttributeSanitizationConfig> {
+  return { ...globalSanitizationConfig };
+}
+
+/**
  * Check if a span is currently active
  * @returns True if there is an active span
  */
@@ -148,10 +206,16 @@ export function hasActiveSpan(): boolean {
 /**
  * Check if a key would be considered sensitive
  * @param key - The key to check
- * @returns True if the key matches sensitive patterns
+ * @returns True if the key matches sensitive patterns (default + additional)
  */
 export function isSensitiveKey(key: string): boolean {
-  return DEFAULT_SENSITIVE_PATTERNS.some((pattern) => pattern.test(key));
+  // Check default patterns
+  const matchesDefault = DEFAULT_SENSITIVE_PATTERNS.some((pattern) => pattern.test(key));
+
+  // Check additional patterns from configuration
+  const matchesAdditional = globalSanitizationConfig.additionalSensitivePatterns.some((pattern) => pattern.test(key));
+
+  return matchesDefault || matchesAdditional;
 }
 
 /**
@@ -188,18 +252,28 @@ export function setSpanStatus(status: 'ERROR' | 'OK', message?: string): void {
 }
 
 /**
- * Get the redacted placeholder value from environment or use default
+ * Get the redacted placeholder value from configuration, environment, or use default
  * @returns Placeholder string for redacted values
  */
 function getRedactedPlaceholder(): string {
-  return process.env['OTEL_SPAN_ATTRIBUTE_REDACTED_PLACEHOLDER'] ?? '[REDACTED]';
+  return (
+    globalSanitizationConfig.customRedactedPlaceholder ??
+    process.env['OTEL_SPAN_ATTRIBUTE_REDACTED_PLACEHOLDER'] ??
+    '[REDACTED]'
+  );
 }
 
 /**
- * Check if span attribute sanitization is enabled via environment variable
+ * Check if span attribute sanitization is enabled via configuration or environment variable
  * @returns True if sanitization is enabled
  */
 function isSanitizationEnabled(): boolean {
+  // Check configuration override first
+  if (globalSanitizationConfig.enableSanitization !== undefined) {
+    return globalSanitizationConfig.enableSanitization;
+  }
+
+  // Fall back to environment variable
   const envValue = process.env['OTEL_SPAN_ATTRIBUTE_SANITIZATION_ENABLED'];
   if (envValue === undefined) {
     return true; // Default to enabled
@@ -218,10 +292,8 @@ function sanitizeAttributeValue(key: string, value: unknown): string {
     return String(value);
   }
 
-  // Check if attribute name matches sensitive patterns
-  const isSensitive = DEFAULT_SENSITIVE_PATTERNS.some((pattern) => pattern.test(key));
-
-  if (isSensitive) {
+  // Check if attribute name matches sensitive patterns (default + additional)
+  if (isSensitiveKey(key)) {
     return getRedactedPlaceholder();
   }
 
