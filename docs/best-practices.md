@@ -490,6 +490,7 @@ As of v1.0.0, the library uses **environment-driven configuration** following Op
 
 ```bash
 # Production Environment
+OTEL_SERVICE_ENV=production
 OTEL_SERVICE_NAME=my-service
 OTEL_SERVICE_VERSION=1.0.0
 OTEL_RESOURCE_ATTRIBUTES=environment=production
@@ -509,7 +510,7 @@ OTEL_METRICS_EXPORTER=otlp
 OTEL_EXPORTER_OTLP_METRICS_ENDPOINT=https://your-otlp-metrics-endpoint
 
 # Development vs Production
-NODE_ENV=production  # This affects default behaviors
+OTEL_SERVICE_ENV=production  # This affects observability behaviors
 ```
 
 **NestJS Module Usage (No changes needed):**
@@ -528,7 +529,7 @@ export class AppModule {}
 
 ```bash
 # Development Environment
-NODE_ENV=development
+OTEL_SERVICE_ENV=development
 OTEL_SERVICE_NAME=my-service
 OTEL_SERVICE_VERSION=1.0.0
 OTEL_LOGS_EXPORTER=console
@@ -537,62 +538,12 @@ OTEL_METRICS_EXPORTER=console
 OTEL_TRACES_SAMPLER=always_on  # Trace everything in development
 
 # Staging Environment
-NODE_ENV=staging
+OTEL_SERVICE_ENV=staging
 OTEL_SERVICE_NAME=my-service-staging
 OTEL_SERVICE_VERSION=1.0.0
 OTEL_TRACES_SAMPLER=traceidratio
 OTEL_TRACES_SAMPLER_ARG=0.5  # Sample 50% in staging
 OTEL_EXPORTER_OTLP_ENDPOINT=https://staging-otlp-endpoint
-```
-
-### Environment Variable Validation
-
-#### ✅ **DO: Validate Environment Variables**
-
-Since v1.0.0 uses environment-driven configuration, you can validate environment variables at startup:
-
-```typescript
-// config-validator.ts
-export function validateEnvironmentConfig(): void {
-  const requiredVars = ['OTEL_SERVICE_NAME', 'OTEL_SERVICE_VERSION'];
-  const missingVars = requiredVars.filter((varName) => !process.env[varName]);
-
-  if (missingVars.length > 0) {
-    throw new Error(`Missing required environment variables: ${missingVars.join(', ')}`);
-  }
-
-  // Validate sampling ratio if provided
-  const samplingArg = process.env.OTEL_TRACES_SAMPLER_ARG;
-  if (samplingArg) {
-    const ratio = parseFloat(samplingArg);
-    if (isNaN(ratio) || ratio < 0 || ratio > 1) {
-      throw new Error('OTEL_TRACES_SAMPLER_ARG must be a number between 0 and 1');
-    }
-  }
-
-  // Validate endpoints if provided
-  const endpoints = [
-    'OTEL_EXPORTER_OTLP_ENDPOINT',
-    'OTEL_EXPORTER_OTLP_TRACES_ENDPOINT',
-    'OTEL_EXPORTER_OTLP_METRICS_ENDPOINT',
-    'OTEL_EXPORTER_OTLP_LOGS_ENDPOINT',
-  ];
-
-  endpoints.forEach((envVar) => {
-    const value = process.env[envVar];
-    if (value && !value.startsWith('http')) {
-      throw new Error(`${envVar} must be a valid HTTP(S) URL`);
-    }
-  });
-}
-
-// main.ts
-async function bootstrap() {
-  validateEnvironmentConfig(); // Validate before app starts
-
-  const app = await NestFactory.create(AppModule);
-  await app.listen(3000);
-}
 ```
 
 ## Performance Best Practices
@@ -770,6 +721,103 @@ addSpanAttributes({
 });
 ```
 
+### Configuring Sensitive Data Patterns
+
+The library automatically redacts common sensitive attributes (passwords, tokens, secrets, etc.) in span data. You can extend this protection with custom patterns for your business-specific sensitive data.
+
+#### ✅ **DO: Add Custom Sensitive Patterns**
+
+```typescript
+import { addSensitivePatterns, configureAttributeSanitization } from '@paystackhq/nestjs-observability';
+
+// Method 1: Add patterns incrementally to defaults
+addSensitivePatterns([
+  /customer[_-]?id/i, // Match customer_id, customer-id, customerId
+  /account[_-]?number/i, // Match account_number, account-number, accountNumber
+  /transaction[_-]?ref/i, // Match transaction_ref, transaction-ref, transactionRef
+  /\b\d{16}\b/, // Match 16-digit numbers (like card numbers)
+  /user[_-]?data/i, // Match user_data, user-data, userData
+  /internal[_-]?reference/i, // Match internal_reference, internal-reference
+]);
+
+// Method 2: Configure all sanitization settings at once
+configureAttributeSanitization({
+  additionalSensitivePatterns: [/company[_-]?secret/i, /database[_-]?url/i, /session[_-]?key/i, /api[_-]?response/i],
+  customRedactedPlaceholder: '[BUSINESS_DATA]',
+});
+
+// Method 3: Reset and set new patterns (replaces additional patterns)
+configureAttributeSanitization({
+  additionalSensitivePatterns: [/financial[_-]?data/i, /personal[_-]?info/i],
+});
+```
+
+#### 📝 **Pattern Guidelines**
+
+When creating custom sensitive patterns:
+
+- **Use case-insensitive regex** with `/i` flag for flexible matching
+- **Consider naming conventions**: snake_case, kebab-case, camelCase
+- **Be specific enough** to avoid false positives
+- **Test patterns** with your actual attribute names
+- **Include common variations** of your sensitive field names
+
+```typescript
+// Examples of comprehensive patterns
+const businessPatterns = [
+  // Customer data
+  /customer[_-]?(id|number|ref|reference)/i,
+  /client[_-]?(id|number|ref|reference)/i,
+
+  // Financial data
+  /account[_-]?(number|id|balance)/i,
+  /payment[_-]?(method|token|reference)/i,
+  /transaction[_-]?(id|ref|amount)/i,
+  /card[_-]?(number|token|cvv)/i,
+
+  // Internal references
+  /internal[_-]?(id|ref|key|token)/i,
+  /system[_-]?(id|key|reference)/i,
+  /tracking[_-]?(id|number|reference)/i,
+
+  // User data
+  /user[_-]?(data|info|details|profile)/i,
+  /profile[_-]?(data|info|details)/i,
+
+  // Regex for specific patterns
+  /\b\d{13,19}\b/, // Credit card numbers (13-19 digits)
+  /\b[A-Z]{2}\d{2}[A-Z0-9]{4}\d{7}([A-Z0-9]?){0,16}\b/, // IBAN format
+  /\b\d{3}-\d{2}-\d{4}\b/, // SSN format (US)
+];
+
+addSensitivePatterns(businessPatterns);
+```
+
+#### 🔍 **Default Protected Patterns**
+
+The library automatically protects these common patterns:
+
+- `password`, `passwd`, `pwd`
+- `token`, `auth`, `authorization`
+- `secret`, `key`, `apikey`
+- `credit`, `card`, `payment`
+- `ssn`, `social`, `address`
+- And more common sensitive terms
+
+#### ✅ **Verification**
+
+You can verify your patterns are working:
+
+```typescript
+import { isSensitiveKey } from '@paystackhq/nestjs-observability';
+
+// Test your patterns
+console.log(isSensitiveKey('customer_id')); // true (if pattern added)
+console.log(isSensitiveKey('account_number')); // true (if pattern added)
+console.log(isSensitiveKey('user_email')); // false (not sensitive)
+console.log(isSensitiveKey('password')); // true (default pattern)
+```
+
 ### Configuration Security
 
 #### ✅ **DO: Secure Configuration**
@@ -793,7 +841,7 @@ const observabilityConfig = {
     defaultLabels: {
       service: process.env.SERVICE_NAME,
       version: process.env.SERVICE_VERSION,
-      environment: process.env.NODE_ENV,
+      environment: process.env.OTEL_SERVICE_ENV,
     },
   },
 };

@@ -43,8 +43,6 @@ function sanitizeForLogging(str) {
       .replace(/\t/g, '\\t')
       // Remove any remaining sequences that could be interpreted as log formatting
       .replace(/\x1b\[[0-9;]*m/g, '') // ANSI escape sequences
-      // Limit length to prevent log flooding
-      .substring(0, 1000)
   );
 }
 
@@ -80,29 +78,16 @@ function logData(type, headers, body) {
   if (body && body.length > 0) {
     console.log(`📏 Body size: ${body.length} bytes`);
 
-    // Try to detect if it's JSON
+    // Content type detection (for logging purposes only)
     try {
       const bodyStr = body.toString('utf8');
       if (bodyStr.startsWith('{') || bodyStr.startsWith('[')) {
-        const parsed = JSON.parse(bodyStr);
-        // SECURITY: JSON.stringify handles escaping, but sanitize for comprehensive safety
-        const jsonStr = JSON.stringify(parsed, null, 2);
-        const sanitizedJson = sanitizeForLogging(jsonStr);
-        console.log(`📄 JSON data: ${sanitizedJson.substring(0, 500)}...`);
+        console.log(`📄 Content type: JSON`);
       } else {
-        // SECURITY: Sanitize user-controlled raw data to prevent log injection attacks
-        // This ensures malicious input cannot forge log entries or inject control sequences
-        const sanitizedData = sanitizeForLogging(bodyStr);
-        console.log(`📄 Raw data (first 200 chars): ${sanitizedData.substring(0, 200)}...`);
+        console.log(`📄 Content type: Raw text`);
       }
     } catch (error) {
-      // SECURITY: Sanitize hex representation of binary data to prevent log injection
-      // Even hex should be sanitized as a defensive measure against unexpected content
-      let hexStr = body.toString('hex').substring(0, 100);
-      // Further restrict to hex digits only, as strict defense-in-depth
-      hexStr = hexStr.replace(/[^a-f0-9]/g, '');
-      const sanitizedHex = sanitizeForLogging(hexStr);
-      console.log(`📄 Binary data: "${sanitizedHex}..."`);
+      console.log(`📄 Content type: Binary data`);
     }
   }
 

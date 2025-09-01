@@ -3,7 +3,7 @@ import type { Span, Tracer } from '@opentelemetry/api';
 import { Injectable } from '@nestjs/common';
 import { trace } from '@opentelemetry/api';
 
-import { getServiceName, getServiceVersion } from '../register';
+import { getServiceAttributes, getServiceName, getServiceVersion } from '../register';
 
 /**
  * Enhanced tracing service that integrates with OpenTelemetry global tracer provider
@@ -68,10 +68,7 @@ export class TracingService {
   createSpan<T>(spanName: string, fn: (span: Span) => T): T {
     return this.tracer.startActiveSpan(spanName, (span) => {
       try {
-        span.setAttributes({
-          'instrumentation.type': 'manual',
-          'service.name': getServiceName(),
-        });
+        span.setAttributes(getServiceAttributes());
 
         const result = fn(span);
 
@@ -242,10 +239,7 @@ export class TracingService {
    */
   startSpan(spanName: string): Span {
     const span = this.tracer.startSpan(spanName);
-    span.setAttributes({
-      'instrumentation.type': 'manual',
-      'service.name': getServiceName(),
-    });
+    span.setAttributes(getServiceAttributes());
     return span;
   }
 
@@ -259,8 +253,7 @@ export class TracingService {
     return this.tracer.startActiveSpan(spanName, (span) => {
       // Set initial attributes
       span.setAttributes({
-        'instrumentation.type': 'manual',
-        'service.name': getServiceName(),
+        ...getServiceAttributes(),
         ...attributes,
       });
 

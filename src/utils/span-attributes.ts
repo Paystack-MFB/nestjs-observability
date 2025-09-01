@@ -31,10 +31,6 @@ export interface AttributeSanitizationConfig {
    * Custom redacted placeholder (overrides environment variable)
    */
   customRedactedPlaceholder?: string;
-  /**
-   * Whether to enable sanitization (overrides environment variable)
-   */
-  enableSanitization?: boolean;
 }
 
 // Global configuration for attribute sanitization
@@ -132,13 +128,6 @@ export function addSpanEvent(name: string, attributes?: Record<string, unknown>)
   } else {
     span.addEvent(name);
   }
-}
-
-/**
- * Clear all additional sensitive patterns (resets to defaults only)
- */
-export function clearAdditionalSensitivePatterns(): void {
-  globalSanitizationConfig.additionalSensitivePatterns = [];
 }
 
 /**
@@ -264,16 +253,11 @@ function getRedactedPlaceholder(): string {
 }
 
 /**
- * Check if span attribute sanitization is enabled via configuration or environment variable
+ * Check if span attribute sanitization is enabled via environment variable
  * @returns True if sanitization is enabled
  */
 function isSanitizationEnabled(): boolean {
-  // Check configuration override first
-  if (globalSanitizationConfig.enableSanitization !== undefined) {
-    return globalSanitizationConfig.enableSanitization;
-  }
-
-  // Fall back to environment variable
+  // Check environment variable
   const envValue = process.env['OTEL_SPAN_ATTRIBUTE_SANITIZATION_ENABLED'];
   if (envValue === undefined) {
     return true; // Default to enabled

@@ -190,10 +190,7 @@ describe('Register Module', () => {
         })
       );
 
-      expect(getNodeAutoInstrumentations).toHaveBeenCalledWith({
-        '@opentelemetry/instrumentation-dns': { enabled: true },
-        '@opentelemetry/instrumentation-net': { enabled: true },
-      });
+      expect(getNodeAutoInstrumentations).toHaveBeenCalledWith();
 
       expect(PeriodicExportingMetricReader).toHaveBeenCalledWith({
         exporter: expect.any(Object),

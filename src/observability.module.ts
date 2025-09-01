@@ -22,18 +22,10 @@ export class ObservabilityModule {
    * No configuration objects needed - everything is environment-driven
    */
   static forRoot(): DynamicModule {
-    // Core providers - clean and simple, no configuration objects
     const providers: Provider[] = [
-      // LoggerService - uses global OpenTelemetry logger provider
       LoggerService,
-
-      // MetricsService - uses global OpenTelemetry meter provider
       MetricsService,
-
-      // TracingService - uses global OpenTelemetry tracer provider
       TracingService,
-
-      // AutoTraceInterceptor as global interceptor
       {
         provide: APP_INTERCEPTOR,
         useClass: AutoTraceInterceptor,

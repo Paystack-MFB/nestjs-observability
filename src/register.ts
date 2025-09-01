@@ -24,6 +24,25 @@ import { ATTR_SERVICE_NAME, ATTR_SERVICE_VERSION } from '@opentelemetry/semantic
 let sdk: NodeSDK | null = null;
 
 /**
+ * Get common service attributes for manual instrumentation
+ */
+export function getServiceAttributes(): Record<string, string> {
+  return {
+    'instrumentation.type': 'manual',
+    'service.environment': getServiceEnvironment(),
+    'service.name': getServiceName(),
+    'service.version': getServiceVersion(),
+  };
+}
+
+/**
+ * Get service environment from environment variables
+ */
+export function getServiceEnvironment(): string {
+  return process.env['OTEL_SERVICE_ENV'] ?? process.env['NODE_ENV'] ?? 'development';
+}
+
+/**
  * Get service name from environment variables
  */
 export function getServiceName(): string {
@@ -217,15 +236,7 @@ function initializeSDK(): NodeSDK {
   });
 
   // Get auto-instrumentations
-  const instrumentations = getNodeAutoInstrumentations({
-    // Disable some instrumentations that might be noisy in development
-    '@opentelemetry/instrumentation-dns': {
-      enabled: true,
-    },
-    '@opentelemetry/instrumentation-net': {
-      enabled: true,
-    },
-  });
+  const instrumentations = getNodeAutoInstrumentations();
 
   // Create SDK configuration
   const sdkConfig: Partial<import('@opentelemetry/sdk-node').NodeSDKConfiguration> = {

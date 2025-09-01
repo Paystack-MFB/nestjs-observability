@@ -358,8 +358,9 @@ describe('LoggerService', () => {
 
       service.log(maliciousMessage);
 
-      // Should have sanitized the message by removing all control characters
-      expect(consoleSpy).toHaveBeenCalledWith('[%s] [USER DATA] %s', 'INFO', 'HelloWorldWithTabsAndNulls');
+      // Should have triggered error logging but no console fallback (removed for security)
+      expect(consoleErrorSpy).toHaveBeenCalledWith('LoggerService emit failed:', expect.any(Error));
+      expect(consoleSpy).not.toHaveBeenCalled();
 
       consoleSpy.mockRestore();
       consoleErrorSpy.mockRestore();
@@ -382,7 +383,7 @@ describe('LoggerService', () => {
       service.log('Failed message', { data: 'test' });
 
       expect(consoleErrorSpy).toHaveBeenCalledWith('LoggerService emit failed:', expect.any(Error));
-      expect(consoleSpy).toHaveBeenCalledWith('[%s] [USER DATA] %s %s', 'INFO', 'Failed message', '{"data":"test"}');
+      expect(consoleSpy).not.toHaveBeenCalled();
 
       consoleSpy.mockRestore();
       consoleErrorSpy.mockRestore();
@@ -404,7 +405,7 @@ describe('LoggerService', () => {
       service.error(error, { context: 'test' });
 
       expect(consoleErrorSpy).toHaveBeenCalledWith('LoggerService emit failed:', expect.any(Error));
-      expect(consoleSpy).toHaveBeenCalledWith('[%s] [USER DATA] %s %s', 'ERROR', 'Test error', '{"context":"test"}');
+      expect(consoleSpy).not.toHaveBeenCalled();
 
       consoleSpy.mockRestore();
       consoleErrorSpy.mockRestore();

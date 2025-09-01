@@ -25,6 +25,9 @@ export { MetricsService } from './metrics/metrics.service';
 // Core module and services
 export { ObservabilityModule } from './observability.module';
 
+// Service helper functions
+export { getServiceAttributes, getServiceEnvironment, getServiceName, getServiceVersion } from './register';
+
 export { TracingService } from './tracing/tracing.service';
 
 // Span attribute utilities
@@ -41,11 +44,6 @@ export {
 } from './utils/span-attributes';
 
 // Extensible sanitization configuration (NEW in v1.0.0)
-export {
-  addSensitivePatterns,
-  clearAdditionalSensitivePatterns,
-  configureAttributeSanitization,
-  getSanitizationConfig,
-} from './utils/span-attributes';
+export { addSensitivePatterns, configureAttributeSanitization, getSanitizationConfig } from './utils/span-attributes';
 
 export type { AttributeSanitizationConfig } from './utils/span-attributes';

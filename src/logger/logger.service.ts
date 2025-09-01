@@ -108,13 +108,7 @@ export class LoggerService {
     } catch (error) {
       // Fallback to console if OpenTelemetry logging fails
       console.error('LoggerService emit failed:', error);
-      // Sanitize data before console fallback to prevent log injection and unwanted formatting
-      const sanitizedDataString = data ? this.sanitizeLogMessage(JSON.stringify(this.sanitizeLogData(data))) : '';
-      if (sanitizedDataString) {
-        console.log('[%s] [USER DATA] %s %s', level, sanitizedBody, sanitizedDataString);
-      } else {
-        console.log('[%s] [USER DATA] %s', level, sanitizedBody);
-      }
+      // Note: Console fallback logging removed to avoid potential log injection
     }
   }
 
