@@ -109,7 +109,7 @@ function handleRequest(req, res) {
 
   stats.requests++;
 
-  console.log(`\n🌐 ${safeMethod} ${safePathname} - ${safeContentType}`);
+  console.log(`\n🌐 Method: "${safeMethod}" Path: "${safePathname}" Content-Type: "${safeContentType}"`);
 
   // Set CORS headers for browser requests
   res.setHeader('Access-Control-Allow-Origin', '*');
@@ -195,7 +195,7 @@ function handleRequest(req, res) {
         break;
 
       default:
-        console.log(`❓ Unknown endpoint [user input]: ${safePathname}`);
+        console.log(`❓ Unknown endpoint - Path: "${safePathname}"`);
         res.writeHead(404, { 'Content-Type': 'application/json' });
         res.end(
           JSON.stringify({
