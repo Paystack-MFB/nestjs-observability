@@ -39,7 +39,7 @@ export function getServiceAttributes(): Record<string, string> {
  * Get service environment from environment variables
  */
 export function getServiceEnvironment(): string {
-  return process.env['OTEL_SERVICE_ENV'] ?? process.env['NODE_ENV'] ?? 'development';
+  return process.env['OTEL_SERVICE_ENV'] ?? 'local';
 }
 
 /**

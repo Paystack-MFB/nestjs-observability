@@ -74,21 +74,9 @@ function logData(type, headers, body) {
     console.log(`📋 Headers:`, relevantHeaders);
   }
 
-  // Log body size and first few bytes if available
+  // Log body size if available
   if (body && body.length > 0) {
     console.log(`📏 Body size: ${body.length} bytes`);
-
-    // Content type detection (for logging purposes only)
-    try {
-      const bodyStr = body.toString('utf8');
-      if (bodyStr.startsWith('{') || bodyStr.startsWith('[')) {
-        console.log(`📄 Content type: JSON`);
-      } else {
-        console.log(`📄 Content type: Raw text`);
-      }
-    } catch (error) {
-      console.log(`📄 Content type: Binary data`);
-    }
   }
 
   console.log('─'.repeat(60));

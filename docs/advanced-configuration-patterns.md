@@ -7,7 +7,7 @@ This guide covers advanced patterns for configuring the `ObservabilityModule` us
 This library uses several key environment variables for configuration:
 
 - **`OTEL_SERVICE_ENV`**: The environment your service is running in (production, staging, development, test). This is used instead of `NODE_ENV` for observability-specific configuration.
-- **`APP_NAME`**: The name of your application/service
+- **`OTEL_SERVICE_NAME`**: The name of your application/service
 - **`OTEL_SERVICE_VERSION`**: The version of your service
 - **Standard OpenTelemetry environment variables**: `OTEL_*` variables for configuring exporters, sampling, etc.
 
@@ -51,13 +51,13 @@ export class ObservabilityConfigService implements OnModuleInit {
     const environment = this.configService.get('OTEL_SERVICE_ENV', 'development');
 
     switch (environment) {
-      case 'production':
+      case 'prod':
         process.env.OTEL_TRACES_SAMPLER = 'traceidratio';
         process.env.OTEL_TRACES_SAMPLER_ARG = '0.01'; // 1% in production
         process.env.OTEL_EXPORTER_OTLP_ENDPOINT = this.configService.get('OTEL_ENDPOINT_PROD');
         break;
 
-      case 'staging':
+      case 'dev':
         process.env.OTEL_TRACES_SAMPLER = 'traceidratio';
         process.env.OTEL_TRACES_SAMPLER_ARG = '0.1'; // 10% in staging
         process.env.OTEL_EXPORTER_OTLP_ENDPOINT = this.configService.get('OTEL_ENDPOINT_STAGING');

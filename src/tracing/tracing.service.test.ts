@@ -140,7 +140,7 @@ describe('TracingService', () => {
       expect(mockTracer.startSpan).toHaveBeenCalledWith('test-span');
       expect(mockSpan.setAttributes).toHaveBeenCalledWith({
         'instrumentation.type': 'manual',
-        'service.environment': 'test',
+        'service.environment': 'local',
         'service.name': 'test-service',
         'service.version': '1.0.0-test',
       });
@@ -279,7 +279,7 @@ describe('TracingService', () => {
       expect(mockSpan.setAttributes).toHaveBeenCalledWith({
         custom: 'attribute',
         'instrumentation.type': 'manual',
-        'service.environment': 'test',
+        'service.environment': 'local',
         'service.name': 'test-service',
         'service.version': '1.0.0-test',
       });
