@@ -279,12 +279,12 @@ export class UserService {
 
   async createUser(userData: CreateUserDto): Promise<User> {
     // Basic logging methods
-    this.logger.log('Creating new user');
+    this.logger.info('Creating new user');
     this.logger.debug('User data validation started');
 
     try {
       const user = await this.userRepository.create(userData);
-      this.logger.log(`User created successfully: ${user.id}`);
+      this.logger.info(`User created successfully: ${user.id}`);
       return user;
     } catch (error) {
       this.logger.error('Failed to create user', error.stack);
@@ -305,7 +305,7 @@ export class OrderService {
 
   async processOrder(orderData: OrderDto): Promise<Order> {
     // Structured logging with additional context
-    this.logger.log({
+    this.logger.info({
       message: 'Processing order',
       orderId: orderData.id,
       userId: orderData.userId,
@@ -316,7 +316,7 @@ export class OrderService {
     try {
       const order = await this.orderRepository.create(orderData);
 
-      this.logger.log({
+      this.logger.info({
         message: 'Order processed successfully',
         orderId: order.id,
         status: order.status,
@@ -354,13 +354,13 @@ export class PaymentService {
       amount: paymentData.amount,
     });
 
-    this.logger.log('Starting payment processing');
+    this.logger.info('Starting payment processing');
 
     await this.validatePayment(paymentData);
     await this.chargeCard(paymentData);
     await this.updateInventory(paymentData);
 
-    this.logger.log('Payment processing completed');
+    this.logger.info('Payment processing completed');
 
     // Clear context when done
     this.logger.clearContext();
@@ -395,12 +395,12 @@ export class UserService {
       timestamp: new Date().toISOString(),
     });
 
-    childLogger.log('Processing user request');
+    childLogger.info('Processing user request');
 
     await this.processUserData(childLogger, userId);
     await this.updateUserProfile(childLogger, userId);
 
-    childLogger.log('User request completed');
+    childLogger.info('User request completed');
   }
 
   private async processUserData(logger: LoggerService, userId: string): Promise<void> {
@@ -438,7 +438,7 @@ export class UserService {
   async deleteUser(id: string): Promise<void> {
     try {
       await this.userRepository.delete(id);
-      this.logger.log(`User deleted: ${id}`);
+      this.logger.info(`User deleted: ${id}`);
     } catch (error) {
       // Custom error logging with additional context
       this.logger.error({
@@ -467,7 +467,7 @@ export class DebugService {
     // Different log levels for different purposes
     this.logger.verbose('Starting complex operation'); // Very detailed info
     this.logger.debug('Debug information for developers'); // Debug info
-    this.logger.log('General information'); // General info
+    this.logger.info('General information'); // General info
     this.logger.warn('Warning message'); // Warnings
     this.logger.error('Error occurred'); // Errors
     this.logger.fatal('Critical system error'); // Critical errors

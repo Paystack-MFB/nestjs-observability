@@ -64,7 +64,7 @@ export class LoggerService {
   /**
    * Log info level message
    */
-  log(message: string, data?: Record<string, unknown>): void {
+  info(message: string, data?: Record<string, unknown>): void {
     this.emit('INFO', message, data);
   }
 

@@ -5,7 +5,7 @@ import { metrics } from '@opentelemetry/api';
 import * as promClient from 'prom-client';
 
 import { LoggerService } from '../logger/logger.service';
-import { getServiceName, getServiceVersion } from '../register';
+import { getServiceEnvironment, getServiceName, getServiceVersion } from '../register';
 
 /**
  * Enhanced metrics service that integrates with OpenTelemetry global meter provider
@@ -209,7 +209,7 @@ export class MetricsService implements OnModuleInit {
         prefix: 'node_',
         register: this.registry,
       });
-      this.logger?.log('Default metrics collection enabled', { context: 'MetricsService' });
+      this.logger?.info('Default metrics collection enabled', { context: 'MetricsService' });
     } catch (error) {
       this.logger?.warn('Failed to initialize default metrics collection', {
         context: 'MetricsService',
@@ -250,7 +250,7 @@ export class MetricsService implements OnModuleInit {
    */
   private getServiceLabels(): Record<string, string> {
     return {
-      environment: process.env['NODE_ENV'] ?? 'development',
+      environment: getServiceEnvironment(),
       service: getServiceName(),
       version: getServiceVersion(),
     };

@@ -7,7 +7,7 @@ export class AppService {
 
   @Trace()
   async getHello(): Promise<string> {
-    this.logger.log('Getting hello message');
+    this.logger.info('Getting hello message');
 
     // Simulate some async work
     await this.delay(10);
@@ -17,7 +17,7 @@ export class AppService {
 
   @Trace()
   async getStatus(): Promise<any> {
-    this.logger.log('Getting application status');
+    this.logger.info('Getting application status');
 
     // Simulate status check
     await this.delay(20);
@@ -31,7 +31,7 @@ export class AppService {
 
   @Trace()
   async performComplexOperation(): Promise<any> {
-    this.logger.log('Performing complex operation');
+    this.logger.info('Performing complex operation');
 
     // Simulate complex processing
     await this.delay(100);

@@ -71,47 +71,6 @@
 - `OTEL_RESOURCE_ATTRIBUTES` - Custom resource attributes
 - `OTEL_SPAN_ATTRIBUTE_SANITIZATION_ENABLED` - Enable sensitive data sanitization
 
-#### 📚 Migration Guide
-
-**Before (v0.x)**
-
-```typescript
-@Module({
-  imports: [
-    ObservabilityModule.forRootAsync({
-      imports: [ConfigModule],
-      inject: [ConfigService],
-      useFactory: (configService: ConfigService) => ({
-        serviceName: configService.get('SERVICE_NAME'),
-        // ... complex configuration
-      }),
-    }),
-  ],
-})
-export class AppModule {}
-```
-
-**After (v1.0)**
-
-```typescript
-@Module({
-  imports: [
-    ObservabilityModule.forRoot(), // That's it!
-  ],
-})
-export class AppModule {}
-```
-
-**Startup Command**
-
-```bash
-# Before
-node dist/main.js
-
-# After
-node -r @paystackhq/nestjs-observability/register dist/main.js
-```
-
 #### 📊 Performance Improvements
 
 - **50% faster startup** - Simplified initialization with register pattern
@@ -132,12 +91,10 @@ node -r @paystackhq/nestjs-observability/register dist/main.js
 - ✅ Comprehensive unit tests with OpenTelemetry mocking
 - ✅ Integration test suite for real-world scenarios
 - ✅ End-to-end testing framework with performance benchmarking
-- ✅ Migration validation with multiple configuration scenarios
 
 **Documentation**
 
 - ✅ Complete README overhaul with new architecture examples
-- ✅ Migration guide for v0.x to v1.0 transition
 - ✅ Troubleshooting guide with common issues and solutions
 - ✅ OpenTelemetry compatibility matrix with platform integrations
 
@@ -161,7 +118,6 @@ This major release represents months of development focused on:
 
 #### 📖 Documentation
 
-- [Migration Guide](./docs/migration-guide.md) - Step-by-step v0.x to v1.0 migration
 - [Troubleshooting](./docs/troubleshooting.md) - Common issues and solutions
 - [OpenTelemetry Compatibility](./docs/opentelemetry-compatibility.md) - Version matrix and platform guides
 - [Examples](./examples/basic-app/README.md) - Complete usage examples with different configurations

@@ -77,8 +77,6 @@ export class AutoTraceInterceptor implements NestInterceptor {
       // Add HTTP attributes if this is an HTTP request
       this.addHttpAttributes(span, context);
 
-      this.logger.debug(`Started tracing ${spanName}`, { context: 'AutoTraceInterceptor' });
-
       return next.handle().pipe(
         tap({
           error: (error: Error) => {
@@ -107,11 +105,6 @@ export class AutoTraceInterceptor implements NestInterceptor {
 
             // Update metrics
             this.updateMetrics(context, duration);
-
-            this.logger.debug(`Completed tracing ${spanName} in ${duration.toFixed(3)}s`, {
-              context: 'AutoTraceInterceptor',
-            });
-
             return value;
           },
         })

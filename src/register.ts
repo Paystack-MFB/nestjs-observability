@@ -232,7 +232,7 @@ function initializeSDK(): NodeSDK {
   const resource = resourceFromAttributes({
     [ATTR_SERVICE_NAME]: getServiceName(),
     [ATTR_SERVICE_VERSION]: getServiceVersion(),
-    'service.environment': process.env['NODE_ENV'] ?? 'development',
+    'service.environment': getServiceEnvironment(),
   });
 
   // Get auto-instrumentations

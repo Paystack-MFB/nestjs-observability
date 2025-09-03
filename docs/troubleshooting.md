@@ -381,7 +381,7 @@ grep -o "traceId=[^,]*" logs.txt | sort | uniq -c
        const childLogger = this.logger.createChildLogger();
        childLogger.addContext('operation', 'handleRequest');
 
-       childLogger.log('Processing request');
+       childLogger.info('Processing request');
        // Child logger automatically includes parent context
      }
    }
@@ -398,7 +398,7 @@ grep -o "traceId=[^,]*" logs.txt | sort | uniq -c
      await this.asyncOperation();
 
      // This should still include dataId context
-     this.logger.log('Data processed');
+     this.logger.info('Data processed');
    }
    ```
 

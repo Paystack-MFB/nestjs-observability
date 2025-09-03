@@ -64,7 +64,7 @@ describe('Full-Stack Integration Tests', () => {
       expect(tracingService).toBeDefined();
 
       // Verify services are working
-      expect(typeof loggerService.log).toBe('function');
+      expect(typeof loggerService.info).toBe('function');
       expect(typeof metricsService.createCounter).toBe('function');
       expect(typeof tracingService.startSpan).toBe('function');
     });
@@ -124,7 +124,7 @@ describe('Full-Stack Integration Tests', () => {
 
       // Verify services can handle method calls gracefully (they use hardened constructors)
       expect(() => {
-        loggerService.log('test message');
+        loggerService.info('test message');
       }).not.toThrow();
       expect(() => metricsService.getMeter()).not.toThrow();
       expect(() => tracingService.getActiveSpan()).not.toThrow();
@@ -219,7 +219,7 @@ describe('Full-Stack Integration Tests', () => {
         loggerService.setContext({ component: 'integration', operation: 'test' });
 
         // Log with context - this should work with hardened implementation
-        loggerService.log('Test message with trace context', { data: 'test' });
+        loggerService.info('Test message with trace context', { data: 'test' });
 
         // End the span
         span.end();
@@ -270,7 +270,7 @@ describe('Full-Stack Integration Tests', () => {
         async () => {
           const childLogger = loggerService.createChildLogger();
           childLogger.setContext({ operationId: 'op-1', requestId: 'req-1' });
-          childLogger.log('Operation 1 message');
+          childLogger.info('Operation 1 message');
 
           const span = tracingService.startSpan('operation-1');
           await AsyncTestUtils.delay(10);
@@ -281,7 +281,7 @@ describe('Full-Stack Integration Tests', () => {
         async () => {
           const childLogger = loggerService.createChildLogger();
           childLogger.setContext({ operationId: 'op-2', requestId: 'req-2' });
-          childLogger.log('Operation 2 message');
+          childLogger.info('Operation 2 message');
 
           const span = tracingService.startSpan('operation-2');
           await AsyncTestUtils.delay(15);
@@ -292,7 +292,7 @@ describe('Full-Stack Integration Tests', () => {
         async () => {
           const childLogger = loggerService.createChildLogger();
           childLogger.setContext({ operationId: 'op-3', requestId: 'req-3' });
-          childLogger.log('Operation 3 message');
+          childLogger.info('Operation 3 message');
 
           const span = tracingService.startSpan('operation-3');
           await AsyncTestUtils.delay(5);
@@ -328,7 +328,7 @@ describe('Full-Stack Integration Tests', () => {
     it('should handle logging errors gracefully', () => {
       // Verify hardened logger service handles errors gracefully
       expect(() => {
-        loggerService.log('Test message');
+        loggerService.info('Test message');
         loggerService.error('Test error message');
         loggerService.warn('Test warning message');
         loggerService.debug('Test debug message');
@@ -411,7 +411,7 @@ describe('Full-Stack Integration Tests', () => {
       // Verify hardened logger service handles high-frequency logging
       expect(() => {
         for (let i = 0; i < logCount; i++) {
-          loggerService.log(`High frequency log ${i.toString()}`, { iteration: i });
+          loggerService.info(`High frequency log ${i.toString()}`, { iteration: i });
         }
       }).not.toThrow();
 
@@ -533,7 +533,7 @@ describe('Full-Stack Integration Tests', () => {
       requestLogger.setContext({ operation: 'user-profile', requestId, userId });
 
       // Log request start
-      requestLogger.log('Processing user profile request', {
+      requestLogger.info('Processing user profile request', {
         method: 'GET',
         path: '/api/users/profile',
         userId,
@@ -547,18 +547,18 @@ describe('Full-Stack Integration Tests', () => {
 
       // Simulate business logic
       await tracingService.withSpan('user-lookup', {}, async () => {
-        requestLogger.log('Looking up user in database', { userId });
+        requestLogger.info('Looking up user in database', { userId });
         await AsyncTestUtils.delay(50);
       });
 
       await tracingService.withSpan('profile-enrichment', {}, async () => {
-        requestLogger.log('Enriching user profile', { userId });
+        requestLogger.info('Enriching user profile', { userId });
         await AsyncTestUtils.delay(30);
       });
 
       // Record response
       requestDuration.record(0.08, { method: 'GET', route: '/api/users/profile', status: '200' });
-      requestLogger.log('Request completed successfully', {
+      requestLogger.info('Request completed successfully', {
         duration: '80ms',
         statusCode: 200,
         userId,
@@ -588,7 +588,7 @@ describe('Full-Stack Integration Tests', () => {
         // Simulate operation that throws error
         // eslint-disable-next-line @typescript-eslint/require-await
         await tracingService.withSpan('failing-operation', {}, async () => {
-          requestLogger.log('Starting operation that will fail');
+          requestLogger.info('Starting operation that will fail');
           throw new Error('Simulated business logic error');
         });
       } catch (error) {

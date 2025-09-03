@@ -18,7 +18,7 @@ export class UserService {
   }
   async getUserById(id: string): Promise<{ id: string; name: string; email: string }> {
     // Log the operation start with trace context (automatic via OpenTelemetry)
-    this.logger?.log('Getting user by ID', { userId: id, operation: 'getUserById' });
+    this.logger?.info('Getting user by ID', { userId: id, operation: 'getUserById' });
 
     // Example: Manually add span attributes for tracking
     addSpanAttribute('user.id', id);
@@ -42,7 +42,7 @@ export class UserService {
     });
 
     // Log successful operation (trace context included automatically)
-    this.logger?.log('User retrieved successfully', {
+    this.logger?.info('User retrieved successfully', {
       userId: user.id,
       userName: user.name,
       operation: 'getUserById',

@@ -29,9 +29,9 @@ export class MetricsController {
     this.metricsEndpoint = this.getMetricsEndpointFromEnv();
 
     if (this.isMetricsEnabled) {
-      this.logger?.log(`Metrics endpoint enabled at: ${this.metricsEndpoint}`, { context: 'MetricsController' });
+      this.logger?.info(`Metrics endpoint enabled at: ${this.metricsEndpoint}`, { context: 'MetricsController' });
     } else {
-      this.logger?.log('Metrics endpoint disabled via OTEL_METRICS_ENABLED environment variable', {
+      this.logger?.info('Metrics endpoint disabled via OTEL_METRICS_ENABLED environment variable', {
         context: 'MetricsController',
       });
     }

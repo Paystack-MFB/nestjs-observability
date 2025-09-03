@@ -168,7 +168,7 @@ export class OrderService {
 
   async processOrder(orderData: OrderDto): Promise<Order> {
     // Structured log with context
-    this.logger.log({
+    this.logger.info({
       message: 'Processing order',
       orderId: orderData.id,
       userId: orderData.userId,
@@ -180,7 +180,7 @@ export class OrderService {
     try {
       const order = await this.createOrder(orderData);
 
-      this.logger.log({
+      this.logger.info({
         message: 'Order processed successfully',
         orderId: order.id,
         status: order.status,
@@ -205,7 +205,7 @@ export class OrderService {
 
 ```typescript
 // Bad logging practices
-this.logger.log(`Processing order ${orderId} for user ${userId}`);
+this.logger.info(`Processing order ${orderId} for user ${userId}`);
 this.logger.error(`Order ${orderId} failed: ${error.message}`);
 ```
 
@@ -230,7 +230,7 @@ export class PaymentService {
     });
 
     // INFO: General information about normal operations
-    this.logger.log({
+    this.logger.info({
       message: 'Payment processing initiated',
       paymentId: paymentData.id,
       amount: paymentData.amount,
@@ -240,7 +240,7 @@ export class PaymentService {
       const payment = await this.processPaymentInternal(paymentData);
 
       // INFO: Successful operations
-      this.logger.log({
+      this.logger.info({
         message: 'Payment processed successfully',
         paymentId: payment.id,
         status: payment.status,
@@ -289,14 +289,14 @@ export class UserService {
       timestamp: new Date().toISOString(),
     });
 
-    this.logger.log('Processing user request');
+    this.logger.info('Processing user request');
 
     try {
       await this.processUserData(userId);
       await this.updateUserProfile(userId);
       await this.sendNotification(userId);
 
-      this.logger.log('User request completed successfully');
+      this.logger.info('User request completed successfully');
     } catch (error) {
       this.logger.error({
         message: 'User request failed',
@@ -670,7 +670,7 @@ export class UserService {
 
   async createUser(userData: CreateUserDto): Promise<User> {
     // Log sanitized data
-    this.logger.log({
+    this.logger.info({
       message: 'Creating user',
       email: userData.email,
       // Never log passwords, tokens, or PII
@@ -688,7 +688,7 @@ export class UserService {
     const user = await this.userRepository.create(userData);
 
     // Log success with non-sensitive data
-    this.logger.log({
+    this.logger.info({
       message: 'User created successfully',
       userId: user.id,
       email: user.email,
@@ -704,7 +704,7 @@ export class UserService {
 
 ```typescript
 // Bad - logging sensitive data
-this.logger.log({
+this.logger.info({
   message: 'User login',
   email: userData.email,
   password: userData.password, // Never log passwords
@@ -929,7 +929,7 @@ export class ResilientService {
         const result = await operation();
 
         if (attempt > 1) {
-          this.logger.log({
+          this.logger.info({
             message: 'Operation succeeded after retry',
             attempt,
             totalAttempts: maxRetries,
@@ -1181,7 +1181,7 @@ export class EventHandler {
       });
     }
 
-    this.logger.log({
+    this.logger.info({
       message: 'Processing order created event',
       eventId: event.id,
       orderId: event.orderId,

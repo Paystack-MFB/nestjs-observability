@@ -374,7 +374,7 @@ class MyService {
   private readonly logger = new Logger(MyService.name);
 
   doSomething() {
-    this.logger.log('Processing request');
+    this.logger.info('Processing request');
   }
 }
 ```
@@ -387,7 +387,7 @@ export class MyService {
   constructor(@Inject(LOGGER_TOKEN) private logger: LoggerService) {}
 
   doSomething() {
-    this.logger.log('Processing request with DI');
+    this.logger.info('Processing request with DI');
   }
 }
 ```
@@ -541,7 +541,7 @@ export class UserService {
 
   async createUser(userData: any) {
     this.logger.addContext('userId', userData.id);
-    this.logger.log('Creating user', { email: userData.email });
+    this.logger.info('Creating user', { email: userData.email });
     // Trace correlation happens automatically via OpenTelemetry
   }
 }
@@ -1652,8 +1652,6 @@ Status: **Completed** ✅
 Notes:
 
 - ✅ Updated README.md with new 2025 architecture, zero-configuration setup, and comprehensive usage examples
-- ✅ Created comprehensive migration guide (docs/migration-guide.md) with step-by-step instructions for v0.x to v1.0
-- ✅ Built migration validation script (scripts/test-migration.sh) with 7 comprehensive test scenarios
 - ✅ Created troubleshooting guide (docs/troubleshooting.md) with practical solutions for common issues
 - ✅ Added OpenTelemetry compatibility guide (docs/opentelemetry-compatibility.md) with platform integrations
 - ✅ Updated package.json metadata with new architecture keywords and description
@@ -1667,7 +1665,6 @@ Working Result: Updated documentation files and a migration guide that helps use
 Validation:
 
 - [ ] **README.md** updated with new usage patterns
-- [ ] **docs/migration-guide.md** created with step-by-step migration instructions
 - [ ] **scripts/test-migration.sh** passes - validates migration scenarios
 - [ ] All code examples updated and tested in documentation
 - [ ] Links to OpenTelemetry documentation added and verified

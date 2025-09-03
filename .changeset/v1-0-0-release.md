@@ -11,7 +11,7 @@
 - **WHY**: Simplified architecture for better maintainability and performance
 - **HOW**: No action needed - configuration is now purely environment-driven via `OTEL_*` variables
 
-### Module Simplification  
+### Module Simplification
 - **WHAT**: `ObservabilityModule.forRoot()` no longer accepts configuration objects
 - **WHY**: Eliminates complexity and follows OpenTelemetry standards
 - **HOW**: Remove any configuration objects passed to `forRoot()` - use environment variables instead
@@ -46,7 +46,7 @@
 
 ### Legacy Code Cleanup
 - Removed unused configuration providers for faster startup
-- Simplified dependency injection for better performance  
+- Simplified dependency injection for better performance
 - Cleaner module structure with reduced complexity
 - Eliminated dead code paths
 

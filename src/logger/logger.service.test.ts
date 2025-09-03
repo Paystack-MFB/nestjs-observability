@@ -80,7 +80,7 @@ describe('LoggerService', () => {
 
   describe('Basic Logging Methods', () => {
     it('should emit log messages with correct severity levels', () => {
-      service.log('Info message');
+      service.info('Info message');
       service.error('Error message');
       service.warn('Warning message');
       service.debug('Debug message');
@@ -127,7 +127,7 @@ describe('LoggerService', () => {
 
     it('should include additional data in attributes', () => {
       const data = { requestId: 'req-456', userId: '123' };
-      service.log('Message with data', data);
+      service.info('Message with data', data);
 
       expect(getMockEmit()).toHaveBeenCalledWith({
         attributes: data,
@@ -141,7 +141,7 @@ describe('LoggerService', () => {
     it('should set and persist context across log calls', () => {
       service.setContext({ sessionId: 'session-123', userId: 'user-456' });
 
-      service.log('First message');
+      service.info('First message');
       service.warn('Second message');
 
       expect(getMockEmit()).toHaveBeenCalledTimes(2);
@@ -170,7 +170,7 @@ describe('LoggerService', () => {
       service.addContext('operationId', 'op-789');
       service.addContext('tenantId', 'tenant-abc');
 
-      service.log('Message with added context');
+      service.info('Message with added context');
 
       expect(getMockEmit()).toHaveBeenCalledWith({
         attributes: {
@@ -186,7 +186,7 @@ describe('LoggerService', () => {
       service.setContext({ sessionId: 'session-123', userId: 'user-456' });
       service.clearContext();
 
-      service.log('Message after clear');
+      service.info('Message after clear');
 
       expect(getMockEmit()).toHaveBeenCalledWith({
         attributes: {},
@@ -199,7 +199,7 @@ describe('LoggerService', () => {
       service.setContext({ sessionId: 'session-123' });
 
       const additionalData = { requestId: 'req-456', userId: 'user-789' };
-      service.log('Message with merged data', additionalData);
+      service.info('Message with merged data', additionalData);
 
       expect(getMockEmit()).toHaveBeenCalledWith({
         attributes: {
@@ -225,7 +225,7 @@ describe('LoggerService', () => {
 
       getMockedGetActiveSpan().mockReturnValue(mockSpan as unknown as ReturnType<typeof trace.getActiveSpan>);
 
-      service.log('Message with trace context');
+      service.info('Message with trace context');
 
       expect(getMockEmit()).toHaveBeenCalledWith({
         attributes: {
@@ -241,7 +241,7 @@ describe('LoggerService', () => {
     it('should handle missing active span gracefully', () => {
       vi.mocked(trace.getActiveSpan).mockReturnValue(undefined);
 
-      service.log('Message without trace');
+      service.info('Message without trace');
 
       expect(getMockEmit()).toHaveBeenCalledWith({
         attributes: {},
@@ -256,7 +256,7 @@ describe('LoggerService', () => {
       });
 
       expect(() => {
-        service.log('Message with broken trace');
+        service.info('Message with broken trace');
       }).not.toThrow();
 
       expect(getMockEmit()).toHaveBeenCalledWith({
@@ -278,7 +278,7 @@ describe('LoggerService', () => {
       getMockedGetActiveSpan().mockReturnValue(mockSpan as unknown as ReturnType<typeof trace.getActiveSpan>);
 
       service.setContext({ sessionId: 'session-789' });
-      service.log('Complete context message', { requestId: 'req-abc' });
+      service.info('Complete context message', { requestId: 'req-abc' });
 
       expect(getMockEmit()).toHaveBeenCalledWith({
         attributes: {
@@ -299,7 +299,7 @@ describe('LoggerService', () => {
       service.setContext({ parentContext: 'parent-value', sessionId: 'session-123' });
 
       const childLogger = service.createChildLogger();
-      childLogger.log('Child message');
+      childLogger.info('Child message');
 
       expect(getMockEmit()).toHaveBeenCalledWith({
         attributes: {
@@ -318,7 +318,7 @@ describe('LoggerService', () => {
       childLogger.addContext('childContext', 'child-value');
 
       // Parent should not have child context
-      service.log('Parent message');
+      service.info('Parent message');
       expect(getMockEmit()).toHaveBeenLastCalledWith({
         attributes: {
           parentContext: 'parent-value',
@@ -328,7 +328,7 @@ describe('LoggerService', () => {
       });
 
       // Child should have both contexts
-      childLogger.log('Child message');
+      childLogger.info('Child message');
       expect(getMockEmit()).toHaveBeenLastCalledWith({
         attributes: {
           childContext: 'child-value',
@@ -356,7 +356,7 @@ describe('LoggerService', () => {
         // Mock implementation
       });
 
-      service.log(maliciousMessage);
+      service.info(maliciousMessage);
 
       // Should have triggered error logging but no console fallback (removed for security)
       expect(consoleErrorSpy).toHaveBeenCalledWith('LoggerService emit failed:', expect.any(Error));
@@ -380,7 +380,7 @@ describe('LoggerService', () => {
         throw new Error('OpenTelemetry failure');
       });
 
-      service.log('Failed message', { data: 'test' });
+      service.info('Failed message', { data: 'test' });
 
       expect(consoleErrorSpy).toHaveBeenCalledWith('LoggerService emit failed:', expect.any(Error));
       expect(consoleSpy).not.toHaveBeenCalled();
@@ -421,7 +421,7 @@ describe('LoggerService', () => {
       expect(service1).toBe(service2);
 
       service1.setContext({ sharedContext: 'shared-value' });
-      service2.log('Message from service2');
+      service2.info('Message from service2');
 
       expect(getMockEmit()).toHaveBeenCalledWith({
         attributes: {

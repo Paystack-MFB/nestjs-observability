@@ -2,10 +2,10 @@ import { Injectable } from '@nestjs/common';
 import {
   LoggerService,
   MetricsService,
-  TracingService,
-  TraceClass,
-  Trace,
   NoTrace,
+  Trace,
+  TraceClass,
+  TracingService,
 } from '@paystackhq/nestjs-observability';
 
 /**
@@ -39,7 +39,7 @@ export class ExampleService {
     // Initialize custom metrics
     this.initializeMetrics();
 
-    this.logger?.log('ExampleService initialized', {
+    this.logger?.info('ExampleService initialized', {
       metricsInitialized: true,
       tracingEnabled: true,
     });
@@ -244,7 +244,7 @@ export class ExampleService {
 
     const batchId = Math.random().toString(36).substring(7);
 
-    this.logger.log('Starting concurrent operations', {
+    this.logger.info('Starting concurrent operations', {
       batchId,
       requestCount: requests.length,
       startTime: new Date().toISOString(),
@@ -293,7 +293,7 @@ export class ExampleService {
 
     const results = await Promise.all(promises);
 
-    this.logger.log('All concurrent operations completed', {
+    this.logger.info('All concurrent operations completed', {
       batchId,
       completedCount: results.length,
       completedAt: new Date().toISOString(),
@@ -308,7 +308,7 @@ export class ExampleService {
   @NoTrace()
   async sensitiveOperation(sensitiveData: any): Promise<any> {
     // This operation won't be traced due to @NoTrace decorator
-    this.logger.log('Processing sensitive operation', {
+    this.logger.info('Processing sensitive operation', {
       note: 'This operation is not traced for security reasons',
       dataType: typeof sensitiveData,
     });

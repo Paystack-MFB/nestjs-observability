@@ -29,17 +29,19 @@ The OpenTelemetry NestJS Observability Package uses environment variables for co
 
 ### Service Identification
 
-| Variable               | Description             | Default           | Example      |
-| ---------------------- | ----------------------- | ----------------- | ------------ |
-| `OTEL_SERVICE_NAME`    | Name of the service     | `unknown-service` | `user-api`   |
-| `OTEL_SERVICE_VERSION` | Version of the service  | `1.0.0`           | `2.1.5`      |
-| `NODE_ENV`             | Application environment | `development`     | `production` |
+| Variable               | Description                | Default           | Example      |
+| ---------------------- | -------------------------- | ----------------- | ------------ |
+| `OTEL_SERVICE_NAME`    | Name of the service        | `unknown-service` | `user-api`   |
+| `OTEL_SERVICE_VERSION` | Version of the service     | `1.0.0`           | `2.1.5`      |
+| `OTEL_SERVICE_ENV    ` | Environment of the service | `local`           | `dev`        |
+| `NODE_ENV`             | Application environment    | `development`     | `production` |
 
 **Example:**
 
 ```bash
 export OTEL_SERVICE_NAME="payment-service"
 export OTEL_SERVICE_VERSION="1.2.3"
+export OTEL_SERVICE_ENV="prod"
 export NODE_ENV="production"
 ```
 
@@ -153,6 +155,7 @@ Resource attributes provide metadata about your service and environment. They ca
 | ------------------------ | ------------------------------------------------ | --------------------- |
 | `service.name`           | Service name (overrides OTEL_SERVICE_NAME)       | `user-service`        |
 | `service.version`        | Service version (overrides OTEL_SERVICE_VERSION) | `1.2.3`               |
+| `service.env`            | Service environment (overrides OTEL_SERVICE_ENV) | `prod`                |
 | `service.namespace`      | Service namespace                                | `backend`             |
 | `service.instance.id`    | Unique service instance identifier               | `instance-123`        |
 | `deployment.environment` | Deployment environment                           | `production`          |
@@ -199,6 +202,7 @@ These variables control enhanced features specific to this NestJS observability 
 # Service identification
 OTEL_SERVICE_NAME=nestjs-app-dev
 OTEL_SERVICE_VERSION=1.0.0-dev
+OTEL_SERVICE_ENV=local
 NODE_ENV=development
 
 # Use console exporters for local development
@@ -225,6 +229,7 @@ OTEL_RESOURCE_ATTRIBUTES=deployment.environment=development,service.namespace=lo
 # Service identification
 OTEL_SERVICE_NAME=nestjs-app
 OTEL_SERVICE_VERSION=1.2.3
+OTEL_SERVICE_ENV=prod
 NODE_ENV=production
 
 # Use OTLP exporters for production
@@ -256,6 +261,7 @@ OTEL_RESOURCE_ATTRIBUTES=deployment.environment=production,service.namespace=bac
 # Service identification
 OTEL_SERVICE_NAME=nestjs-app-staging
 OTEL_SERVICE_VERSION=1.2.3-rc1
+OTEL_SERVICE_ENV=dev
 NODE_ENV=staging
 
 # Use OTLP exporters
@@ -284,6 +290,7 @@ OTEL_RESOURCE_ATTRIBUTES=deployment.environment=staging,service.namespace=backen
 # Service identification
 OTEL_SERVICE_NAME=nestjs-app
 OTEL_SERVICE_VERSION=latest
+OTEL_SERVICE_ENV=prod
 NODE_ENV=production
 
 # Docker-specific OTLP configuration
@@ -301,125 +308,6 @@ OTEL_BSP_EXPORT_TIMEOUT=15000
 OTEL_RESOURCE_ATTRIBUTES=deployment.environment=docker,container.runtime=docker
 ```
 
-## Kubernetes Configuration Examples
-
-### ConfigMap Example
-
-```yaml
-apiVersion: v1
-kind: ConfigMap
-metadata:
-  name: otel-config
-  namespace: default
-data:
-  OTEL_SERVICE_NAME: 'nestjs-app'
-  OTEL_SERVICE_VERSION: '1.2.3'
-  NODE_ENV: 'production'
-  OTEL_TRACES_EXPORTER: 'otlp'
-  OTEL_METRICS_EXPORTER: 'otlp'
-  OTEL_LOGS_EXPORTER: 'otlp'
-  OTEL_EXPORTER_OTLP_ENDPOINT: 'http://otel-collector.observability:4317'
-  OTEL_TRACES_SAMPLER: 'traceidratio'
-  OTEL_TRACES_SAMPLER_ARG: '0.1'
-  OTEL_RESOURCE_ATTRIBUTES: 'deployment.environment=production,service.namespace=backend,k8s.cluster.name=prod-cluster'
-```
-
-### Secret Example
-
-```yaml
-apiVersion: v1
-kind: Secret
-metadata:
-  name: otel-secrets
-  namespace: default
-type: Opaque
-data:
-  OTEL_EXPORTER_OTLP_HEADERS: base64-encoded-headers
-stringData:
-  OTEL_EXPORTER_OTLP_HEADERS: 'authorization=Bearer your-api-token'
-```
-
-### Deployment Example
-
-```yaml
-apiVersion: apps/v1
-kind: Deployment
-metadata:
-  name: nestjs-app
-spec:
-  template:
-    spec:
-      containers:
-        - name: app
-          image: nestjs-app:latest
-          envFrom:
-            - configMapRef:
-                name: otel-config
-            - secretRef:
-                name: otel-secrets
-          env:
-            - name: OTEL_RESOURCE_ATTRIBUTES
-              value: 'k8s.pod.name=$(HOSTNAME),k8s.namespace.name=$(NAMESPACE)'
-            - name: NAMESPACE
-              valueFrom:
-                fieldRef:
-                  fieldPath: metadata.namespace
-```
-
-## Docker Compose Examples
-
-### Development Stack
-
-```yaml
-version: '3.8'
-services:
-  app:
-    build: .
-    environment:
-      - OTEL_SERVICE_NAME=nestjs-app-dev
-      - OTEL_SERVICE_VERSION=dev
-      - NODE_ENV=development
-      - OTEL_TRACES_EXPORTER=otlp
-      - OTEL_METRICS_EXPORTER=otlp
-      - OTEL_LOGS_EXPORTER=otlp
-      - OTEL_EXPORTER_OTLP_ENDPOINT=http://jaeger:4317
-      - OTEL_TRACES_SAMPLER=always_on
-    depends_on:
-      - jaeger
-
-  jaeger:
-    image: jaegertracing/all-in-one:latest
-    ports:
-      - '16686:16686'
-      - '4317:4317'
-    environment:
-      - COLLECTOR_OTLP_ENABLED=true
-```
-
-### Production Stack
-
-```yaml
-version: '3.8'
-services:
-  app:
-    image: nestjs-app:latest
-    env_file:
-      - .env.production
-    environment:
-      - OTEL_EXPORTER_OTLP_ENDPOINT=http://otel-collector:4317
-    depends_on:
-      - otel-collector
-
-  otel-collector:
-    image: otel/opentelemetry-collector-contrib:latest
-    command: ['--config=/etc/otel-collector-config.yaml']
-    volumes:
-      - ./otel-collector-config.yaml:/etc/otel-collector-config.yaml
-    ports:
-      - '4317:4317'
-      - '4318:4318'
-```
-
 ## Observability Platform Examples
 
 ### Datadog
@@ -432,40 +320,6 @@ export OTEL_METRICS_EXPORTER="otlp"
 export OTEL_EXPORTER_OTLP_ENDPOINT="https://api.datadoghq.com"
 export OTEL_EXPORTER_OTLP_HEADERS="DD-API-KEY=your-datadog-api-key"
 export OTEL_RESOURCE_ATTRIBUTES="deployment.environment=production,service.version=1.2.3"
-```
-
-### New Relic
-
-```bash
-# New Relic configuration
-export OTEL_SERVICE_NAME="nestjs-app"
-export OTEL_TRACES_EXPORTER="otlp"
-export OTEL_EXPORTER_OTLP_ENDPOINT="https://otlp.nr-data.net:4317"
-export OTEL_EXPORTER_OTLP_HEADERS="api-key=your-new-relic-license-key"
-export OTEL_RESOURCE_ATTRIBUTES="service.instance.id=$(hostname)"
-```
-
-### Honeycomb
-
-```bash
-# Honeycomb configuration
-export OTEL_SERVICE_NAME="nestjs-app"
-export OTEL_TRACES_EXPORTER="otlp"
-export OTEL_EXPORTER_OTLP_ENDPOINT="https://api.honeycomb.io"
-export OTEL_EXPORTER_OTLP_HEADERS="x-honeycomb-team=your-api-key"
-export OTEL_TRACES_SAMPLER="traceidratio"
-export OTEL_TRACES_SAMPLER_ARG="0.1"
-```
-
-### Jaeger
-
-```bash
-# Jaeger configuration
-export OTEL_SERVICE_NAME="nestjs-app"
-export OTEL_TRACES_EXPORTER="jaeger"
-export OTEL_EXPORTER_JAEGER_ENDPOINT="http://jaeger-collector:14268/api/traces"
-export OTEL_METRICS_EXPORTER="prometheus"
-export OTEL_EXPORTER_PROMETHEUS_PORT="9090"
 ```
 
 ## Precedence Rules
@@ -481,6 +335,7 @@ Understanding how environment variables are prioritized:
 3. **OTEL_RESOURCE_ATTRIBUTES** can override individual service settings
    - `service.name` in resource attributes overrides `OTEL_SERVICE_NAME`
    - `service.version` in resource attributes overrides `OTEL_SERVICE_VERSION`
+   - `service.env` in resource attributes overrides `OTEL_SERVICE_ENV`
 
 ### Example Precedence
 

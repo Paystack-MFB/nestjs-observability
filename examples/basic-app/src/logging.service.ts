@@ -19,7 +19,7 @@ export class LoggingService {
   // ==== BASIC LOGGING EXAMPLES ====
 
   async logInfo(message: string): Promise<void> {
-    this.logger.log(`Processing info: ${message}`);
+    this.logger.info(`Processing info: ${message}`);
 
     // Simulate some processing
     await this.delay(5);
@@ -51,7 +51,7 @@ export class LoggingService {
 
   async logActivity(activity: string, userId?: string): Promise<void> {
     // Log with structured data
-    this.logger.log('User activity tracked', {
+    this.logger.info('User activity tracked', {
       activity,
       userId,
       timestamp: new Date().toISOString(),
@@ -66,7 +66,7 @@ export class LoggingService {
 
   async logUserAction(action: string, userId: string, metadata?: Record<string, any>): Promise<void> {
     // Example of rich structured logging
-    this.logger.log(`User performed action: ${action}`, {
+    this.logger.info(`User performed action: ${action}`, {
       action,
       userId,
       timestamp: new Date().toISOString(),
@@ -91,9 +91,9 @@ export class LoggingService {
     });
 
     // All subsequent logs from this logger will include the context
-    requestLogger.log('Processing user request');
-    requestLogger.log('Validating input parameters');
-    requestLogger.log('Request processing completed');
+    requestLogger.info('Processing user request');
+    requestLogger.info('Validating input parameters');
+    requestLogger.info('Request processing completed');
 
     await this.delay(15);
   }
@@ -120,7 +120,7 @@ export class LoggingService {
     validationLogger.log('Validation phase started');
 
     // Use the original logger for logs without additional context
-    this.logger.log('Operation completed, no additional context');
+    this.logger.info('Operation completed, no additional context');
 
     await this.delay(20);
   }
@@ -128,7 +128,7 @@ export class LoggingService {
   // ==== PERFORMANCE MONITORING EXAMPLES ====
 
   async logPerformanceMetrics(operation: string, duration: number): Promise<void> {
-    this.logger.log(`Performance metric recorded`, {
+    this.logger.info(`Performance metric recorded`, {
       operation,
       duration,
       unit: 'ms',
@@ -169,7 +169,7 @@ export class LoggingService {
   // ==== BUSINESS LOGIC EXAMPLES ====
 
   async logBusinessEvent(eventType: string, eventData: Record<string, any>): Promise<void> {
-    this.logger.log(`Business event: ${eventType}`, {
+    this.logger.info(`Business event: ${eventType}`, {
       eventType,
       eventData,
       timestamp: new Date().toISOString(),

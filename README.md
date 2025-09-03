@@ -4,7 +4,7 @@ A modern, production-ready observability package for NestJS applications that pr
 
 ## 🚀 Quick Start
 
-**2025 Architecture - Zero Configuration Required!**
+**Architecture - Zero Configuration Required!**
 
 ```bash
 # 1. Install the package
@@ -13,6 +13,7 @@ npm install @paystackhq/nestjs-observability
 # 2. Set environment variables (optional - has great defaults)
 export OTEL_SERVICE_NAME="my-nestjs-app"
 export OTEL_SERVICE_VERSION="1.0.0"
+export OTEL_SERVICE_ENV="local"
 
 # 3. Start your app with the register pattern
 node -r @paystackhq/nestjs-observability/register dist/main.js
@@ -22,7 +23,7 @@ node -r @paystackhq/nestjs-observability/register dist/main.js
 
 ## 🎯 Features
 
-### 🆕 2025 Modern Architecture
+### Modern Architecture
 
 - **🚀 Register Pattern**: OpenTelemetry initialization before app startup (Node.js `-r` flag)
 - **🌐 Environment Variable Configuration**: Zero-config setup with OpenTelemetry standard variables
@@ -108,7 +109,7 @@ export class AppModule {}
 # Service identification
 export OTEL_SERVICE_NAME="my-nestjs-app"
 export OTEL_SERVICE_VERSION="1.0.0"
-export NODE_ENV="development"
+export OTEL_SERVICE_ENV="dev"
 
 # Development exporters (console output)
 export OTEL_TRACES_EXPORTER="console"
@@ -122,6 +123,7 @@ export OTEL_LOGS_EXPORTER="console"
 # Service identification
 export OTEL_SERVICE_NAME="my-nestjs-app"
 export OTEL_SERVICE_VERSION="1.0.0"
+export OTEL_SERVICE_ENV="prod"
 export NODE_ENV="production"
 
 # Production exporters (OTLP)
@@ -186,14 +188,14 @@ export class UserService {
     this.logger.addContext('operation', 'createUser');
     this.logger.addContext('userId', userData.id);
 
-    this.logger.log('Creating user', {
+    this.logger.info('Creating user', {
       email: userData.email,
       roles: userData.roles,
     });
 
     // Business logic here...
 
-    this.logger.log('User created successfully', {
+    this.logger.info('User created successfully', {
       userId: userData.id,
       duration: '245ms',
     });
@@ -340,6 +342,7 @@ export OTEL_EXPORTER_OTLP_HEADERS="authorization=Bearer your-token"
 | ---------------------- | --------------------------- | --------------- | -------------------- |
 | `OTEL_SERVICE_NAME`    | Service identification name | `"nestjs-app"`  | `"my-ecommerce-api"` |
 | `OTEL_SERVICE_VERSION` | Service version             | `"1.0.0"`       | `"2.1.3"`            |
+| `OTEL_SERVICE_ENV`     | Service environment         | `"local"`       | `"prod"`             |
 | `NODE_ENV`             | Environment name            | `"development"` | `"production"`       |
 
 ### Exporter Configuration
@@ -380,144 +383,6 @@ export OTEL_RESOURCE_ATTRIBUTES="deployment.environment=staging,service.namespac
 | `OTEL_METRICS_ENDPOINT`                    | Metrics HTTP endpoint path        | `"/metrics"` |
 | `OTEL_SPAN_ATTRIBUTE_SANITIZATION_ENABLED` | Enable PII sanitization           | `"true"`     |
 
-## 📚 Migration Guide
-
-### Migrating from v0.x to v1.0 (2025 Architecture)
-
-**⚠️ Breaking Changes:** Version 1.0 introduces a completely new architecture focused on environment variables and the register pattern.
-
-#### Before (v0.x - Configuration-Based)
-
-```typescript
-// ❌ OLD: Complex configuration objects
-@Module({
-  imports: [
-    ObservabilityModule.forRootAsync({
-      imports: [ConfigModule],
-      inject: [ConfigService],
-      useFactory: (configService: ConfigService) => ({
-        serviceName: configService.get('SERVICE_NAME'),
-        environment: configService.get('NODE_ENV'),
-        logging: {
-          level: 'info',
-          consoleOutput: true,
-          otlpExport: {
-            enabled: true,
-            endpoint: 'http://localhost:4318',
-          },
-        },
-        metrics: {
-          enabled: true,
-          endpoint: '/metrics',
-        },
-        tracing: {
-          enabled: true,
-          exporter: {
-            type: 'otlp',
-            endpoint: 'http://localhost:4318/v1/traces',
-          },
-        },
-      }),
-    }),
-  ],
-})
-export class AppModule {}
-
-// ❌ OLD: Manual application startup
-// main.ts - had to initialize OpenTelemetry manually
-```
-
-#### After (v1.0 - Environment Variable Based)
-
-```typescript
-// ✅ NEW: Zero configuration needed
-@Module({
-  imports: [
-    // Just import the module - no configuration! 🎉
-    ObservabilityModule.forRoot(),
-  ],
-})
-export class AppModule {}
-```
-
-**Environment Variables (replaces all configuration):**
-
-```bash
-# Service identification
-export OTEL_SERVICE_NAME="my-nestjs-app"
-export OTEL_SERVICE_VERSION="1.0.0"
-export NODE_ENV="production"
-
-# Exporters (replaces old config.logging/metrics/tracing)
-export OTEL_TRACES_EXPORTER="otlp"
-export OTEL_METRICS_EXPORTER="otlp"
-export OTEL_LOGS_EXPORTER="otlp"
-
-# OTLP configuration (replaces old exporter config)
-export OTEL_EXPORTER_OTLP_ENDPOINT="https://api.your-platform.com"
-export OTEL_EXPORTER_OTLP_HEADERS="authorization=Bearer your-token"
-```
-
-**Application Startup (Register Pattern):**
-
-```bash
-# ✅ NEW: Use register pattern
-node -r @paystackhq/nestjs-observability/register dist/main.js
-```
-
-#### Migration Steps
-
-1. **Update Module Import**
-
-   ```diff
-   - ObservabilityModule.forRootAsync({ /* config */ })
-   + ObservabilityModule.forRoot()
-   ```
-
-2. **Remove Configuration Objects** - Delete all configuration factory functions
-
-3. **Set Environment Variables** - Convert your old configuration to environment variables
-
-4. **Update Start Scripts**
-
-   ```diff
-   - "start": "node dist/main.js"
-   + "start": "node -r @paystackhq/nestjs-observability/register dist/main.js"
-   ```
-
-5. **Update Package Version**
-   ```bash
-   npm install @paystackhq/nestjs-observability@^1.0.0
-   ```
-
-#### Configuration Mapping
-
-| Old Configuration                    | New Environment Variable      |
-| ------------------------------------ | ----------------------------- |
-| `config.serviceName`                 | `OTEL_SERVICE_NAME`           |
-| `config.environment`                 | `NODE_ENV`                    |
-| `config.logging.otlpExport.endpoint` | `OTEL_EXPORTER_OTLP_ENDPOINT` |
-| `config.tracing.exporter.endpoint`   | `OTEL_EXPORTER_OTLP_ENDPOINT` |
-| `config.metrics.endpoint`            | `OTEL_METRICS_ENDPOINT`       |
-| `config.tracing.sampler.ratio`       | `OTEL_TRACES_SAMPLER_ARG`     |
-
-## 🚀 2025 Benefits
-
-### Why Upgrade to v1.0?
-
-- **🎯 Zero Configuration**: No more complex factory functions
-- **🌐 Standard Compliance**: Uses OpenTelemetry standard environment variables
-- **🚀 Faster Startup**: Register pattern initializes OpenTelemetry before your app
-- **📦 Smaller Bundles**: Removed configuration complexity reduces package size
-- **🔧 DevOps Friendly**: All configuration via environment variables
-- **🏢 Enterprise Ready**: Battle-tested architecture patterns
-
-### Performance Improvements
-
-- **50% Faster Startup**: Register pattern vs. factory configuration
-- **30% Less Memory**: Simplified module initialization
-- **Zero Config Overhead**: No configuration parsing at runtime
-
 ## 🆘 Troubleshooting
 
 ### Common Issues
@@ -551,7 +416,6 @@ npm install --save-dev @types/node
 ## 📖 Documentation
 
 - [Environment Variables Guide](./docs/environment-variables.md)
-- [Migration Guide](./docs/migration-guide.md)
 - [Best Practices](./docs/best-practices.md)
 - [Examples](./examples/basic-app/)
 
