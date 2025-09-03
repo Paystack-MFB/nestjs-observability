@@ -108,8 +108,8 @@ export class LoggingService {
     });
 
     // These logs will include the session context
-    operationLogger.log('Starting operation');
-    operationLogger.log('Operation in progress');
+    operationLogger.info('Starting operation');
+    operationLogger.info('Operation in progress');
 
     // Create a new child logger with additional context
     const validationLogger = operationLogger.createChildLogger();
@@ -117,7 +117,7 @@ export class LoggingService {
     validationLogger.addContext('attempts', 1);
     validationLogger.addContext('context', 'ValidationPhase');
 
-    validationLogger.log('Validation phase started');
+    validationLogger.info('Validation phase started');
 
     // Use the original logger for logs without additional context
     this.logger.info('Operation completed, no additional context');
@@ -216,7 +216,7 @@ export class LoggingService {
     });
 
     // Log transaction start
-    transactionLogger.log('Transaction processing started');
+    transactionLogger.info('Transaction processing started');
 
     // Log validation steps
     transactionLogger.debug('Validating transaction parameters', {
@@ -224,14 +224,14 @@ export class LoggingService {
     });
 
     // Log business logic
-    transactionLogger.log('Processing payment', {
+    transactionLogger.info('Processing payment', {
       paymentMethod: 'credit_card',
       processor: 'stripe',
       processingTime: 250,
     });
 
     // Log success
-    transactionLogger.log('Transaction completed successfully', {
+    transactionLogger.info('Transaction completed successfully', {
       result: 'success',
       confirmationCode: 'conf-123456',
       processingTime: 500,

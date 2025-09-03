@@ -29,11 +29,7 @@ export class ExampleService {
   ) {
     // Set service context for all logging - ensure logger is available
     if (this.logger && typeof this.logger.setContext === 'function') {
-      this.logger.setContext({
-        service: 'ExampleService',
-        version: '1.0.0',
-        component: 'business-logic',
-      });
+      this.logger.setContext({ service: 'ExampleService' });
     }
 
     // Initialize custom metrics
@@ -93,7 +89,7 @@ export class ExampleService {
     operationLogger.addContext('operationId', operationId);
     operationLogger.addContext('operation', 'simpleOperation');
 
-    operationLogger.log('Starting simple operation', {
+    operationLogger.info('Starting simple operation', {
       inputData: this.sanitizeData(data),
       timestamp: new Date().toISOString(),
     });
@@ -112,7 +108,7 @@ export class ExampleService {
         processedAt: new Date().toISOString(),
       };
 
-      operationLogger.log('Simple operation completed', {
+      operationLogger.info('Simple operation completed', {
         result: this.sanitizeData(result),
         duration: '~200ms',
       });
@@ -147,7 +143,7 @@ export class ExampleService {
       correlationId: `complex-${operationId}`,
     });
 
-    operationLogger.log('Starting complex operation', {
+    operationLogger.info('Starting complex operation', {
       userId,
       inputSize: JSON.stringify(data).length,
       startTime: new Date().toISOString(),
@@ -162,23 +158,23 @@ export class ExampleService {
 
     try {
       // Step 1: Validation
-      operationLogger.log('Validating input data', { step: 'validation' });
+      operationLogger.info('Validating input data', { step: 'validation' });
       await this.validateComplexData(data, operationLogger);
       span.setAttributes({ 'validation.status': 'passed' });
 
       // Step 2: Processing
-      operationLogger.log('Processing data', { step: 'processing' });
+      operationLogger.info('Processing data', { step: 'processing' });
       const processedData = await this.processComplexData(data, operationLogger);
       span.setAttributes({ 'processing.status': 'completed' });
 
       // Step 3: Business logic
-      operationLogger.log('Applying business logic', { step: 'business-logic' });
+      operationLogger.info('Applying business logic', { step: 'business-logic' });
       const result = await this.applyBusinessLogic(processedData, operationLogger);
       span.setAttributes({ 'business-logic.status': 'applied' });
 
       const duration = Date.now() - startTime;
 
-      operationLogger.log('Complex operation completed successfully', {
+      operationLogger.info('Complex operation completed successfully', {
         operationId,
         userId,
         duration: `${duration}ms`,
@@ -260,7 +256,7 @@ export class ExampleService {
         operationId: `${batchId}-${index}`,
       });
 
-      operationLogger.log('Processing concurrent request', {
+      operationLogger.info('Processing concurrent request', {
         requestIndex: index,
         requestData: this.sanitizeData(request),
       });
@@ -276,7 +272,7 @@ export class ExampleService {
           processedAt: new Date().toISOString(),
         };
 
-        operationLogger.log('Concurrent request completed', {
+        operationLogger.info('Concurrent request completed', {
           requestIndex: index,
           result: this.sanitizeData(result),
         });
