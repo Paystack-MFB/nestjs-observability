@@ -115,7 +115,7 @@ describe('Register Module', () => {
       await import('./register');
 
       expect(resourceFromAttributes).toHaveBeenCalledWith({
-        'service.environment': 'test',
+        'service.environment': 'local',
         'service.name': 'test-service-otel',
         'service.version': '1.0.0',
       });
@@ -128,7 +128,7 @@ describe('Register Module', () => {
       await import('./register');
 
       expect(resourceFromAttributes).toHaveBeenCalledWith({
-        'service.environment': 'test',
+        'service.environment': 'local',
         'service.name': 'unknown-service',
         'service.version': '1.0.0',
       });
@@ -141,7 +141,7 @@ describe('Register Module', () => {
       await import('./register');
 
       expect(resourceFromAttributes).toHaveBeenCalledWith({
-        'service.environment': 'test',
+        'service.environment': 'local',
         'service.name': 'unknown-service',
         'service.version': '2.1.0',
       });
@@ -154,20 +154,21 @@ describe('Register Module', () => {
       await import('./register');
 
       expect(resourceFromAttributes).toHaveBeenCalledWith({
-        'service.environment': 'test',
+        'service.environment': 'local',
         'service.name': 'unknown-service',
         'service.version': '1.0.0',
       });
     });
 
-    it('should use NODE_ENV when provided', async () => {
+    it('should prioritize OTEL_SERVICE_ENV over NODE_ENV', async () => {
+      process.env['OTEL_SERVICE_ENV'] = 'staging';
       process.env['NODE_ENV'] = 'production';
 
       const { resourceFromAttributes } = await import('@opentelemetry/resources');
       await import('./register');
 
       expect(resourceFromAttributes).toHaveBeenCalledWith({
-        'service.environment': 'production',
+        'service.environment': 'staging',
         'service.name': 'unknown-service',
         'service.version': '1.0.0',
       });

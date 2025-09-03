@@ -9,7 +9,7 @@ import { MetricsController } from './metrics.controller';
 interface MockLoggerService {
   debug: ReturnType<typeof vi.fn>;
   error: ReturnType<typeof vi.fn>;
-  log: ReturnType<typeof vi.fn>;
+  info: ReturnType<typeof vi.fn>;
   warn: ReturnType<typeof vi.fn>;
 }
 
@@ -39,7 +39,7 @@ describe('MetricsController', () => {
     mockLoggerService = {
       debug: vi.fn(),
       error: vi.fn(),
-      log: vi.fn(),
+      info: vi.fn(),
       warn: vi.fn(),
     };
 

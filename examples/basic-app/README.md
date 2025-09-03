@@ -51,7 +51,41 @@ OTEL_SERVICE_NAME=my-app OTEL_TRACES_EXPORTER=console node -r ../../dist/cjs/reg
 
 ## 🌍 Environment Configuration
 
-The application uses OpenTelemetry standard environment variables. Copy `env.example` to `.env` and adjust as needed.
+The application uses OpenTelemetry standard environment variables. We provide several pre-configured environment files for different deployment scenarios.
+
+### Environment Files Available
+
+- **`env.example`** - Base template with all available options
+- **`env.production`** - Production-ready configuration with OTLP exporters
+- **`env.staging`** - Staging configuration with moderate sampling
+- **`env.test.otlp`** - Test configuration for OTLP integration testing
+- **`env.docker`** - Docker/container deployment configuration
+
+Copy the appropriate file to `.env` and adjust values as needed:
+
+```bash
+# For development
+cp env.example .env
+
+# For production
+cp env.production .env
+
+# For staging
+cp env.staging .env
+
+# For Docker deployment
+cp env.docker .env
+```
+
+### Key Environment Variables
+
+```bash
+# Service identification
+OTEL_SERVICE_NAME=my-nestjs-app
+OTEL_SERVICE_VERSION=1.0.0
+OTEL_SERVICE_ENV=development  # Observability environment (NEW in v1.0.0)
+NODE_ENV=development          # Application environment
+```
 
 ### Development Configuration
 
@@ -59,6 +93,7 @@ The application uses OpenTelemetry standard environment variables. Copy `env.exa
 # Service identification
 OTEL_SERVICE_NAME=my-nestjs-app
 OTEL_SERVICE_VERSION=1.0.0
+OTEL_SERVICE_ENV=development
 NODE_ENV=development
 
 # Console exporters for local development
@@ -76,6 +111,7 @@ OTEL_TRACES_SAMPLER=always_on
 # Service identification
 OTEL_SERVICE_NAME=my-nestjs-app
 OTEL_SERVICE_VERSION=1.2.3
+OTEL_SERVICE_ENV=production
 NODE_ENV=production
 
 # OTLP exporters for production

@@ -18,6 +18,7 @@ export default defineConfig({
           statements: 90,
         },
       },
+      include: ['src/**/*.ts'],
     },
     pool: 'forks',
     isolate: true,
