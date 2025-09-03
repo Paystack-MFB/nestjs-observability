@@ -1,9 +1,9 @@
-import { Injectable, Logger } from '@nestjs/common';
-import { Trace } from '@paystackhq/nestjs-observability';
+import { Injectable } from '@nestjs/common';
+import { Trace, LoggerService } from '@paystackhq/nestjs-observability';
 
 @Injectable()
 export class AppService {
-  private readonly logger = new Logger(AppService.name);
+  constructor(private readonly logger: LoggerService) {}
 
   @Trace()
   async getHello(): Promise<string> {

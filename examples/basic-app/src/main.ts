@@ -22,7 +22,7 @@ async function bootstrap() {
   const environment = process.env.NODE_ENV || 'development';
 
   // Log startup information using enhanced logger
-  logger.log('Starting NestJS application', {
+  logger.info('Starting NestJS application', {
     environment,
     serviceName,
     serviceVersion,
@@ -31,7 +31,7 @@ async function bootstrap() {
 
   await app.listen(port);
 
-  logger.log('Application started successfully', {
+  logger.info('Application started successfully', {
     port,
     metricsUrl: `http://localhost:${port}${process.env.OTEL_METRICS_ENDPOINT || '/metrics'}`,
     healthUrl: `http://localhost:${port}/health`,
