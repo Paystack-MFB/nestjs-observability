@@ -1,120 +1,191 @@
-import { Inject, Injectable, OnModuleInit } from '@nestjs/common';
+import type { Counter, Histogram, Meter, ObservableGauge } from '@opentelemetry/api';
+
+import { Injectable, OnModuleInit, Optional } from '@nestjs/common';
+import { metrics } from '@opentelemetry/api';
 import * as promClient from 'prom-client';
 
-import type { ObservabilityConfig } from '../config/observability.config';
-
 import { LoggerService } from '../logger/logger.service';
+import { getServiceEnvironment, getServiceName, getServiceVersion } from '../register';
 
 /**
- * Service for Prometheus metrics collection and exposure
+ * Enhanced metrics service that integrates with OpenTelemetry global meter provider
+ * Provides both OpenTelemetry metrics and Prometheus-compatible metrics for backward compatibility
  */
 @Injectable()
 export class MetricsService implements OnModuleInit {
   private appInfoGauge!: promClient.Gauge;
-
   private httpRequestCounter!: promClient.Counter;
-  // Common metrics
   private httpRequestDurationHistogram!: promClient.Histogram;
-  private registry: promClient.Registry;
+  // OpenTelemetry metrics
+  private otelCounters = new Map<string, Counter>();
+  private otelGauges = new Map<string, ObservableGauge>();
 
-  constructor(
-    @Inject('OBSERVABILITY_CONFIG') private readonly config: ObservabilityConfig,
-    private readonly logger: LoggerService
-  ) {
-    // Create a new registry
+  private otelHistograms = new Map<string, Histogram>();
+  private readonly otelMeter: Meter;
+  private readonly registry: promClient.Registry;
+
+  constructor(@Optional() private readonly logger: LoggerService | undefined) {
+    // Get OpenTelemetry meter from global provider
+    const meterProvider = typeof metrics.getMeterProvider === 'function' ? metrics.getMeterProvider() : undefined;
+    const resolvedMeter =
+      meterProvider && typeof meterProvider.getMeter === 'function'
+        ? meterProvider.getMeter(getServiceName(), getServiceVersion())
+        : ({
+            createCounter: () => ({ add: (_v: number, _attrs?: Record<string, string>) => undefined }),
+            createHistogram: () => ({ record: (_v: number, _attrs?: Record<string, string>) => undefined }),
+            createObservableGauge: () => ({ addCallback: (_cb: () => void) => undefined }),
+          } as unknown as Meter);
+    this.otelMeter = resolvedMeter;
+
+    // Create Prometheus registry for backward compatibility
     this.registry = new promClient.Registry();
 
-    // Set default labels from config
-    this.registry.setDefaultLabels(this.config.metrics.defaultLabels);
+    // Set default labels from environment/resource attributes
+    this.setDefaultLabels();
 
     // Initialize common metrics
     this.initializeMetrics();
   }
 
   /**
-   * Create and register a new Counter metric
+   * Create and register a new Counter metric using OpenTelemetry
    * @param name Metric name
-   * @param help Help text
-   * @param labelNames Array of label names
-   * @returns Prometheus Counter instance
+   * @param description Description of the metric
+   * @param labels Default labels to apply
+   * @returns OpenTelemetry Counter instance
    */
-  createCounter(name: string, help: string, labelNames: string[] = []): promClient.Counter {
-    const counter = new promClient.Counter({
-      help,
-      labelNames,
-      name,
+  createCounter(name: string, description: string, labels?: Record<string, string>): Counter {
+    const counter = this.otelMeter.createCounter(name, {
+      description,
     });
-    this.registry.registerMetric(counter);
+
+    this.otelCounters.set(name, counter);
+
+    // Also create Prometheus counter for backward compatibility
+    try {
+      new promClient.Counter({
+        help: description,
+        labelNames: Object.keys(labels ?? {}),
+        name: name.replace(/[.-]/g, '_'), // Prometheus naming convention
+        registers: [this.registry], // Use our specific registry
+      });
+    } catch (_error) {
+      // Ignore registry conflicts in test environments
+      this.logger?.debug('Counter already exists in registry', { context: 'MetricsService', name });
+    }
+
     return counter;
   }
 
   /**
-   * Create and register a new Gauge metric
+   * Create and register a new Observable Gauge metric using OpenTelemetry
    * @param name Metric name
-   * @param help Help text
-   * @param labelNames Array of label names
-   * @returns Prometheus Gauge instance
+   * @param description Description of the metric
+   * @param callback Callback function to provide gauge value
+   * @returns OpenTelemetry ObservableGauge instance
    */
-  createGauge(name: string, help: string, labelNames: string[] = []): promClient.Gauge {
-    const gauge = new promClient.Gauge({
-      help,
-      labelNames,
-      name,
+  createGauge(name: string, description: string, callback?: () => number): ObservableGauge {
+    const gauge = this.otelMeter.createObservableGauge(name, {
+      description,
     });
-    this.registry.registerMetric(gauge);
+
+    if (callback) {
+      this.otelMeter.addBatchObservableCallback(
+        (observableResult) => {
+          observableResult.observe(gauge, callback());
+        },
+        [gauge]
+      );
+    }
+
+    this.otelGauges.set(name, gauge);
+
+    // Also create Prometheus gauge for backward compatibility
+    try {
+      new promClient.Gauge({
+        help: description,
+        name: name.replace(/[.-]/g, '_'), // Prometheus naming convention
+        registers: [this.registry], // Use our specific registry
+      });
+    } catch (_error) {
+      // Ignore registry conflicts in test environments
+      this.logger?.debug('Gauge already exists in registry', { context: 'MetricsService', name });
+    }
+
     return gauge;
   }
 
   /**
-   * Create and register a new Histogram metric
+   * Create and register a new Histogram metric using OpenTelemetry
    * @param name Metric name
-   * @param help Help text
-   * @param labelNames Array of label names
+   * @param description Description of the metric
    * @param buckets Array of bucket boundaries
-   * @returns Prometheus Histogram instance
+   * @returns OpenTelemetry Histogram instance
    */
-  createHistogram(
-    name: string,
-    help: string,
-    labelNames: string[] = [],
-    buckets: number[] = promClient.linearBuckets(0.1, 0.1, 10)
-  ): promClient.Histogram {
-    const histogram = new promClient.Histogram({
-      buckets,
-      help,
-      labelNames,
-      name,
+  createHistogram(name: string, description: string, buckets?: number[]): Histogram {
+    const histogram = this.otelMeter.createHistogram(name, {
+      description,
     });
-    this.registry.registerMetric(histogram);
+
+    this.otelHistograms.set(name, histogram);
+
+    // Also create Prometheus histogram for backward compatibility
+    try {
+      new promClient.Histogram({
+        buckets: buckets ?? [0.01, 0.05, 0.1, 0.5, 1, 2, 5, 10],
+        help: description,
+        name: name.replace(/[.-]/g, '_'), // Prometheus naming convention
+        registers: [this.registry], // Use our specific registry
+      });
+    } catch (_error) {
+      // Ignore registry conflicts in test environments
+      this.logger?.debug('Histogram already exists in registry', { context: 'MetricsService', name });
+    }
+
     return histogram;
   }
 
   /**
-   * Create and register a new Summary metric
+   * Create a Summary metric using OpenTelemetry Histogram with percentiles
    * @param name Metric name
-   * @param help Help text
-   * @param labelNames Array of label names
-   * @param percentiles Array of percentiles
-   * @returns Prometheus Summary instance
+   * @param description Description of the metric
+   * @param percentiles Array of percentiles (not directly supported in OpenTelemetry, creates histogram instead)
+   * @returns OpenTelemetry Histogram instance configured for summary-like behavior
    */
-  createSummary(
-    name: string,
-    help: string,
-    labelNames: string[] = [],
-    percentiles: number[] = [0.5, 0.9, 0.95, 0.99]
-  ): promClient.Summary {
-    const summary = new promClient.Summary({
-      help,
-      labelNames,
-      name,
-      percentiles,
+  createSummary(name: string, description: string, percentiles: number[] = [0.5, 0.9, 0.95, 0.99]): Histogram {
+    // OpenTelemetry doesn't have native summaries, use histogram with appropriate buckets
+    const histogram = this.otelMeter.createHistogram(name, {
+      description,
     });
-    this.registry.registerMetric(summary);
-    return summary;
+
+    this.otelHistograms.set(name, histogram);
+
+    // Create Prometheus summary for backward compatibility
+    try {
+      new promClient.Summary({
+        help: description,
+        name: name.replace(/[.-]/g, '_'), // Prometheus naming convention
+        percentiles,
+        registers: [this.registry], // Use our specific registry
+      });
+    } catch (_error) {
+      // Ignore registry conflicts in test environments
+      this.logger?.debug('Summary already exists in registry', { context: 'MetricsService', name });
+    }
+
+    return histogram;
   }
 
   /**
-   * Get Prometheus metrics in string format
+   * Get OpenTelemetry meter instance for advanced usage
+   * @returns OpenTelemetry Meter instance
+   */
+  getMeter(): Meter {
+    return this.otelMeter;
+  }
+
+  /**
+   * Get Prometheus metrics in string format (for backward compatibility)
    * @returns Metrics in Prometheus exposition format
    */
   async getMetrics(): Promise<string> {
@@ -122,7 +193,7 @@ export class MetricsService implements OnModuleInit {
   }
 
   /**
-   * Get the Prometheus registry
+   * Get the Prometheus registry (for backward compatibility)
    * @returns Prometheus registry
    */
   getRegistry(): promClient.Registry {
@@ -130,14 +201,20 @@ export class MetricsService implements OnModuleInit {
   }
 
   onModuleInit(): void {
-    // Register default metrics if enabled
-    if (this.config.metrics.defaultMetrics) {
+    // Register default Prometheus metrics for backward compatibility
+    // OpenTelemetry auto-instrumentation will handle native metrics
+    try {
       promClient.collectDefaultMetrics({
-        labels: this.config.metrics.defaultLabels,
+        labels: this.getServiceLabels(),
         prefix: 'node_',
         register: this.registry,
       });
-      this.logger.log('Default metrics collection enabled', 'MetricsService');
+      this.logger?.info('Default metrics collection enabled', { context: 'MetricsService' });
+    } catch (error) {
+      this.logger?.warn('Failed to initialize default metrics collection', {
+        context: 'MetricsService',
+        error: error instanceof Error ? error.message : String(error),
+      });
     }
   }
 
@@ -150,42 +227,107 @@ export class MetricsService implements OnModuleInit {
    */
   recordHttpRequest(method: string, route: string, statusCode: number, durationSec: number): void {
     const labels = { method, route, status_code: statusCode.toString() };
+
+    // Record in both systems for compatibility
     this.httpRequestDurationHistogram.observe(labels, durationSec);
     this.httpRequestCounter.inc(labels);
+
+    // Also record in OpenTelemetry if available
+    const otelHistogram = this.otelHistograms.get('http_request_duration_seconds');
+    const otelCounter = this.otelCounters.get('http_requests_total');
+
+    if (otelHistogram) {
+      otelHistogram.record(durationSec, labels);
+    }
+    if (otelCounter) {
+      otelCounter.add(1, labels);
+    }
   }
 
   /**
-   * Initialize Prometheus metrics
+   * Extract service labels from environment variables
+   * @returns Service labels object
+   */
+  private getServiceLabels(): Record<string, string> {
+    return {
+      environment: getServiceEnvironment(),
+      service: getServiceName(),
+      version: getServiceVersion(),
+    };
+  }
+
+  /**
+   * Initialize common Prometheus metrics for backward compatibility
    */
   private initializeMetrics(): void {
-    // HTTP request duration histogram
-    this.httpRequestDurationHistogram = new promClient.Histogram({
-      buckets: [0.01, 0.05, 0.1, 0.5, 1, 2, 5, 10],
-      help: 'Duration of HTTP requests in seconds',
-      labelNames: ['method', 'route', 'status_code'],
-      name: 'http_request_duration_seconds',
-    });
+    const serviceLabels = this.getServiceLabels();
 
-    // HTTP request counter
-    this.httpRequestCounter = new promClient.Counter({
-      help: 'Total number of HTTP requests',
-      labelNames: ['method', 'route', 'status_code'],
-      name: 'http_requests_total',
-    });
+    try {
+      // HTTP request duration histogram
+      this.httpRequestDurationHistogram = new promClient.Histogram({
+        buckets: [0.01, 0.05, 0.1, 0.5, 1, 2, 5, 10],
+        help: 'Duration of HTTP requests in seconds',
+        labelNames: ['method', 'route', 'status_code'],
+        name: 'http_request_duration_seconds',
+        registers: [this.registry],
+      });
 
-    // Application info gauge
-    this.appInfoGauge = new promClient.Gauge({
-      help: 'Application information',
-      labelNames: ['version', 'environment'],
-      name: 'app_info',
-    });
+      // HTTP request counter
+      this.httpRequestCounter = new promClient.Counter({
+        help: 'Total number of HTTP requests',
+        labelNames: ['method', 'route', 'status_code'],
+        name: 'http_requests_total',
+        registers: [this.registry],
+      });
 
-    // Register metrics with the registry
-    this.registry.registerMetric(this.httpRequestDurationHistogram);
-    this.registry.registerMetric(this.httpRequestCounter);
-    this.registry.registerMetric(this.appInfoGauge);
+      // Application info gauge
+      this.appInfoGauge = new promClient.Gauge({
+        help: 'Application information',
+        labelNames: ['version', 'environment'],
+        name: 'app_info',
+        registers: [this.registry],
+      });
 
-    // Set application info
-    this.appInfoGauge.labels(this.config.serviceVersion, this.config.environment).set(1);
+      // Set application info
+      this.appInfoGauge.labels(serviceLabels['version'], serviceLabels['environment']).set(1);
+    } catch (error) {
+      // Create fallback metrics if the registry approach fails
+      this.logger?.warn('Failed to initialize common Prometheus metrics', {
+        context: 'MetricsService',
+        error: error instanceof Error ? error.message : String(error),
+      });
+
+      // Create minimal fallback metrics
+      this.httpRequestDurationHistogram = new promClient.Histogram({
+        buckets: [0.01, 0.05, 0.1, 0.5, 1, 2, 5, 10],
+        help: 'Duration of HTTP requests in seconds',
+        labelNames: ['method', 'route', 'status_code'],
+        name: 'http_request_duration_seconds_fallback',
+      });
+
+      this.httpRequestCounter = new promClient.Counter({
+        help: 'Total number of HTTP requests',
+        labelNames: ['method', 'route', 'status_code'],
+        name: 'http_requests_total_fallback',
+      });
+
+      this.appInfoGauge = new promClient.Gauge({
+        help: 'Application information',
+        labelNames: ['version', 'environment'],
+        name: 'app_info_fallback',
+      });
+    }
+
+    // Create corresponding OpenTelemetry metrics
+    this.createCounter('http_requests_total', 'Total number of HTTP requests');
+    this.createHistogram('http_request_duration_seconds', 'Duration of HTTP requests in seconds');
+  }
+
+  /**
+   * Set default labels from environment variables and resource attributes
+   */
+  private setDefaultLabels(): void {
+    const defaultLabels = this.getServiceLabels();
+    this.registry.setDefaultLabels(defaultLabels);
   }
 }

@@ -1,11 +1,11 @@
-import { Injectable, Logger } from '@nestjs/common';
-import { TraceClass } from '@paystackhq/nestjs-observability';
+import { Injectable } from '@nestjs/common';
+import { LoggerService, TraceClass } from '@paystackhq/nestjs-observability';
 
 @Injectable()
 @TraceClass()
 export class PaymentService {
-  private readonly logger = new Logger(PaymentService.name);
   private readonly payments: Map<string, any> = new Map();
+  constructor(private readonly logger: LoggerService) {}
 
   async processPayment(paymentData: {
     amount: number;
@@ -13,7 +13,7 @@ export class PaymentService {
     customerId: string;
     method: string;
   }): Promise<any> {
-    this.logger.log(`Processing payment for customer: ${paymentData.customerId}`);
+    this.logger.info(`Processing payment for customer: ${paymentData.customerId}`);
 
     // Simulate payment processing
     await this.delay(200);
@@ -26,13 +26,13 @@ export class PaymentService {
     };
 
     this.payments.set(payment.id, payment);
-    this.logger.log(`Payment processed with ID: ${payment.id}`);
+    this.logger.info(`Payment processed with ID: ${payment.id}`);
 
     return payment;
   }
 
   async validatePayment(paymentId: string): Promise<boolean> {
-    this.logger.log(`Validating payment: ${paymentId}`);
+    this.logger.info(`Validating payment: ${paymentId}`);
 
     // Simulate validation checks
     await this.delay(50);
@@ -40,12 +40,12 @@ export class PaymentService {
     const payment = this.payments.get(paymentId);
     const isValid = payment && payment.status === 'completed';
 
-    this.logger.log(`Payment validation result: ${isValid}`);
+    this.logger.info(`Payment validation result: ${isValid}`);
     return isValid;
   }
 
   async getPaymentStatus(paymentId: string): Promise<string> {
-    this.logger.log(`Getting payment status: ${paymentId}`);
+    this.logger.info(`Getting payment status: ${paymentId}`);
 
     await this.delay(30);
 
@@ -54,7 +54,7 @@ export class PaymentService {
   }
 
   async refundPayment(paymentId: string): Promise<any> {
-    this.logger.log(`Processing refund for payment: ${paymentId}`);
+    this.logger.info(`Processing refund for payment: ${paymentId}`);
 
     // Simulate refund processing
     await this.delay(150);
@@ -73,12 +73,12 @@ export class PaymentService {
       processedAt: new Date().toISOString(),
     };
 
-    this.logger.log(`Refund processed with ID: ${refund.id}`);
+    this.logger.info(`Refund processed with ID: ${refund.id}`);
     return refund;
   }
 
   async processSensitiveData(data: any): Promise<void> {
-    this.logger.log('Processing sensitive payment data');
+    this.logger.info('Processing sensitive payment data');
 
     // Simulate sensitive data processing
     await this.delay(100);

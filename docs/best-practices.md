@@ -168,7 +168,7 @@ export class OrderService {
 
   async processOrder(orderData: OrderDto): Promise<Order> {
     // Structured log with context
-    this.logger.log({
+    this.logger.info({
       message: 'Processing order',
       orderId: orderData.id,
       userId: orderData.userId,
@@ -180,7 +180,7 @@ export class OrderService {
     try {
       const order = await this.createOrder(orderData);
 
-      this.logger.log({
+      this.logger.info({
         message: 'Order processed successfully',
         orderId: order.id,
         status: order.status,
@@ -205,7 +205,7 @@ export class OrderService {
 
 ```typescript
 // Bad logging practices
-this.logger.log(`Processing order ${orderId} for user ${userId}`);
+this.logger.info(`Processing order ${orderId} for user ${userId}`);
 this.logger.error(`Order ${orderId} failed: ${error.message}`);
 ```
 
@@ -230,7 +230,7 @@ export class PaymentService {
     });
 
     // INFO: General information about normal operations
-    this.logger.log({
+    this.logger.info({
       message: 'Payment processing initiated',
       paymentId: paymentData.id,
       amount: paymentData.amount,
@@ -240,7 +240,7 @@ export class PaymentService {
       const payment = await this.processPaymentInternal(paymentData);
 
       // INFO: Successful operations
-      this.logger.log({
+      this.logger.info({
         message: 'Payment processed successfully',
         paymentId: payment.id,
         status: payment.status,
@@ -289,14 +289,14 @@ export class UserService {
       timestamp: new Date().toISOString(),
     });
 
-    this.logger.log('Processing user request');
+    this.logger.info('Processing user request');
 
     try {
       await this.processUserData(userId);
       await this.updateUserProfile(userId);
       await this.sendNotification(userId);
 
-      this.logger.log('User request completed successfully');
+      this.logger.info('User request completed successfully');
     } catch (error) {
       this.logger.error({
         message: 'User request failed',
@@ -484,122 +484,66 @@ export class BusinessMetricsService {
 
 ### Environment-Specific Configuration
 
-#### ✅ **DO: Use Environment-Specific Settings**
+#### ✅ **DO: Use Environment Variables for Configuration**
 
-```typescript
-// config/observability.config.ts
-export const createObservabilityConfig = (env: string) => {
-  const baseConfig = {
-    serviceName: process.env.SERVICE_NAME || 'my-service',
-    serviceVersion: process.env.SERVICE_VERSION || '1.0.0',
-    environment: env,
-  };
+As of v1.0.0, the library uses **environment-driven configuration** following OpenTelemetry standards. No configuration objects are needed - just set the appropriate environment variables:
 
-  switch (env) {
-    case 'production':
-      return {
-        ...baseConfig,
-        logging: {
-          level: 'info',
-          consoleOutput: false, // Use structured logging in production
-          otlpExport: {
-            enabled: true,
-            endpoint: process.env.OTLP_LOGS_ENDPOINT,
-          },
-        },
-        tracing: {
-          enabled: true,
-          sampler: {
-            type: 'trace_id_ratio',
-            ratio: 0.1, // Sample 10% in production
-          },
-        },
-        metrics: {
-          enabled: true,
-          defaultLabels: {
-            datacenter: process.env.DATACENTER,
-            region: process.env.AWS_REGION,
-          },
-        },
-      };
+```bash
+# Production Environment
+OTEL_SERVICE_ENV=production
+OTEL_SERVICE_NAME=my-service
+OTEL_SERVICE_VERSION=1.0.0
+OTEL_RESOURCE_ATTRIBUTES=environment=production
 
-    case 'staging':
-      return {
-        ...baseConfig,
-        logging: {
-          level: 'debug',
-          consoleOutput: true,
-        },
-        tracing: {
-          enabled: true,
-          sampler: {
-            type: 'trace_id_ratio',
-            ratio: 0.5, // Sample 50% in staging
-          },
-        },
-      };
+# Logging Configuration
+OTEL_LOGS_EXPORTER=otlp
+OTEL_EXPORTER_OTLP_LOGS_ENDPOINT=https://your-otlp-logs-endpoint
 
-    case 'development':
-      return {
-        ...baseConfig,
-        logging: {
-          level: 'debug',
-          consoleOutput: true,
-        },
-        tracing: {
-          enabled: true,
-          sampler: {
-            type: 'always_on', // Trace everything in development
-          },
-        },
-      };
+# Tracing Configuration
+OTEL_TRACES_EXPORTER=otlp
+OTEL_EXPORTER_OTLP_TRACES_ENDPOINT=https://your-otlp-traces-endpoint
+OTEL_TRACES_SAMPLER=traceidratio
+OTEL_TRACES_SAMPLER_ARG=0.1  # Sample 10% in production
 
-    default:
-      return baseConfig;
-  }
-};
+# Metrics Configuration
+OTEL_METRICS_EXPORTER=otlp
+OTEL_EXPORTER_OTLP_METRICS_ENDPOINT=https://your-otlp-metrics-endpoint
+
+# Development vs Production
+OTEL_SERVICE_ENV=production  # This affects observability behaviors
 ```
 
-### Configuration Validation
-
-#### ✅ **DO: Validate Configuration**
+**NestJS Module Usage (No changes needed):**
 
 ```typescript
-import { IsString, IsEnum, IsOptional, IsNumber, Min, Max } from 'class-validator';
-import { plainToClass, Transform } from 'class-transformer';
+// app.module.ts
+@Module({
+  imports: [
+    ObservabilityModule.forRoot(), // No configuration needed!
+  ],
+})
+export class AppModule {}
+```
 
-export class ObservabilityConfigDto {
-  @IsString()
-  serviceName: string;
+**Environment-specific examples:**
 
-  @IsString()
-  serviceVersion: string;
+```bash
+# Development Environment
+OTEL_SERVICE_ENV=development
+OTEL_SERVICE_NAME=my-service
+OTEL_SERVICE_VERSION=1.0.0
+OTEL_LOGS_EXPORTER=console
+OTEL_TRACES_EXPORTER=console
+OTEL_METRICS_EXPORTER=console
+OTEL_TRACES_SAMPLER=always_on  # Trace everything in development
 
-  @IsEnum(['development', 'staging', 'production'])
-  environment: string;
-
-  @IsOptional()
-  @IsNumber()
-  @Min(0)
-  @Max(1)
-  @Transform(({ value }) => parseFloat(value))
-  samplingRatio?: number;
-
-  @IsOptional()
-  @IsEnum(['debug', 'info', 'warn', 'error'])
-  logLevel?: string;
-}
-
-export function validateObservabilityConfig(config: any): ObservabilityConfigDto {
-  const configDto = plainToClass(ObservabilityConfigDto, config);
-  const errors = validate(configDto);
-
-  if (errors.length > 0) {
-    throw new Error(`Invalid observability configuration: ${errors.join(', ')}`);
-  }
-
-  return configDto;
-}
+# Staging Environment
+OTEL_SERVICE_ENV=staging
+OTEL_SERVICE_NAME=my-service-staging
+OTEL_SERVICE_VERSION=1.0.0
+OTEL_TRACES_SAMPLER=traceidratio
+OTEL_TRACES_SAMPLER_ARG=0.5  # Sample 50% in staging
+OTEL_EXPORTER_OTLP_ENDPOINT=https://staging-otlp-endpoint
 ```
 
 ## Performance Best Practices
@@ -608,28 +552,33 @@ export function validateObservabilityConfig(config: any): ObservabilityConfigDto
 
 #### ✅ **DO: Use Appropriate Sampling**
 
-```typescript
-// Environment-based sampling
-const getSamplingRatio = (environment: string): number => {
-  switch (environment) {
-    case 'production':
-      return 0.01; // 1% sampling in production
-    case 'staging':
-      return 0.1; // 10% sampling in staging
-    case 'development':
-      return 1.0; // 100% sampling in development
-    default:
-      return 0.01;
-  }
-};
+Configure sampling using environment variables based on your environment:
 
-// Load-based sampling
-const getLoadBasedSampling = (currentLoad: number): number => {
-  if (currentLoad > 0.8) return 0.01; // 1% under high load
-  if (currentLoad > 0.5) return 0.05; // 5% under medium load
-  return 0.1; // 10% under normal load
-};
+```bash
+# Production: 1% sampling for high-traffic services
+OTEL_TRACES_SAMPLER=traceidratio
+OTEL_TRACES_SAMPLER_ARG=0.01
+
+# Staging: 10% sampling for better testing coverage
+OTEL_TRACES_SAMPLER=traceidratio
+OTEL_TRACES_SAMPLER_ARG=0.1
+
+# Development: 100% sampling for debugging
+OTEL_TRACES_SAMPLER=always_on
+
+# Custom sampling for specific needs
+OTEL_TRACES_SAMPLER=parentbased_traceidratio  # Respects parent decisions
+OTEL_TRACES_SAMPLER_ARG=0.05  # 5% sampling
 ```
+
+**Available sampler types:**
+
+- `always_on` - Sample all traces (development)
+- `always_off` - Sample no traces (disabled)
+- `traceidratio` - Sample based on trace ID ratio
+- `parentbased_always_on` - Respect parent sampling, default to always_on
+- `parentbased_always_off` - Respect parent sampling, default to always_off
+- `parentbased_traceidratio` - Respect parent sampling, default to ratio
 
 ### Avoiding Performance Bottlenecks
 
@@ -721,7 +670,7 @@ export class UserService {
 
   async createUser(userData: CreateUserDto): Promise<User> {
     // Log sanitized data
-    this.logger.log({
+    this.logger.info({
       message: 'Creating user',
       email: userData.email,
       // Never log passwords, tokens, or PII
@@ -739,7 +688,7 @@ export class UserService {
     const user = await this.userRepository.create(userData);
 
     // Log success with non-sensitive data
-    this.logger.log({
+    this.logger.info({
       message: 'User created successfully',
       userId: user.id,
       email: user.email,
@@ -755,7 +704,7 @@ export class UserService {
 
 ```typescript
 // Bad - logging sensitive data
-this.logger.log({
+this.logger.info({
   message: 'User login',
   email: userData.email,
   password: userData.password, // Never log passwords
@@ -770,6 +719,103 @@ addSpanAttributes({
   'payment.credit_card': paymentData.creditCard,
   'auth.token': authToken,
 });
+```
+
+### Configuring Sensitive Data Patterns
+
+The library automatically redacts common sensitive attributes (passwords, tokens, secrets, etc.) in span data. You can extend this protection with custom patterns for your business-specific sensitive data.
+
+#### ✅ **DO: Add Custom Sensitive Patterns**
+
+```typescript
+import { addSensitivePatterns, configureAttributeSanitization } from '@paystackhq/nestjs-observability';
+
+// Method 1: Add patterns incrementally to defaults
+addSensitivePatterns([
+  /customer[_-]?id/i, // Match customer_id, customer-id, customerId
+  /account[_-]?number/i, // Match account_number, account-number, accountNumber
+  /transaction[_-]?ref/i, // Match transaction_ref, transaction-ref, transactionRef
+  /\b\d{16}\b/, // Match 16-digit numbers (like card numbers)
+  /user[_-]?data/i, // Match user_data, user-data, userData
+  /internal[_-]?reference/i, // Match internal_reference, internal-reference
+]);
+
+// Method 2: Configure all sanitization settings at once
+configureAttributeSanitization({
+  additionalSensitivePatterns: [/company[_-]?secret/i, /database[_-]?url/i, /session[_-]?key/i, /api[_-]?response/i],
+  customRedactedPlaceholder: '[BUSINESS_DATA]',
+});
+
+// Method 3: Reset and set new patterns (replaces additional patterns)
+configureAttributeSanitization({
+  additionalSensitivePatterns: [/financial[_-]?data/i, /personal[_-]?info/i],
+});
+```
+
+#### 📝 **Pattern Guidelines**
+
+When creating custom sensitive patterns:
+
+- **Use case-insensitive regex** with `/i` flag for flexible matching
+- **Consider naming conventions**: snake_case, kebab-case, camelCase
+- **Be specific enough** to avoid false positives
+- **Test patterns** with your actual attribute names
+- **Include common variations** of your sensitive field names
+
+```typescript
+// Examples of comprehensive patterns
+const businessPatterns = [
+  // Customer data
+  /customer[_-]?(id|number|ref|reference)/i,
+  /client[_-]?(id|number|ref|reference)/i,
+
+  // Financial data
+  /account[_-]?(number|id|balance)/i,
+  /payment[_-]?(method|token|reference)/i,
+  /transaction[_-]?(id|ref|amount)/i,
+  /card[_-]?(number|token|cvv)/i,
+
+  // Internal references
+  /internal[_-]?(id|ref|key|token)/i,
+  /system[_-]?(id|key|reference)/i,
+  /tracking[_-]?(id|number|reference)/i,
+
+  // User data
+  /user[_-]?(data|info|details|profile)/i,
+  /profile[_-]?(data|info|details)/i,
+
+  // Regex for specific patterns
+  /\b\d{13,19}\b/, // Credit card numbers (13-19 digits)
+  /\b[A-Z]{2}\d{2}[A-Z0-9]{4}\d{7}([A-Z0-9]?){0,16}\b/, // IBAN format
+  /\b\d{3}-\d{2}-\d{4}\b/, // SSN format (US)
+];
+
+addSensitivePatterns(businessPatterns);
+```
+
+#### 🔍 **Default Protected Patterns**
+
+The library automatically protects these common patterns:
+
+- `password`, `passwd`, `pwd`
+- `token`, `auth`, `authorization`
+- `secret`, `key`, `apikey`
+- `credit`, `card`, `payment`
+- `ssn`, `social`, `address`
+- And more common sensitive terms
+
+#### ✅ **Verification**
+
+You can verify your patterns are working:
+
+```typescript
+import { isSensitiveKey } from '@paystackhq/nestjs-observability';
+
+// Test your patterns
+console.log(isSensitiveKey('customer_id')); // true (if pattern added)
+console.log(isSensitiveKey('account_number')); // true (if pattern added)
+console.log(isSensitiveKey('user_email')); // false (not sensitive)
+console.log(isSensitiveKey('password')); // true (default pattern)
 ```
 
 ### Configuration Security
@@ -795,7 +841,7 @@ const observabilityConfig = {
     defaultLabels: {
       service: process.env.SERVICE_NAME,
       version: process.env.SERVICE_VERSION,
-      environment: process.env.NODE_ENV,
+      environment: process.env.OTEL_SERVICE_ENV,
     },
   },
 };
@@ -883,7 +929,7 @@ export class ResilientService {
         const result = await operation();
 
         if (attempt > 1) {
-          this.logger.log({
+          this.logger.info({
             message: 'Operation succeeded after retry',
             attempt,
             totalAttempts: maxRetries,
@@ -1135,7 +1181,7 @@ export class EventHandler {
       });
     }
 
-    this.logger.log({
+    this.logger.info({
       message: 'Processing order created event',
       eventId: event.id,
       orderId: event.orderId,

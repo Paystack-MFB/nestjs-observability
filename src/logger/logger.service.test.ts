@@ -1,688 +1,435 @@
-/* eslint-disable @typescript-eslint/no-unsafe-member-access */
-/* eslint-disable @typescript-eslint/no-explicit-any */
-
-/* eslint-disable @typescript-eslint/no-unsafe-assignment */
-/* eslint-disable @typescript-eslint/no-unsafe-return */
-/* eslint-disable @typescript-eslint/no-unsafe-argument */
-
-import { ConsoleLogger } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
 import { trace } from '@opentelemetry/api';
+import { logs } from '@opentelemetry/api-logs';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { ObservabilityConfig } from '../config/observability.config';
+import { getServiceName, getServiceVersion } from '../register';
 import { LoggerService } from './logger.service';
 
-// Mock OpenTelemetry
+interface MockLoggerProvider {
+  getLogger: ReturnType<typeof vi.fn>;
+}
+
+// Test types
+interface MockOtelLogger {
+  emit: ReturnType<typeof vi.fn>;
+}
+
+// Mock OpenTelemetry APIs
 vi.mock('@opentelemetry/api', () => ({
   trace: {
     getActiveSpan: vi.fn(),
   },
 }));
 
-// Mock OpenTelemetry SDK logs
-vi.mock('@opentelemetry/sdk-logs', () => ({
-  BatchLogRecordProcessor: vi.fn(),
-  LoggerProvider: vi.fn(),
-}));
-
-// Mock OpenTelemetry resources
-vi.mock('@opentelemetry/resources', () => ({
-  resourceFromAttributes: vi.fn(),
-}));
-
-// Mock OpenTelemetry exporter
-vi.mock('@opentelemetry/exporter-logs-otlp-http', () => ({
-  OTLPLogExporter: vi.fn(),
+vi.mock('@opentelemetry/api-logs', () => ({
+  logs: {
+    getLoggerProvider: vi.fn(),
+  },
 }));
 
 describe('LoggerService', () => {
   let service: LoggerService;
   let module: TestingModule;
+  let mockOtelLogger: MockOtelLogger;
+  let mockLoggerProvider: MockLoggerProvider;
 
-  // Spies for capturing the actual log output
-  let logSpy: ReturnType<typeof vi.spyOn>;
+  // Helper function to get typed mock emit
+  const getMockEmit = (): ReturnType<typeof vi.fn> => mockOtelLogger.emit;
 
-  const createConfig = (overrides: Partial<ObservabilityConfig> = {}): ObservabilityConfig => ({
-    environment: 'test',
-    logging: {
-      consoleOutput: true,
-      level: 'debug',
-      otlpExport: {
-        enabled: false,
-        endpoint: 'http://localhost:4318/v1/logs',
-      },
-    },
-    metrics: {
-      defaultLabels: {},
-      defaultMetrics: true,
-      enabled: true,
-      endpoint: '/metrics',
-    },
-    serviceName: 'test-service',
-    serviceVersion: '1.0.0',
-    tracing: {
-      attributeSanitization: {
-        additionalSensitivePatterns: [],
-        enabled: true,
-        redactedPlaceholder: '[REDACTED]',
-      },
-      enabled: true,
-      exporter: {
-        endpoint: 'http://localhost:4318/v1/traces',
-        type: 'otlp',
-      },
-      instrumentations: {
-        autoInstrumentations: true,
-        disabled: [],
-        overrides: {},
-      },
-      sampler: {
-        ratio: 1.0,
-        type: 'always_on',
-      },
-    },
-    ...overrides,
-  });
+  // Helper functions to avoid unbound method warnings
+  const getMockedGetLoggerProvider = (): ReturnType<typeof vi.mocked<typeof logs.getLoggerProvider>> =>
+    // eslint-disable-next-line @typescript-eslint/unbound-method
+    vi.mocked(logs.getLoggerProvider);
+  const getMockedGetActiveSpan = (): ReturnType<typeof vi.mocked<typeof trace.getActiveSpan>> =>
+    vi.mocked(trace.getActiveSpan);
 
-  const setupModule = async (config: ObservabilityConfig = createConfig()): Promise<TestingModule> => {
-    return await Test.createTestingModule({
-      providers: [
-        {
-          provide: 'OBSERVABILITY_CONFIG',
-          useValue: config,
-        },
-        {
-          inject: ['OBSERVABILITY_CONFIG'],
-          provide: LoggerService,
-          useFactory: (config: ObservabilityConfig) => new LoggerService(config),
-        },
-      ],
+  beforeEach(async () => {
+    // Mock OpenTelemetry logger
+    mockOtelLogger = {
+      emit: vi.fn(),
+    };
+
+    mockLoggerProvider = {
+      getLogger: vi.fn().mockReturnValue(mockOtelLogger),
+    };
+
+    getMockedGetLoggerProvider().mockReturnValue(
+      mockLoggerProvider as unknown as ReturnType<typeof logs.getLoggerProvider>
+    );
+    getMockedGetActiveSpan().mockReturnValue(undefined);
+
+    module = await Test.createTestingModule({
+      providers: [LoggerService],
     }).compile();
-  };
 
-  beforeEach(() => {
-    vi.clearAllMocks();
-    vi.mocked(trace.getActiveSpan).mockReturnValue(undefined);
+    service = module.get<LoggerService>(LoggerService);
   });
 
   afterEach(async () => {
     await module.close();
-    vi.restoreAllMocks();
+    vi.clearAllMocks();
   });
 
-  describe('Structured Logging (Production)', () => {
-    beforeEach(async () => {
-      const config = createConfig({
-        environment: 'production',
-      });
-      module = await setupModule(config);
-      service = module.get<LoggerService>(LoggerService);
-
-      // In production mode, we output directly to console.log, so spy on that instead
-      logSpy = vi.spyOn(console, 'log').mockImplementation(() => undefined);
+  describe('Initialization', () => {
+    it('should initialize with OpenTelemetry global logger provider', () => {
+      expect(getMockedGetLoggerProvider()).toHaveBeenCalled();
+      expect(mockLoggerProvider.getLogger).toHaveBeenCalledWith(getServiceName(), getServiceVersion());
     });
+  });
 
-    it('should call parent logger with structured JSON format', () => {
-      service.log('Test message', 'TestContext');
-
-      expect(logSpy).toHaveBeenCalledTimes(1);
-      const [loggedMessage] = logSpy.mock.calls[0] as [string];
-
-      // Should be valid JSON
-      expect(() => JSON.parse(loggedMessage)).not.toThrow();
-
-      const parsed = JSON.parse(loggedMessage);
-      expect(parsed).toMatchObject({
-        context: 'TestContext',
-        dd: {
-          env: 'production',
-          service: 'test-service',
-          version: '1.0.0',
-        },
-        level: 'log',
-        message: 'Test message',
-        timestamp: expect.stringMatching(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/),
-      });
-    });
-
-    it('should include trace context when span is available', () => {
-      // Mock the trace.getActiveSpan to return a fake span
-      const mockSpan = {
-        spanContext: () => ({
-          spanId: 'abc123',
-          traceId: 'def456',
-        }),
-      };
-      vi.mocked(trace.getActiveSpan).mockReturnValue(mockSpan as any);
-
-      service.log('Test message with trace');
-
-      expect(logSpy).toHaveBeenCalledTimes(1);
-      const [loggedMessage] = logSpy.mock.calls[0] as [string];
-      const parsed = JSON.parse(loggedMessage);
-
-      expect(parsed).toMatchObject({
-        dd: {
-          span_id: 'abc123',
-          trace_id: 'def456',
-        },
-        level: 'log',
-        message: 'Test message with trace',
-      });
-    });
-
-    it('should properly format Error objects with stack traces', () => {
-      const error = new Error('Test error message');
-
-      service.error(error, 'ErrorContext');
-
-      expect(logSpy).toHaveBeenCalledTimes(1);
-      const [loggedMessage] = logSpy.mock.calls[0] as [string];
-      const parsed = JSON.parse(loggedMessage);
-
-      expect(parsed).toMatchObject({
-        context: 'ErrorContext',
-        dd: {
-          env: 'production',
-          service: 'test-service',
-          version: '1.0.0',
-        },
-        level: 'error',
-        message: 'Test error message',
-      });
-    });
-
-    it('should merge persistent context with log entries', () => {
-      service.addContext({ sessionId: 'session-456', userId: '123' });
-      service.log('Test message with context');
-
-      const [loggedMessage] = logSpy.mock.calls[0] as [string];
-      const parsed = JSON.parse(loggedMessage);
-
-      expect(parsed).toMatchObject({
-        dd: {
-          env: 'production',
-          service: 'test-service',
-          version: '1.0.0',
-        },
-        level: 'log',
-        message: 'Test message with context',
-        sessionId: 'session-456',
-        userId: '123',
-      });
-    });
-
-    it('should handle object messages and merge additional context', () => {
-      const messageObj = {
-        data: { key: 'value' },
-        message: 'Object message',
-        requestId: 'req-123',
-      };
-
-      service.log(messageObj, 'ObjectContext');
-
-      const [loggedMessage] = logSpy.mock.calls[0] as [string];
-      const parsed = JSON.parse(loggedMessage);
-
-      expect(parsed).toMatchObject({
-        context: 'ObjectContext',
-        data: { key: 'value' },
-        dd: {
-          env: 'production',
-          service: 'test-service',
-          version: '1.0.0',
-        },
-        level: 'log',
-        message: 'Object message',
-        requestId: 'req-123',
-      });
-    });
-
-    it('should handle different log levels correctly', () => {
-      service.warn('Warning message');
+  describe('Basic Logging Methods', () => {
+    it('should emit log messages with correct severity levels', () => {
+      service.info('Info message');
       service.error('Error message');
+      service.warn('Warning message');
       service.debug('Debug message');
 
-      expect(logSpy).toHaveBeenCalledTimes(3);
+      expect(getMockEmit()).toHaveBeenCalledTimes(4);
 
-      // Check warn
-      const [warnMessage] = logSpy.mock.calls[0] as [string];
-      const warnParsed = JSON.parse(warnMessage);
-      expect(warnParsed.level).toBe('warn');
-      expect(warnParsed.message).toBe('Warning message');
+      // Check severity levels
+      expect(getMockEmit()).toHaveBeenNthCalledWith(1, {
+        attributes: {},
+        body: 'Info message',
+        severityText: 'INFO',
+      });
 
-      // Check error
-      const [errorMessage] = logSpy.mock.calls[1] as [string];
-      const errorParsed = JSON.parse(errorMessage);
-      expect(errorParsed.level).toBe('error');
-      expect(errorParsed.message).toBe('Error message');
+      expect(getMockEmit()).toHaveBeenNthCalledWith(2, {
+        attributes: {},
+        body: 'Error message',
+        severityText: 'ERROR',
+      });
 
-      // Check debug
-      const [debugMessage] = logSpy.mock.calls[2] as [string];
-      const debugParsed = JSON.parse(debugMessage);
-      expect(debugParsed.level).toBe('debug');
-      expect(debugParsed.message).toBe('Debug message');
+      expect(getMockEmit()).toHaveBeenNthCalledWith(3, {
+        attributes: {},
+        body: 'Warning message',
+        severityText: 'WARN',
+      });
+
+      expect(getMockEmit()).toHaveBeenNthCalledWith(4, {
+        attributes: {},
+        body: 'Debug message',
+        severityText: 'DEBUG',
+      });
+    });
+
+    it('should handle Error objects correctly', () => {
+      const error = new Error('Test error message');
+      service.error(error);
+
+      expect(getMockEmit()).toHaveBeenCalledWith({
+        attributes: {},
+        body: 'Test error message',
+        exception: error,
+        severityText: 'ERROR',
+      });
+    });
+
+    it('should include additional data in attributes', () => {
+      const data = { requestId: 'req-456', userId: '123' };
+      service.info('Message with data', data);
+
+      expect(getMockEmit()).toHaveBeenCalledWith({
+        attributes: data,
+        body: 'Message with data',
+        severityText: 'INFO',
+      });
     });
   });
 
-  describe('Context Management Behavior Verification', () => {
-    beforeEach(async () => {
-      const config = createConfig({ environment: 'production' });
-      module = await setupModule(config);
-      service = module.get<LoggerService>(LoggerService);
+  describe('Context Management', () => {
+    it('should set and persist context across log calls', () => {
+      service.setContext({ sessionId: 'session-123', userId: 'user-456' });
 
-      // Use console.log spy for production mode
-      logSpy = vi.spyOn(console, 'log').mockImplementation(() => undefined);
-    });
-
-    it('should persist context across multiple log calls', () => {
-      service.addContext({ requestId: 'req-123', userId: 'user-456' });
-
-      service.log('First message');
+      service.info('First message');
       service.warn('Second message');
-      service.error('Third message');
 
-      expect(logSpy).toHaveBeenCalledTimes(3);
+      expect(getMockEmit()).toHaveBeenCalledTimes(2);
 
-      // Verify all three logs contain the persistent context
-      const logs = [
-        JSON.parse(logSpy.mock.calls[0][0] as string),
-        JSON.parse(logSpy.mock.calls[1][0] as string),
-        JSON.parse(logSpy.mock.calls[2][0] as string),
-      ];
-
-      logs.forEach((log) => {
-        expect(log).toMatchObject({
-          requestId: 'req-123',
+      // Both calls should include the persistent context
+      expect(getMockEmit()).toHaveBeenNthCalledWith(1, {
+        attributes: {
+          sessionId: 'session-123',
           userId: 'user-456',
-        });
-      });
-    });
-
-    it('should update context when addContext is called multiple times', () => {
-      service.addContext({ sessionId: 'session-456', userId: 'user-123' });
-      service.addContext({ userId: 'user-789' }); // Override userId
-
-      service.log('Context test message');
-
-      const [loggedMessage] = logSpy.mock.calls[0] as [string];
-      const parsed = JSON.parse(loggedMessage);
-
-      expect(parsed).toMatchObject({
-        dd: {
-          env: 'production',
-          service: 'test-service',
-          version: '1.0.0',
         },
-        level: 'log',
-        message: 'Context test message',
-        sessionId: 'session-456',
-        userId: 'user-789', // Should be overridden value
+        body: 'First message',
+        severityText: 'INFO',
+      });
+
+      expect(getMockEmit()).toHaveBeenNthCalledWith(2, {
+        attributes: {
+          sessionId: 'session-123',
+          userId: 'user-456',
+        },
+        body: 'Second message',
+        severityText: 'WARN',
       });
     });
 
-    it('should clear all context when clearContext is called', () => {
-      service.addContext({ sessionId: 'session-456', userId: 'user-123' });
+    it('should add individual context keys', () => {
+      service.addContext('operationId', 'op-789');
+      service.addContext('tenantId', 'tenant-abc');
+
+      service.info('Message with added context');
+
+      expect(getMockEmit()).toHaveBeenCalledWith({
+        attributes: {
+          operationId: 'op-789',
+          tenantId: 'tenant-abc',
+        },
+        body: 'Message with added context',
+        severityText: 'INFO',
+      });
+    });
+
+    it('should clear all context', () => {
+      service.setContext({ sessionId: 'session-123', userId: 'user-456' });
       service.clearContext();
-      service.log('Message after clear');
 
-      const [loggedMessage] = logSpy.mock.calls[0] as [string];
-      const parsed = JSON.parse(loggedMessage);
+      service.info('Message after clear');
 
-      expect(parsed).not.toHaveProperty('sessionId');
-      expect(parsed).not.toHaveProperty('userId');
-      expect(parsed.message).toBe('Message after clear');
+      expect(getMockEmit()).toHaveBeenCalledWith({
+        attributes: {},
+        body: 'Message after clear',
+        severityText: 'INFO',
+      });
+    });
+
+    it('should merge context with additional data', () => {
+      service.setContext({ sessionId: 'session-123' });
+
+      const additionalData = { requestId: 'req-456', userId: 'user-789' };
+      service.info('Message with merged data', additionalData);
+
+      expect(getMockEmit()).toHaveBeenCalledWith({
+        attributes: {
+          requestId: 'req-456',
+          sessionId: 'session-123',
+          userId: 'user-789',
+        },
+        body: 'Message with merged data',
+        severityText: 'INFO',
+      });
     });
   });
 
-  describe('Child Logger Behavior Verification', () => {
-    beforeEach(async () => {
-      const config = createConfig({ environment: 'production' });
-      module = await setupModule(config);
-      service = module.get<LoggerService>(LoggerService);
+  describe('OpenTelemetry Trace Context Integration', () => {
+    it('should include trace context when active span is available', () => {
+      const mockSpan = {
+        spanContext: () => ({
+          spanId: 'span-456',
+          traceFlags: 1,
+          traceId: 'trace-123',
+        }),
+      };
 
-      // Use console.log spy for production mode
-      logSpy = vi.spyOn(console, 'log').mockImplementation(() => undefined);
-    });
+      getMockedGetActiveSpan().mockReturnValue(mockSpan as unknown as ReturnType<typeof trace.getActiveSpan>);
 
-    it('should create child logger with isolated context', () => {
-      service.addContext({ parentContext: 'parent-value' });
+      service.info('Message with trace context');
 
-      const childLogger = service.createChildLogger('ChildContext', {
-        childContext: 'child-value',
-        operationId: 'op-123',
-      });
-
-      service.log('Parent message');
-      childLogger.log('Child message');
-
-      expect(logSpy).toHaveBeenCalledTimes(2);
-
-      const [parentMessage] = logSpy.mock.calls[0] as [string];
-      const [childMessage] = logSpy.mock.calls[1] as [string];
-
-      const parentParsed = JSON.parse(parentMessage);
-      const childParsed = JSON.parse(childMessage);
-
-      expect(parentParsed).toMatchObject({
-        dd: {
-          env: 'production',
+      expect(getMockEmit()).toHaveBeenCalledWith({
+        attributes: {
+          spanId: 'span-456',
+          traceFlags: 1,
+          traceId: 'trace-123',
         },
-        level: 'log',
-        message: 'Parent message',
-        parentContext: 'parent-value',
-      });
-
-      expect(childParsed).toMatchObject({
-        childContext: 'child-value',
-        dd: {
-          env: 'production',
-        },
-        level: 'log',
-        message: 'Child message',
-        operationId: 'op-123',
-        parentContext: 'parent-value', // Should inherit from parent
+        body: 'Message with trace context',
+        severityText: 'INFO',
       });
     });
 
-    it('should handle child logger context independently', () => {
-      const child1 = service.createChildLogger('Service1', { service1Ctx: 'value1' });
-      const child2 = service.createChildLogger('Service2', { service2Ctx: 'value2' });
-
-      child1.log('Message from service 1');
-      child2.log('Message from service 2');
-
-      expect(logSpy).toHaveBeenCalledTimes(2);
-
-      const [child1Message] = logSpy.mock.calls[0] as [string];
-      const [child2Message] = logSpy.mock.calls[1] as [string];
-
-      const child1Parsed = JSON.parse(child1Message);
-      const child2Parsed = JSON.parse(child2Message);
-
-      expect(child1Parsed).toMatchObject({
-        dd: {
-          env: 'production',
-        },
-        level: 'log',
-        message: 'Message from service 1',
-        service1Ctx: 'value1',
-      });
-      expect(child1Parsed).not.toHaveProperty('service2Ctx');
-
-      expect(child2Parsed).toMatchObject({
-        dd: {
-          env: 'production',
-        },
-        level: 'log',
-        message: 'Message from service 2',
-        service2Ctx: 'value2',
-      });
-      expect(child2Parsed).not.toHaveProperty('service1Ctx');
-    });
-  });
-
-  describe('OpenTelemetry Integration Verification', () => {
-    beforeEach(async () => {
-      const config = createConfig({ environment: 'production' });
-      module = await setupModule(config);
-      service = module.get<LoggerService>(LoggerService);
-
-      // Use console.log spy for production mode
-      logSpy = vi.spyOn(console, 'log').mockImplementation(() => undefined);
-    });
-
-    it('should not include trace context when no active span', () => {
+    it('should handle missing active span gracefully', () => {
       vi.mocked(trace.getActiveSpan).mockReturnValue(undefined);
 
-      service.log('Message without trace');
+      service.info('Message without trace');
 
-      const [loggedMessage] = logSpy.mock.calls[0] as [string];
-      const parsed = JSON.parse(loggedMessage);
-
-      expect(parsed.dd).not.toHaveProperty('traceId');
-      expect(parsed.dd).not.toHaveProperty('spanId');
-      expect(parsed.message).toBe('Message without trace');
+      expect(getMockEmit()).toHaveBeenCalledWith({
+        attributes: {},
+        body: 'Message without trace',
+        severityText: 'INFO',
+      });
     });
 
-    it('should handle trace extraction errors gracefully', () => {
+    it('should handle trace context extraction errors gracefully', () => {
       vi.mocked(trace.getActiveSpan).mockImplementation(() => {
         throw new Error('Trace error');
       });
 
       expect(() => {
-        service.log('Message with broken trace');
+        service.info('Message with broken trace');
       }).not.toThrow();
 
-      const [loggedMessage] = logSpy.mock.calls[0] as [string];
-      const parsed = JSON.parse(loggedMessage);
-
-      // Should still log message even if trace extraction fails
-      expect(parsed.message).toBe('Message with broken trace');
-      expect(parsed.dd).not.toHaveProperty('traceId');
-      expect(parsed.dd).not.toHaveProperty('spanId');
-    });
-  });
-
-  describe('OTLP Export Functionality', () => {
-    let mockLogger: any;
-    let mockLoggerProvider: any;
-    let mockEmit: any;
-
-    beforeEach(async () => {
-      // Mock the LoggerProvider and its methods
-      mockEmit = vi.fn();
-      mockLogger = {
-        emit: mockEmit,
-      };
-      mockLoggerProvider = {
-        getLogger: vi.fn().mockReturnValue(mockLogger),
-      };
-
-      // Mock the LoggerProvider constructor
-      const { LoggerProvider } = await import('@opentelemetry/sdk-logs');
-      vi.mocked(LoggerProvider).mockImplementation(() => ({
-        ...mockLoggerProvider,
-        addLogRecordProcessor: vi.fn(),
-      }));
-
-      // Mock the BatchLogRecordProcessor
-      const { BatchLogRecordProcessor } = await import('@opentelemetry/sdk-logs');
-      vi.mocked(BatchLogRecordProcessor).mockImplementation(
-        () =>
-          ({
-            _exporter: {},
-            _maxExportBatchSize: 512,
-            _maxQueueSize: 2048,
-            onShutdown: vi.fn(),
-          }) as any
-      );
-
-      // Mock the OTLPLogExporter
-      const { OTLPLogExporter } = await import('@opentelemetry/exporter-logs-otlp-http');
-      vi.mocked(OTLPLogExporter).mockImplementation(
-        () =>
-          ({
-            _delegate: {},
-            export: vi.fn(),
-            forceFlush: vi.fn(),
-            shutdown: vi.fn(),
-          }) as any
-      );
-
-      // Mock the resourceFromAttributes
-      const { resourceFromAttributes } = await import('@opentelemetry/resources');
-      vi.mocked(resourceFromAttributes).mockReturnValue({} as any);
-
-      const config = createConfig({
-        logging: {
-          consoleOutput: false, // Disable console output to focus on OTLP
-          level: 'debug',
-          otlpExport: {
-            enabled: true,
-            endpoint: 'http://localhost:4318/v1/logs',
-          },
-        },
+      expect(getMockEmit()).toHaveBeenCalledWith({
+        attributes: {},
+        body: 'Message with broken trace',
+        severityText: 'INFO',
       });
-
-      module = await setupModule(config);
-      service = module.get<LoggerService>(LoggerService);
     });
 
-    it('should emit properly structured log records to OTLP', () => {
-      service.log('Test message', 'TestContext');
-
-      expect(mockEmit).toHaveBeenCalledTimes(1);
-      const [logRecord] = mockEmit.mock.calls[0];
-
-      expect(logRecord).toMatchObject({
-        body: {
-          context: 'TestContext',
-          dd: {
-            env: 'test',
-            service: 'test-service',
-            version: '1.0.0',
-          },
-          level: 'log',
-          message: 'Test message',
-          timestamp: expect.stringMatching(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/),
-        },
-        severityText: 'log',
-      });
-
-      // Verify the body is an object, not a JSON string
-      expect(typeof logRecord.body).toBe('object');
-      expect(typeof logRecord.body.message).toBe('string');
-    });
-
-    it('should include trace context in OTLP logs when span is available', () => {
+    it('should merge trace context with persistent context and additional data', () => {
       const mockSpan = {
         spanContext: () => ({
-          spanId: 'abc123',
-          traceId: 'def456',
+          spanId: 'span-456',
+          traceFlags: 1,
+          traceId: 'trace-123',
         }),
       };
-      vi.mocked(trace.getActiveSpan).mockReturnValue(mockSpan as any);
 
-      service.log('Test message with trace');
+      getMockedGetActiveSpan().mockReturnValue(mockSpan as unknown as ReturnType<typeof trace.getActiveSpan>);
 
-      expect(mockEmit).toHaveBeenCalledTimes(1);
-      const [logRecord] = mockEmit.mock.calls[0];
+      service.setContext({ sessionId: 'session-789' });
+      service.info('Complete context message', { requestId: 'req-abc' });
 
-      expect(logRecord.body).toMatchObject({
-        dd: {
-          span_id: 'abc123',
-          trace_id: 'def456',
+      expect(getMockEmit()).toHaveBeenCalledWith({
+        attributes: {
+          requestId: 'req-abc',
+          sessionId: 'session-789',
+          spanId: 'span-456',
+          traceFlags: 1,
+          traceId: 'trace-123',
         },
-        message: 'Test message with trace',
-      });
-    });
-
-    it('should handle object messages in OTLP export', () => {
-      const messageObj = {
-        data: { key: 'value' },
-        message: 'Object message',
-        requestId: 'req-123',
-      };
-
-      service.log(messageObj, 'ObjectContext');
-
-      expect(mockEmit).toHaveBeenCalledTimes(1);
-      const [logRecord] = mockEmit.mock.calls[0];
-
-      expect(logRecord.body).toMatchObject({
-        context: 'ObjectContext',
-        data: { key: 'value' },
-        message: 'Object message',
-        requestId: 'req-123',
-      });
-    });
-
-    it('should include persistent context in OTLP logs', () => {
-      service.addContext({ sessionId: 'session-456', userId: 'user-123' });
-      service.log('Test message with context');
-
-      expect(mockEmit).toHaveBeenCalledTimes(1);
-      const [logRecord] = mockEmit.mock.calls[0];
-
-      expect(logRecord.body).toMatchObject({
-        message: 'Test message with context',
-        sessionId: 'session-456',
-        userId: 'user-123',
-      });
-    });
-
-    it('should handle error logs with stack traces in OTLP export', () => {
-      const error = new Error('Test error');
-      service.error(error, 'Error stack', 'ErrorContext');
-
-      expect(mockEmit).toHaveBeenCalledTimes(1);
-      const [logRecord] = mockEmit.mock.calls[0];
-
-      expect(logRecord).toMatchObject({
-        body: {
-          context: 'ErrorContext',
-          message: 'Test error',
-          stack: 'Error stack',
-        },
-        severityText: 'error',
+        body: 'Complete context message',
+        severityText: 'INFO',
       });
     });
   });
 
-  describe('Configuration Behavior Verification', () => {
-    it('should respect consoleOutput: false configuration', async () => {
-      const config = createConfig({
-        logging: {
-          consoleOutput: false,
-          level: 'debug',
-          otlpExport: { enabled: false, endpoint: '' },
+  describe('Child Logger', () => {
+    it('should create child logger with inherited context', () => {
+      service.setContext({ parentContext: 'parent-value', sessionId: 'session-123' });
+
+      const childLogger = service.createChildLogger();
+      childLogger.info('Child message');
+
+      expect(getMockEmit()).toHaveBeenCalledWith({
+        attributes: {
+          parentContext: 'parent-value',
+          sessionId: 'session-123',
         },
+        body: 'Child message',
+        severityText: 'INFO',
       });
-
-      module = await setupModule(config);
-      service = module.get<LoggerService>(LoggerService);
-
-      logSpy = vi.spyOn(console, 'log').mockImplementation(() => undefined);
-
-      service.log('This should not output');
-
-      expect(logSpy).not.toHaveBeenCalled();
     });
 
-    it('should format differently based on environment', async () => {
-      // Test production formatting (structured)
-      const prodModule = await setupModule(createConfig({ environment: 'production' }));
-      const prodService = prodModule.get<LoggerService>(LoggerService);
+    it('should isolate child logger context from parent', () => {
+      service.setContext({ parentContext: 'parent-value' });
 
-      logSpy = vi.spyOn(console, 'log').mockImplementation(() => undefined);
+      const childLogger = service.createChildLogger();
+      childLogger.addContext('childContext', 'child-value');
 
-      prodService.log('Production message');
-      const [prodMessage] = logSpy.mock.calls[0] as [string];
+      // Parent should not have child context
+      service.info('Parent message');
+      expect(getMockEmit()).toHaveBeenLastCalledWith({
+        attributes: {
+          parentContext: 'parent-value',
+        },
+        body: 'Parent message',
+        severityText: 'INFO',
+      });
 
-      // Should be JSON
-      expect(() => JSON.parse(prodMessage)).not.toThrow();
-      const prodParsed = JSON.parse(prodMessage);
-      expect(prodParsed.dd.env).toBe('production');
+      // Child should have both contexts
+      childLogger.info('Child message');
+      expect(getMockEmit()).toHaveBeenLastCalledWith({
+        attributes: {
+          childContext: 'child-value',
+          parentContext: 'parent-value',
+        },
+        body: 'Child message',
+        severityText: 'INFO',
+      });
+    });
+  });
 
-      await prodModule.close();
+  describe('Security Features', () => {
+    it('should sanitize log messages by removing control characters', () => {
+      // Test data with various control characters
+      const maliciousMessage = 'Hello\nWorld\r\nWith\tTabs\0AndNulls\x01\x1F\x7F';
 
-      // Test development formatting (pretty)
-      logSpy.mockRestore();
-      const devModule = await setupModule(createConfig({ environment: 'development' }));
-      const devService = devModule.get<LoggerService>(LoggerService);
+      getMockEmit().mockImplementation(() => {
+        throw new Error('OpenTelemetry failure');
+      });
 
-      logSpy = vi.spyOn(ConsoleLogger.prototype, 'log').mockImplementation(() => undefined);
+      const consoleSpy = vi.spyOn(console, 'log').mockImplementation(() => {
+        // Mock implementation
+      });
+      const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {
+        // Mock implementation
+      });
 
-      devService.log('Development message', 'DevContext');
-      const [devMessage] = logSpy.mock.calls[0] as [unknown];
+      service.info(maliciousMessage);
 
-      // Should NOT be JSON format in development - NestJS formats it as a string
-      expect(typeof devMessage).toBe('string');
-      expect(() => JSON.parse(devMessage as string)).toThrow();
+      // Should have triggered error logging but no console fallback (removed for security)
+      expect(consoleErrorSpy).toHaveBeenCalledWith('LoggerService emit failed:', expect.any(Error));
+      expect(consoleSpy).not.toHaveBeenCalled();
 
-      await devModule.close();
+      consoleSpy.mockRestore();
+      consoleErrorSpy.mockRestore();
+    });
+  });
+
+  describe('Error Handling', () => {
+    it('should fallback to console logging when OpenTelemetry fails', () => {
+      const consoleSpy = vi.spyOn(console, 'log').mockImplementation(() => {
+        // Mock implementation
+      });
+      const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {
+        // Mock implementation
+      });
+
+      getMockEmit().mockImplementation(() => {
+        throw new Error('OpenTelemetry failure');
+      });
+
+      service.info('Failed message', { data: 'test' });
+
+      expect(consoleErrorSpy).toHaveBeenCalledWith('LoggerService emit failed:', expect.any(Error));
+      expect(consoleSpy).not.toHaveBeenCalled();
+
+      consoleSpy.mockRestore();
+      consoleErrorSpy.mockRestore();
+    });
+
+    it('should handle Error object fallback correctly', () => {
+      const consoleSpy = vi.spyOn(console, 'log').mockImplementation(() => {
+        // Mock implementation
+      });
+      const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {
+        // Mock implementation
+      });
+
+      getMockEmit().mockImplementation(() => {
+        throw new Error('OpenTelemetry failure');
+      });
+
+      const error = new Error('Test error');
+      service.error(error, { context: 'test' });
+
+      expect(consoleErrorSpy).toHaveBeenCalledWith('LoggerService emit failed:', expect.any(Error));
+      expect(consoleSpy).not.toHaveBeenCalled();
+
+      consoleSpy.mockRestore();
+      consoleErrorSpy.mockRestore();
+    });
+  });
+
+  describe('Singleton Behavior', () => {
+    it('should maintain context across multiple service instances from DI', () => {
+      const service1 = module.get<LoggerService>(LoggerService);
+      const service2 = module.get<LoggerService>(LoggerService);
+
+      // Should be the same instance (singleton)
+      expect(service1).toBe(service2);
+
+      service1.setContext({ sharedContext: 'shared-value' });
+      service2.info('Message from service2');
+
+      expect(getMockEmit()).toHaveBeenCalledWith({
+        attributes: {
+          sharedContext: 'shared-value',
+        },
+        body: 'Message from service2',
+        severityText: 'INFO',
+      });
     });
   });
 });

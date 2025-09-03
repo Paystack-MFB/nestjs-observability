@@ -1,10 +1,25 @@
 import { Injectable } from '@nestjs/common';
-import { addSpanAttribute, addSpanAttributes, getCurrentSpan, TraceClass } from '@paystackhq/nestjs-observability';
+import {
+  addSpanAttribute,
+  addSpanAttributes,
+  getCurrentSpan,
+  LoggerService,
+  TraceClass,
+} from '@paystackhq/nestjs-observability';
 
 @Injectable()
 @TraceClass()
 export class UserService {
+  constructor(private readonly logger: LoggerService) {
+    // Ensure logger is available before setting context
+    if (this.logger && typeof this.logger.setContext === 'function') {
+      this.logger.setContext({ service: 'UserService' });
+    }
+  }
   async getUserById(id: string): Promise<{ id: string; name: string; email: string }> {
+    // Log the operation start with trace context (automatic via OpenTelemetry)
+    this.logger?.info('Getting user by ID', { userId: id, operation: 'getUserById' });
+
     // Example: Manually add span attributes for tracking
     addSpanAttribute('user.id', id);
     addSpanAttribute('operation.type', 'user-get-by-id');
@@ -24,6 +39,13 @@ export class UserService {
       'user.name': user.name,
       'user.email': user.email, // This will be redacted due to sensitive pattern matching
       'response.size': JSON.stringify(user).length,
+    });
+
+    // Log successful operation (trace context included automatically)
+    this.logger?.info('User retrieved successfully', {
+      userId: user.id,
+      userName: user.name,
+      operation: 'getUserById',
     });
 
     return user;

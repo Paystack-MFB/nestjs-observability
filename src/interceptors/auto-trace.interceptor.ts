@@ -1,11 +1,12 @@
 import type { AttributeValue } from '@opentelemetry/api';
 
-import { CallHandler, ExecutionContext, Injectable, Logger, NestInterceptor } from '@nestjs/common';
+import { CallHandler, ExecutionContext, Injectable, NestInterceptor } from '@nestjs/common';
 import { Exception, Span, SpanStatusCode, trace } from '@opentelemetry/api';
 import { Observable } from 'rxjs';
 import { tap } from 'rxjs/operators';
 
 import { getTraceOptions, isNoTraceClassEnabled, isNoTraceEnabled } from '../decorators/auto-trace.decorators';
+import { LoggerService } from '../logger/logger.service';
 import { MetricsService } from '../metrics/metrics.service';
 
 // Express types for better typing
@@ -36,10 +37,12 @@ interface Response {
  */
 @Injectable()
 export class AutoTraceInterceptor implements NestInterceptor {
-  private readonly logger = new Logger(AutoTraceInterceptor.name);
   private readonly tracer = trace.getTracer('auto-trace-interceptor');
 
-  constructor(private readonly metricsService: MetricsService) {}
+  constructor(
+    private readonly metricsService: MetricsService,
+    private readonly logger: LoggerService
+  ) {}
 
   intercept(context: ExecutionContext, next: CallHandler): Observable<unknown> {
     const handler = context.getHandler();
@@ -74,8 +77,6 @@ export class AutoTraceInterceptor implements NestInterceptor {
       // Add HTTP attributes if this is an HTTP request
       this.addHttpAttributes(span, context);
 
-      this.logger.debug(`Started tracing ${spanName}`);
-
       return next.handle().pipe(
         tap({
           error: (error: Error) => {
@@ -87,10 +88,10 @@ export class AutoTraceInterceptor implements NestInterceptor {
             // Update metrics
             this.updateMetrics(context, duration);
 
-            this.logger.error(
-              `Error in ${spanName} after ${duration.toFixed(3)}s: ${error.message}`,
-              error.stack ?? ''
-            );
+            this.logger.error(`Error in ${spanName} after ${duration.toFixed(3)}s: ${error.message}`, {
+              context: 'AutoTraceInterceptor',
+              stack: error.stack,
+            });
           },
           finalize: () => {
             // Always end the span
@@ -104,9 +105,6 @@ export class AutoTraceInterceptor implements NestInterceptor {
 
             // Update metrics
             this.updateMetrics(context, duration);
-
-            this.logger.debug(`Completed tracing ${spanName} in ${duration.toFixed(3)}s`);
-
             return value;
           },
         })
@@ -153,7 +151,9 @@ export class AutoTraceInterceptor implements NestInterceptor {
         span.setAttribute('http.status_code', response.statusCode as AttributeValue);
       }
     } catch (error) {
-      this.logger.warn(`Failed to add HTTP attributes: ${(error as Error).message}`);
+      this.logger.warn(`Failed to add HTTP attributes: ${(error as Error).message}`, {
+        context: 'AutoTraceInterceptor',
+      });
     }
   }
 
@@ -197,7 +197,7 @@ export class AutoTraceInterceptor implements NestInterceptor {
         );
       }
     } catch (error) {
-      this.logger.warn(`Failed to update metrics: ${(error as Error).message}`);
+      this.logger.warn(`Failed to update metrics: ${(error as Error).message}`, { context: 'AutoTraceInterceptor' });
     }
   }
 }

@@ -1,396 +1,464 @@
-# NestJS Observability - Basic Example App
+# NestJS Observability Example Application
 
-This example application demonstrates the complete functionality of the `@paystackhq/nestjs-observability` library, showcasing structured logging, metrics collection, and distributed tracing with automatic controller and service instrumentation.
+This example application demonstrates all features of the `@paystackhq/nestjs-observability` package using the modern register pattern and environment variable configuration.
 
-## 🚀 Features Demonstrated
+## 🚀 Quick Start
 
-### 1. **Automatic Controller Tracing**
+### 1. Build the Package
 
-- All controller methods are automatically traced with HTTP context
-- Request/response tracing with performance metrics
-- Argument sanitization for sensitive data protection
-
-### 2. **Service Method Tracing**
-
-- `UserService` and `PaymentService` use `@TraceClass()` decorator
-- Automatic tracing of all public methods
-- Nested service calls create proper parent-child trace relationships
-
-### 3. **Argument Sanitization**
-
-- Sensitive data (passwords, tokens, card numbers) are automatically redacted
-- Configurable sanitization patterns and placeholder text
-- Demonstration with `/payments/sensitive` endpoint
-
-### 4. **Enhanced Structured Logging**
-
-- Context-aware logging with persistent fields
-- Business event tracking
-- Performance metrics logging
-- Exception handling with context
-
-### 5. **Metrics Collection**
-
-- Prometheus metrics available at `/metrics`
-- HTTP request metrics (duration, status codes, routes)
-- Custom business metrics
-- Memory and CPU usage monitoring
-
-### 6. **OpenTelemetry Integration**
-
-- Automatic instrumentation for HTTP, database, and file system operations
-- OTLP export support for traces and logs
-- Distributed tracing across service boundaries
-
-## 📋 Quick Start
-
-### 1. Install Dependencies
+From the root directory:
 
 ```bash
-pnpm install
+cd ../../
+pnpm build
 ```
 
-### 2. Configure Environment
-
-Copy the example environment file:
+### 2. Build the Example App
 
 ```bash
+pnpm build
+```
+
+### 3. Run with Register Pattern
+
+```bash
+# Development mode with console output
+pnpm run demo:console
+
+# Or manually with environment variables
+OTEL_SERVICE_NAME=my-app OTEL_TRACES_EXPORTER=console node -r ../../dist/cjs/register.js dist/src/main.js
+```
+
+## 📋 Available Scripts
+
+### Standard Scripts
+
+- `pnpm build` - Build the application
+- `pnpm start` - Start with register pattern
+- `pnpm start:dev` - Development mode with hot reload
+- `pnpm start:prod` - Production mode with register pattern
+
+### Environment-Specific Scripts
+
+- `pnpm run start:development` - Console exporters for local development
+- `pnpm run start:staging` - OTLP exporters for staging
+- `pnpm run start:docker` - Docker-optimized configuration
+
+### Demo Scripts
+
+- `pnpm run demo:console` - Console output demo
+- `pnpm run demo:metrics` - Metrics endpoint demo
+
+## 🌍 Environment Configuration
+
+The application uses OpenTelemetry standard environment variables. We provide several pre-configured environment files for different deployment scenarios.
+
+### Environment Files Available
+
+- **`env.example`** - Base template with all available options
+- **`env.production`** - Production-ready configuration with OTLP exporters
+- **`env.staging`** - Staging configuration with moderate sampling
+- **`env.test.otlp`** - Test configuration for OTLP integration testing
+- **`env.docker`** - Docker/container deployment configuration
+
+Copy the appropriate file to `.env` and adjust values as needed:
+
+```bash
+# For development
 cp env.example .env
+
+# For production
+cp env.production .env
+
+# For staging
+cp env.staging .env
+
+# For Docker deployment
+cp env.docker .env
 ```
 
-The example includes all available configuration options:
-
-- **Application**: service name, version, port
-- **Logging**: level, OTLP export settings
-- **Metrics**: Prometheus endpoint, labels
-- **Tracing**: OpenTelemetry configuration
-- **Argument Sanitization**: configurable data protection
-
-### 3. Run the Application
+### Key Environment Variables
 
 ```bash
-# Development mode with hot reload
-pnpm run start:dev
-
-# Production mode
-pnpm run build
-pnpm run start:prod
+# Service identification
+OTEL_SERVICE_NAME=my-nestjs-app
+OTEL_SERVICE_VERSION=1.0.0
+OTEL_SERVICE_ENV=development  # Observability environment (NEW in v1.0.0)
+NODE_ENV=development          # Application environment
 ```
 
-### 4. Test the Endpoints
-
-#### Automated Testing
-
-Run the included test script to hit all endpoints:
+### Development Configuration
 
 ```bash
-node test-endpoints.js
-```
-
-#### Manual Testing
-
-The app runs on `http://localhost:3000` with these endpoints:
-
-**Basic Endpoints:**
-
-- `GET /` - Hello world
-- `GET /status` - Service status
-- `GET /complex` - Complex operation demonstration
-
-**User Management:**
-
-- `POST /users` - Create user
-- `GET /users/:id` - Get user by ID
-- `GET /users/:id/profile` - Get user profile
-- `POST /users/validate` - Validate user data
-- `GET /users/:id/advanced-profile` - Complex nested operations
-
-**Payment Processing:**
-
-- `POST /payments` - Process payment
-- `GET /payments/:id/validate` - Validate payment
-- `GET /payments/:id/status` - Get payment status
-- `POST /payments/:id/refund` - Refund payment
-- `POST /payments/sensitive` - **Sensitive data demo** (shows argument sanitization)
-
-**Logging Demonstrations:**
-
-- `POST /logs/info` - Info logging
-- `POST /logs/error` - Error logging
-- `POST /logs/user-action` - User action tracking
-- `POST /logs/performance` - Performance metrics
-- `POST /logs/business-event` - Business event logging
-- `POST /logs/security-event` - Security event logging
-- `POST /logs/exception` - Exception handling
-
-**Context Management:**
-
-- `GET /logs/demo/context-persistence` - Context persistence demo
-- `GET /logs/demo/context-updates` - Context updates demo
-- `GET /logs/demo/comprehensive` - Full transaction flow
-
-**Error Testing:**
-
-- `GET /error-test` - Error handling demonstration
-
-## 🔧 Configuration Options
-
-### Environment Variables
-
-#### Basic Configuration
-
-```env
-SERVICE_NAME=basic-example
-SERVICE_VERSION=1.0.0
+# Service identification
+OTEL_SERVICE_NAME=my-nestjs-app
+OTEL_SERVICE_VERSION=1.0.0
+OTEL_SERVICE_ENV=development
 NODE_ENV=development
-PORT=3000
+
+# Console exporters for local development
+OTEL_TRACES_EXPORTER=console
+OTEL_METRICS_EXPORTER=console
+OTEL_LOGS_EXPORTER=console
+
+# Always sample for development
+OTEL_TRACES_SAMPLER=always_on
 ```
 
-#### Logging Configuration
-
-```env
-LOG_LEVEL=info
-OTLP_LOGS_ENABLED=false
-OTLP_LOGS_ENDPOINT=http://localhost:4318/v1/logs
-```
-
-#### Metrics Configuration
-
-```env
-METRICS_ENABLED=true
-METRICS_ENDPOINT=/metrics
-```
-
-#### Tracing Configuration
-
-```env
-TRACING_ENABLED=true
-OTLP_TRACES_ENDPOINT=http://localhost:4318/v1/traces
-TRACING_SAMPLER_TYPE=always_on
-TRACING_SAMPLER_RATIO=1.0
-```
-
-#### OpenTelemetry Auto-Instrumentations
-
-```env
-TRACING_AUTO_INSTRUMENTATIONS=true
-TRACING_DISABLED_INSTRUMENTATIONS=@opentelemetry/instrumentation-fs
-TRACING_INSTRUMENTATION_OVERRIDES={}
-```
-
-#### Argument Sanitization
-
-```env
-ARGUMENT_SANITIZATION_ENABLED=true
-ARGUMENT_SANITIZATION_MAX_LENGTH=100
-ARGUMENT_SANITIZATION_PLACEHOLDER=[REDACTED]
-ARGUMENT_SANITIZATION_IDENTIFIER_FIELDS=id,userId,name,email,type,status
-ARGUMENT_SANITIZATION_ADDITIONAL_PATTERNS=api[_-]?key,secret,token,password
-```
-
-## 🎯 Testing Different Scenarios
-
-### 1. **Argument Sanitization Testing**
+### Production Configuration
 
 ```bash
-# Test sensitive data redaction
-curl -X POST http://localhost:3000/payments/sensitive \
-  -H "Content-Type: application/json" \
-  -d '{
-    "cardNumber": "4111111111111111",
-    "cvv": "123",
-    "apiKey": "secret-key-123",
-    "password": "mypassword"
-  }'
+# Service identification
+OTEL_SERVICE_NAME=my-nestjs-app
+OTEL_SERVICE_VERSION=1.2.3
+OTEL_SERVICE_ENV=production
+NODE_ENV=production
+
+# OTLP exporters for production
+OTEL_TRACES_EXPORTER=otlp
+OTEL_METRICS_EXPORTER=otlp
+OTEL_LOGS_EXPORTER=otlp
+
+# Your observability platform
+OTEL_EXPORTER_OTLP_ENDPOINT=https://api.honeycomb.io
+OTEL_EXPORTER_OTLP_HEADERS=x-honeycomb-team=your-api-key
+
+# Sample 10% for cost efficiency
+OTEL_TRACES_SAMPLER=traceidratio
+OTEL_TRACES_SAMPLER_ARG=0.1
 ```
 
-Check the logs to see sensitive data is redacted as `[REDACTED]`.
+## 🔍 API Endpoints
 
-### 2. **Nested Service Calls**
+### Health and Status
+
+- `GET /health` - Application health check
+- `GET /health/ready` - Readiness probe
+- `GET /health/live` - Liveness probe
+- `GET /health/metrics` - Health metrics
+- `GET /health/version` - Version information
+
+### Observability Features
+
+- `GET /metrics` - Prometheus metrics endpoint
+- `GET /metrics/health` - Metrics system health
+- `GET /metrics/names` - Available metric names
+
+### Example Service Endpoints
+
+These endpoints demonstrate all observability features:
+
+#### Simple Operations
+
+- `POST /example/simple` - Basic operation with logging and tracing
+  ```bash
+  curl -X POST http://localhost:3000/example/simple \
+    -H "Content-Type: application/json" \
+    -d '{"test": "data", "timestamp": "2025-01-01T00:00:00Z"}'
+  ```
+
+#### Complex Operations
+
+- `POST /example/complex/:userId` - Complex operation with metrics and manual tracing
+  ```bash
+  curl -X POST http://localhost:3000/example/complex/user123 \
+    -H "Content-Type: application/json" \
+    -d '{"operation": "test", "complexity": "high"}'
+  ```
+
+#### Concurrent Operations
+
+- `POST /example/concurrent` - Demonstrates context isolation
+  ```bash
+  curl -X POST http://localhost:3000/example/concurrent \
+    -H "Content-Type: application/json" \
+    -d '[{"id":1,"data":"test1"},{"id":2,"data":"test2"}]'
+  ```
+
+#### Sensitive Operations
+
+- `POST /example/sensitive` - Demonstrates @NoTrace decorator
+  ```bash
+  curl -X POST http://localhost:3000/example/sensitive \
+    -H "Content-Type: application/json" \
+    -d '{"sensitive": "data", "password": "secret123"}'
+  ```
+
+#### Health Check
+
+- `GET /example/health` - Example service health check
+
+## 📊 Observability Features Demonstrated
+
+### 1. Structured Logging
+
+The application demonstrates structured logging with:
+
+- **Context Isolation**: Each request maintains separate logging context
+- **Child Loggers**: Operation-specific loggers with inherited context
+- **Trace Correlation**: Automatic inclusion of trace IDs in logs
+- **Data Sanitization**: Sensitive data redaction in logs
+
+```typescript
+// Example from ExampleService
+const operationLogger = this.logger.createChildLogger();
+operationLogger.setContext({
+  operationId,
+  userId,
+  operation: 'complexOperation',
+});
+
+operationLogger.log('Starting complex operation', {
+  userId,
+  inputSize: JSON.stringify(data).length,
+});
+```
+
+### 2. Custom Metrics
+
+Business metrics are created and tracked:
+
+- **Counters**: `example_requests_total` - Request counting by operation and status
+- **Gauges**: `example_active_operations` - Currently active operations
+- **Histograms**: `example_operation_duration_seconds` - Operation timing
+
+```typescript
+// Metrics creation
+this.requestCounter = this.metrics.createCounter('example_requests_total', 'Total number of example requests', [
+  'operation',
+  'status',
+]);
+
+// Metrics usage
+this.requestCounter.inc({ operation: 'complex', status: 'success' });
+```
+
+### 3. Distributed Tracing
+
+Multiple tracing patterns are demonstrated:
+
+- **@TraceClass**: Automatic tracing for entire service
+- **@Trace**: Method-level tracing annotation
+- **@NoTrace**: Exclude sensitive methods from tracing
+- **Manual Spans**: Custom span creation with attributes
+
+```typescript
+@TraceClass('ExampleService')
+@Injectable()
+export class ExampleService {
+  @Trace('simpleOperation')
+  async simpleOperation(data: any): Promise<any> {
+    // Automatically traced
+  }
+
+  @NoTrace()
+  async sensitiveOperation(data: any): Promise<any> {
+    // Not traced for security
+  }
+}
+```
+
+### 4. Enhanced Features
+
+- **Attribute Sanitization**: Automatic redaction of sensitive data
+- **Environment Control**: Full configuration via environment variables
+- **Performance Tuning**: Configurable batch processing and export settings
+- **Multiple Exporters**: Console, OTLP, Jaeger, Prometheus support
+
+## 🧪 Testing
+
+### Run Comprehensive Tests
 
 ```bash
-# Test complex nested operations
-curl http://localhost:3000/users/1/advanced-profile
+# From root directory
+./scripts/test-complete-example.sh
 ```
 
-This endpoint demonstrates:
+This test suite validates:
 
-- Controller -> Service -> Nested Service calls
-- Proper parent-child trace relationships
-- Argument passing and sanitization
+- Register pattern startup
+- Environment variable configuration
+- All observability features working together
+- Context isolation with concurrent requests
+- Custom metrics collection
+- Tracing with decorators
+- Sensitive data handling
+- Performance characteristics
 
-### 3. **Error Handling**
+### Manual Testing
+
+1. **Start the application**:
+
+   ```bash
+   pnpm run demo:console
+   ```
+
+2. **Test endpoints**:
+
+   ```bash
+   # Simple operation
+   curl -X POST http://localhost:3000/example/simple \
+     -H "Content-Type: application/json" \
+     -d '{"test": "manual"}'
+
+   # Check metrics
+   curl http://localhost:3000/metrics
+
+   # Check health
+   curl http://localhost:3000/health
+   ```
+
+3. **Observe output**: Check console for structured logs and traces
+
+## 🐳 Docker Usage
+
+### Using Environment File
 
 ```bash
-# Test error tracing
-curl http://localhost:3000/error-test
+# Build the package and app
+pnpm build
+
+# Run with Docker environment
+docker run -d \
+  --env-file .env.docker \
+  -p 3000:3000 \
+  my-nestjs-app:latest \
+  node -r @paystackhq/nestjs-observability/register dist/src/main.js
 ```
 
-Shows how errors are captured in traces and logs.
-
-### 4. **Performance Monitoring**
-
-```bash
-# Generate multiple requests to see metrics
-for i in {1..10}; do
-  curl http://localhost:3000/complex
-done
-
-# Check metrics
-curl http://localhost:3000/metrics
-```
-
-## 📊 Observability Stack Setup
-
-### Local Development with Docker Compose
-
-For complete observability testing, set up the full stack:
+### Docker Compose Example
 
 ```yaml
 version: '3.8'
 services:
-  # OpenTelemetry Collector
+  app:
+    build: .
+    env_file:
+      - .env.production
+    environment:
+      - OTEL_SERVICE_NAME=my-app
+      - OTEL_EXPORTER_OTLP_ENDPOINT=http://otel-collector:4317
+    ports:
+      - '3000:3000'
+    command: node -r @paystackhq/nestjs-observability/register dist/src/main.js
+    depends_on:
+      - otel-collector
+
   otel-collector:
     image: otel/opentelemetry-collector-contrib:latest
-    command: ['--config=/etc/otelcol-contrib/config.yaml']
-    volumes:
-      - ./otel-config.yaml:/etc/otelcol-contrib/config.yaml
     ports:
-      - '4317:4317' # OTLP gRPC receiver
-      - '4318:4318' # OTLP HTTP receiver
-      - '8888:8888' # Prometheus metrics
-      - '8889:8889' # Prometheus exporter metrics
-
-  # Jaeger for traces
-  jaeger:
-    image: jaegertracing/all-in-one:latest
-    ports:
-      - '16686:16686'
-      - '14250:14250'
-    environment:
-      - COLLECTOR_OTLP_ENABLED=true
-
-  # Prometheus for metrics
-  prometheus:
-    image: prom/prometheus:latest
-    ports:
-      - '9090:9090'
-    volumes:
-      - ./prometheus.yml:/etc/prometheus/prometheus.yml
+      - '4317:4317'
 ```
 
-### Viewing Observability Data
+## ☁️ Platform Integration Examples
 
-1. **Traces**: Visit http://localhost:16686 (Jaeger UI)
-2. **Metrics**: Visit http://localhost:9090 (Prometheus UI)
-3. **Application Metrics**: Visit http://localhost:3000/metrics
-4. **Logs**: Check console output (pretty-printed in development)
-
-## 🔍 What to Look For
-
-### In the Logs
-
-- **Structured JSON** (when NODE_ENV != 'development')
-- **Context persistence** across service calls
-- **Argument sanitization** in sensitive endpoints
-- **Performance metrics** and timing information
-- **Error context** with stack traces and metadata
-
-### In the Traces
-
-- **HTTP request spans** with method, URL, status code
-- **Service method spans** with arguments and return values
-- **Nested service calls** with proper parent-child relationships
-- **Database/external service calls** (if any)
-- **Error spans** with exception details
-
-### In the Metrics
-
-- **HTTP request metrics**: duration, count, status codes
-- **System metrics**: memory usage, CPU, garbage collection
-- **Custom business metrics**: user actions, payment processing
-- **OpenTelemetry metrics**: trace export statistics
-
-## 🛠️ Development Commands
+### Honeycomb
 
 ```bash
-# Start development server
-pnpm run start:dev
+export OTEL_SERVICE_NAME="my-app"
+export OTEL_EXPORTER_OTLP_ENDPOINT="https://api.honeycomb.io"
+export OTEL_EXPORTER_OTLP_HEADERS="x-honeycomb-team=your-api-key"
+export OTEL_TRACES_SAMPLER="traceidratio"
+export OTEL_TRACES_SAMPLER_ARG="0.1"
 
-# Build for production
-pnpm run build
-
-# Run tests
-pnpm run test
-
-# Run tests with coverage
-pnpm run test:cov
-
-# Lint code
-pnpm run lint
-
-# Format code
-pnpm run format
+node -r ../../dist/cjs/register.js dist/src/main.js
 ```
 
-## 🎨 Customization
+### Datadog
 
-### Adding Custom Metrics
+```bash
+export OTEL_SERVICE_NAME="my-app"
+export OTEL_EXPORTER_OTLP_ENDPOINT="https://api.datadoghq.com"
+export OTEL_EXPORTER_OTLP_HEADERS="DD-API-KEY=your-datadog-key"
 
-```typescript
-// In your service
-constructor(private readonly metricsService: MetricsService) {
-  this.customCounter = this.metricsService.createCounter({
-    name: 'custom_operations_total',
-    help: 'Total custom operations',
-    labelNames: ['type', 'status']
-  });
-}
-
-someMethod() {
-  this.customCounter.inc({ type: 'user_action', status: 'success' });
-}
+node -r ../../dist/cjs/register.js dist/src/main.js
 ```
 
-### Adding Custom Tracing
+### New Relic
 
-```typescript
-// Use individual method tracing
-@Trace()
-async customMethod() {
-  // This method will be traced
-}
+```bash
+export OTEL_SERVICE_NAME="my-app"
+export OTEL_EXPORTER_OTLP_ENDPOINT="https://otlp.nr-data.net:4317"
+export OTEL_EXPORTER_OTLP_HEADERS="api-key=your-license-key"
 
-// Or trace entire class
-@TraceClass()
-class MyService {
-  // All public methods will be traced
-}
+node -r ../../dist/cjs/register.js dist/src/main.js
 ```
 
-### Custom Logging Context
+## 🔧 Troubleshooting
 
-```typescript
-// In your service
-constructor(private readonly logger: LoggerService) {}
+### Common Issues
 
-someMethod() {
-  this.logger.setContext('userId', '123');
-  this.logger.setContext('operation', 'user_creation');
-  this.logger.info('User created successfully');
-}
+1. **Module not found error**:
+
+   ```bash
+   # Ensure package is built
+   cd ../../ && pnpm build
+   ```
+
+2. **Metrics endpoint returns 404**:
+
+   ```bash
+   # Check metrics are enabled
+   export OTEL_METRICS_ENABLED=true
+   ```
+
+3. **No traces visible**:
+
+   ```bash
+   # Ensure trace exporter is set
+   export OTEL_TRACES_EXPORTER=console
+   # Or for production
+   export OTEL_TRACES_EXPORTER=otlp
+   ```
+
+4. **Performance issues**:
+   ```bash
+   # Reduce sampling
+   export OTEL_TRACES_SAMPLER=traceidratio
+   export OTEL_TRACES_SAMPLER_ARG=0.1
+   ```
+
+### Debug Mode
+
+Enable debug logging:
+
+```bash
+export OTEL_LOG_LEVEL=debug
+export DEBUG="*"
+node -r ../../dist/cjs/register.js dist/src/main.js
 ```
 
-## 📝 Notes
+## 📚 Architecture
 
-- The example uses the `@TraceClass()` decorator for services to demonstrate automatic tracing
-- Controllers are automatically traced by the `AutoTraceInterceptor`
-- All configuration is environment-variable driven for easy deployment
-- The `/payments/sensitive` endpoint specifically demonstrates argument sanitization
-- Log structured output varies by environment (pretty in development, JSON in production)
+This example demonstrates the modern OpenTelemetry architecture:
 
-## 🔗 Related Documentation
+1. **Register Module**: `node -r register.js` initializes OpenTelemetry before application code
+2. **Environment Variables**: All configuration via OTEL\_\* environment variables
+3. **Global Providers**: Services use global OpenTelemetry providers
+4. **No Configuration Objects**: Zero-config `ObservabilityModule.forRoot()`
+5. **Enhanced Features**: Context isolation, custom metrics, tracing decorators
 
-- [Auto-Tracing Documentation](../../docs/autotracing-v2.md)
-- [Main Library README](../../README.md)
-- [Configuration Guide](../../docs/configuration.md)
+## 🎯 Production Checklist
+
+Before deploying to production:
+
+- [ ] Set `OTEL_SERVICE_NAME` and `OTEL_SERVICE_VERSION`
+- [ ] Configure `OTEL_EXPORTER_OTLP_ENDPOINT` and headers
+- [ ] Set appropriate sampling: `OTEL_TRACES_SAMPLER=traceidratio`
+- [ ] Enable attribute sanitization: `OTEL_SPAN_ATTRIBUTE_SANITIZATION_ENABLED=true`
+- [ ] Set production resource attributes in `OTEL_RESOURCE_ATTRIBUTES`
+- [ ] Configure performance settings for your load
+- [ ] Test with your observability platform
+- [ ] Validate metrics are being collected
+- [ ] Verify traces contain expected data
+- [ ] Check logs include trace correlation
+
+## 📖 Further Reading
+
+- [Environment Variables Reference](../../docs/environment-variables.md)
+- [OpenTelemetry Documentation](https://opentelemetry.io/docs/)
+- [Package Documentation](../../README.md)
+
+---
+
+This example application serves as a comprehensive reference for implementing observability in NestJS applications using modern OpenTelemetry patterns.

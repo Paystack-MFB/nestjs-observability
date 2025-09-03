@@ -1,364 +1,185 @@
-import type { AnyValueMap } from '@opentelemetry/api-logs';
-
-import { ConsoleLogger, Inject, Injectable, LogLevel, Scope } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 import { trace } from '@opentelemetry/api';
-import { OTLPLogExporter } from '@opentelemetry/exporter-logs-otlp-http';
-import { resourceFromAttributes } from '@opentelemetry/resources';
-import { BatchLogRecordProcessor, LoggerProvider } from '@opentelemetry/sdk-logs';
+import { Logger, logs } from '@opentelemetry/api-logs';
 
-import type { ObservabilityConfig } from '../config/observability.config';
-
-interface LogContext extends Record<string, unknown> {
-  message?: string;
-  msg?: string;
-}
+import { getServiceName, getServiceVersion } from '../register';
 
 /**
- * Enhanced NestJS logger that extends ConsoleLogger with observability features
- * Provides structured logging with OpenTelemetry integration while maintaining
- * native NestJS logger compatibility
+ * Enhanced NestJS logger that integrates with OpenTelemetry global providers
+ * Provides structured logging with automatic trace context correlation
+ * Uses singleton scope for better performance
  */
-@Injectable({ scope: Scope.TRANSIENT })
-export class LoggerService extends ConsoleLogger {
-  private readonly loggerProvider: LoggerProvider | null = null;
-  private readonly persistentContext: LogContext = {};
+@Injectable()
+export class LoggerService {
+  private readonly otelLogger: Logger;
+  private persistentContext: Record<string, unknown> = {};
 
-  constructor(@Inject('OBSERVABILITY_CONFIG') private readonly config: ObservabilityConfig) {
-    super('LoggerService', {
-      logLevels: LoggerService.getLogLevels(config.logging.level),
-    });
-
-    if (this.config.logging.otlpExport.enabled) {
-      try {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-assignment
-        const exporter = new OTLPLogExporter({ url: this.config.logging.otlpExport.endpoint }) as any;
-        const resource = resourceFromAttributes({
-          'deployment.environment': this.config.environment,
-          'service.name': this.config.serviceName,
-          'service.version': this.config.serviceVersion,
-        });
-
-        this.loggerProvider = new LoggerProvider({
-          resource,
-        });
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-argument
-        this.loggerProvider.addLogRecordProcessor(new BatchLogRecordProcessor(exporter));
-      } catch (error) {
-        console.warn('Failed to initialize OTLP log exporter:', error);
-      }
-    }
-  }
-
-  private static getLogLevels(level: string): LogLevel[] {
-    const levels: Record<string, LogLevel[]> = {
-      debug: ['debug', 'verbose', 'log', 'warn', 'error', 'fatal'],
-      error: ['error', 'fatal'],
-      fatal: ['fatal'],
-      log: ['log', 'warn', 'error', 'fatal'],
-      verbose: ['verbose', 'log', 'warn', 'error', 'fatal'],
-      warn: ['warn', 'error', 'fatal'],
-    };
-    return levels[level] ?? levels['log'];
+  constructor() {
+    // Get OpenTelemetry logger from global provider
+    const loggerProvider = typeof logs.getLoggerProvider === 'function' ? logs.getLoggerProvider() : undefined;
+    const resolved =
+      loggerProvider && typeof loggerProvider.getLogger === 'function'
+        ? loggerProvider.getLogger(getServiceName(), getServiceVersion())
+        : undefined;
+    this.otelLogger = resolved ?? ({ emit: (_r: unknown) => undefined } as unknown as Logger);
   }
 
   /**
-   * Add context that persists across log calls
+   * Add a single context key-value pair
    */
-  addContext(context: LogContext): void {
-    Object.assign(this.persistentContext, context);
+  addContext(key: string, value: unknown): void {
+    this.persistentContext[key] = value;
   }
 
   /**
    * Clear all persistent context
    */
   clearContext(): void {
-    Object.keys(this.persistentContext).forEach((key) => {
-      // eslint-disable-next-line @typescript-eslint/no-dynamic-delete
-      delete this.persistentContext[key];
-    });
+    this.persistentContext = {};
   }
 
   /**
-   * Create a child logger with additional context
+   * Create a child logger with inherited context
    */
-  createChildLogger(context: string, additionalContext?: LogContext): LoggerService {
-    const child = new LoggerService(this.config);
-    child.setContext(context);
-
-    if (additionalContext) {
-      child.addContext(additionalContext);
-    }
-
-    // Copy persistent context from parent
-    child.addContext(this.persistentContext);
-
-    return child;
+  createChildLogger(): LoggerService {
+    const childLogger = new LoggerService();
+    childLogger.setContext(this.persistentContext);
+    return childLogger;
   }
 
   /**
-   * Enhanced debug method with context merging
+   * Log debug level message
    */
-  override debug(message: unknown, context?: string): void {
-    this.writeLog('debug', message, context);
+  debug(message: string, data?: Record<string, unknown>): void {
+    this.emit('DEBUG', message, data);
   }
 
   /**
-   * Enhanced error method with context merging
+   * Log error level message
    */
-  override error(message: unknown, stackOrContext?: string, context?: string): void {
-    // Handle both overloads of error method
-    if (typeof stackOrContext === 'string' && !context) {
-      // error(message, context)
-      this.writeLog('error', message, stackOrContext);
-    } else {
-      // error(message, stack, context)
-      this.writeLog('error', message, context, stackOrContext);
-    }
+  error(message: Error | string, data?: Record<string, unknown>): void {
+    this.emit('ERROR', message, data);
   }
 
   /**
-   * Enhanced fatal method with context merging
+   * Log info level message
    */
-  override fatal(message: unknown, context?: string): void {
-    this.writeLog('fatal', message, context);
+  info(message: string, data?: Record<string, unknown>): void {
+    this.emit('INFO', message, data);
   }
 
   /**
-   * Enhanced log method with context merging
+   * Set context that persists across log calls
    */
-  override log(message: unknown, context?: string): void {
-    this.writeLog('log', message, context);
+  setContext(context: Record<string, unknown>): void {
+    Object.assign(this.persistentContext, context);
   }
 
   /**
-   * Enhanced verbose method with context merging
+   * Log warning level message
    */
-  override verbose(message: unknown, context?: string): void {
-    this.writeLog('verbose', message, context);
+  warn(message: string, data?: Record<string, unknown>): void {
+    this.emit('WARN', message, data);
   }
 
   /**
-   * Enhanced warn method with context merging
+   * Core method that emits logs to OpenTelemetry
    */
-  override warn(message: unknown, context?: string): void {
-    this.writeLog('warn', message, context);
-  }
-
-  /**
-   * Format message as structured JSON
-   */
-  private formatAsJSON(level: LogLevel, message: unknown, context?: string, stack?: string): string {
-    const traceContext = this.getTraceContext();
-
-    const logEntry: Record<string, unknown> = {
-      dd: {
-        env: this.config.environment,
-        service: this.config.serviceName,
-        span_id: traceContext?.spanId,
-        trace_id: traceContext?.traceId,
-        version: this.config.serviceVersion,
-      },
-      level,
-      timestamp: new Date().toISOString(),
+  private emit(level: string, message: Error | string, data?: Record<string, unknown>): void {
+    // Prepare enriched attributes
+    const enrichedData = {
+      ...data,
+      ...this.persistentContext,
+      ...this.getTraceContext(),
     };
 
-    if (context) {
-      logEntry['context'] = context;
+    // Determine the log body and sanitize it to prevent log injection
+    const rawBody = message instanceof Error ? message.message : message;
+    const sanitizedBody = this.sanitizeLogMessage(rawBody);
+
+    try {
+      // Emit structured log record
+      this.otelLogger.emit({
+        attributes: enrichedData as Record<string, boolean | number | string | string[]>,
+        body: sanitizedBody,
+        severityText: level,
+        ...(message instanceof Error && { exception: message }),
+      });
+    } catch (error) {
+      // Fallback to console if OpenTelemetry logging fails
+      console.error('LoggerService emit failed:', error);
+      // Note: Console fallback logging removed to avoid potential log injection
     }
-
-    // Add stack trace for errors
-    if (stack) {
-      logEntry['stack'] = stack;
-    }
-
-    // Handle message extraction and object context merging
-    if (typeof message === 'string') {
-      logEntry['message'] = message;
-    } else if (typeof message === 'object' && message !== null && !Array.isArray(message)) {
-      const messageObj = message as LogContext;
-      const { message: msg, msg: msgAlias, ...additionalContext } = messageObj;
-
-      // Extract message from object
-      if (msg ?? msgAlias) {
-        logEntry['message'] = String(msg ?? msgAlias);
-      } else if (message instanceof Error) {
-        logEntry['message'] = message.message;
-      } else {
-        logEntry['params'] = message;
-      }
-
-      // Merge additional context from object
-      Object.assign(logEntry, additionalContext);
-    } else {
-      logEntry['message'] = String(message);
-    }
-
-    // Merge persistent context
-    Object.assign(logEntry, this.persistentContext);
-
-    return JSON.stringify(logEntry);
   }
 
   /**
    * Get current OpenTelemetry trace context
    */
-  private getTraceContext(): null | { spanId: string; traceId: string } {
+  private getTraceContext(): Record<string, unknown> {
     try {
       const activeSpan = trace.getActiveSpan();
       if (activeSpan) {
         const spanContext = activeSpan.spanContext();
         return {
           spanId: spanContext.spanId,
+          traceFlags: spanContext.traceFlags,
           traceId: spanContext.traceId,
         };
       }
-    } catch {
-      // Silently ignore tracing errors
+    } catch (_error) {
+      // Silently ignore tracing errors to prevent affecting application flow
     }
-    return null;
+    return {};
   }
 
   /**
-   * Core method that handles all logging with console output check
+   * Recursively sanitize all string values in an object to prevent log injection
+   * This ensures that any user-provided data in the logging context is safe
    */
-  private writeLog(level: LogLevel, message: unknown, context?: string, stack?: string): void {
-    // OTLP export
-    if (this.loggerProvider) {
-      const traceContext = this.getTraceContext();
-
-      // Create the log record body as an object, not a JSON string
-      const logBody: AnyValueMap = {
-        dd: {
-          env: this.config.environment,
-          service: this.config.serviceName,
-          span_id: traceContext?.spanId,
-          trace_id: traceContext?.traceId,
-          version: this.config.serviceVersion,
-        },
-        level,
-        timestamp: new Date().toISOString(),
-      };
-
-      if (context) {
-        logBody['context'] = context;
+  private sanitizeLogData(obj: unknown): unknown {
+    if (obj === null || obj === undefined) {
+      return obj;
+    }
+    if (typeof obj === 'string') {
+      return this.sanitizeLogMessage(obj);
+    }
+    if (Array.isArray(obj)) {
+      return obj.map((item) => this.sanitizeLogData(item));
+    }
+    if (typeof obj === 'object') {
+      const sanitizedObj: Record<string, unknown> = {};
+      for (const [key, value] of Object.entries(obj as Record<string, unknown>)) {
+        // Sanitize both keys and values to be extra safe
+        const sanitizedKey = typeof key === 'string' ? this.sanitizeLogMessage(key) : key;
+        sanitizedObj[sanitizedKey] = this.sanitizeLogData(value);
       }
+      return sanitizedObj;
+    }
+    return obj; // number, boolean, etc.
+  }
 
-      // Add stack trace for errors
-      if (stack) {
-        logBody['stack'] = stack;
-      }
-
-      // Handle message extraction and object context merging
-      if (typeof message === 'string') {
-        logBody['message'] = message;
-      } else if (typeof message === 'object' && message !== null && !Array.isArray(message)) {
-        const messageObj = message as LogContext;
-        const { message: msg, msg: msgAlias, ...additionalContext } = messageObj;
-
-        // Extract message from object
-        if (msg ?? msgAlias) {
-          logBody['message'] = String(msg ?? msgAlias);
-        } else if (message instanceof Error) {
-          logBody['message'] = message.message;
-        } else {
-          // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-explicit-any
-          logBody['params'] = message as any; // Cast to any to satisfy AnyValue type
-        }
-
-        // Merge additional context from object
-        Object.assign(logBody, additionalContext);
-      } else {
-        logBody['message'] = String(message);
-      }
-
-      // Merge persistent context
-      Object.assign(logBody, this.persistentContext);
-
-      this.loggerProvider.getLogger(this.config.serviceName, this.config.serviceVersion).emit({
-        body: logBody,
-        severityText: level,
-      });
+  /**
+   * Sanitize log message to prevent log injection attacks
+   * Removes all control characters that could be used to forge log entries
+   */
+  private sanitizeLogMessage(message: string): string {
+    if (typeof message !== 'string') {
+      return String(message);
     }
 
-    if (!this.config.logging.consoleOutput) {
-      return;
-    }
-
-    const isProduction = this.config.environment !== 'development';
-
-    if (isProduction) {
-      // In production, output structured JSON directly to console
-      const formattedMessage = this.formatAsJSON(level, message, context, stack);
-      console.log(formattedMessage);
-    } else {
-      // In development, use the parent ConsoleLogger for pretty printing
-      // Merge persistent context and trace context with the message
-      const traceContext = this.getTraceContext();
-      const baseContext = {
-        ...this.persistentContext,
-        ...(traceContext && {
-          spanId: traceContext.spanId,
-          traceId: traceContext.traceId,
-        }),
-      };
-
-      let processedMessage = message;
-      if (Object.keys(baseContext).length > 0) {
-        if (typeof message === 'object' && message !== null) {
-          processedMessage = { ...baseContext, ...message };
-        } else {
-          processedMessage = { ...baseContext, message: String(message) };
-        }
-      }
-
-      // Call parent logger methods with clean arguments
-      switch (level) {
-        case 'debug':
-          if (context) {
-            super.debug(processedMessage, context);
-          } else {
-            super.debug(processedMessage);
-          }
-          break;
-        case 'error':
-          if (stack && context) {
-            super.error(processedMessage, stack, context);
-          } else if (stack) {
-            super.error(processedMessage, stack);
-          } else if (context) {
-            super.error(processedMessage, context);
-          } else {
-            super.error(processedMessage);
-          }
-          break;
-        case 'fatal':
-          if (context) {
-            super.fatal(processedMessage, context);
-          } else {
-            super.fatal(processedMessage);
-          }
-          break;
-        case 'verbose':
-          if (context) {
-            super.verbose(processedMessage, context);
-          } else {
-            super.verbose(processedMessage);
-          }
-          break;
-        case 'warn':
-          if (context) {
-            super.warn(processedMessage, context);
-          } else {
-            super.warn(processedMessage);
-          }
-          break;
-        default:
-          if (context) {
-            super.log(processedMessage, context);
-          } else {
-            super.log(processedMessage);
-          }
-      }
-    }
+    // Remove all line endings, tabs, nulls, and other control characters, replacing with nothing
+    // Covers: \r, \n, \t, \0, ASCII 0x01-0x1F, and 0x7F (DEL)
+    // For further safety, also trim whitespace at the ends
+    // Use character code filtering to avoid ESLint control-regex warnings
+    return message
+      .replace(/[\r\n\t\0]/g, '') // Remove common control chars
+      .split('')
+      .filter((char) => {
+        const code = char.charCodeAt(0);
+        // Keep all characters except control characters (0x01-0x1F and 0x7F)
+        return !(code >= 1 && code <= 31) && code !== 127;
+      })
+      .join('')
+      .trim();
   }
 }

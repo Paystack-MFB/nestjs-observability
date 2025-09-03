@@ -1,215 +1,292 @@
-import { Inject, Injectable, OnApplicationShutdown, OnModuleInit } from '@nestjs/common';
-import { getNodeAutoInstrumentations } from '@opentelemetry/auto-instrumentations-node';
-import { OTLPTraceExporter } from '@opentelemetry/exporter-trace-otlp-http';
-import { NodeSDK } from '@opentelemetry/sdk-node';
-import {
-  AlwaysOffSampler,
-  AlwaysOnSampler,
-  BatchSpanProcessor,
-  TraceIdRatioBasedSampler,
-} from '@opentelemetry/sdk-trace-node';
+import type { Span, Tracer } from '@opentelemetry/api';
 
-import type { ObservabilityConfig } from '../config/observability.config';
+import { Injectable } from '@nestjs/common';
+import { trace } from '@opentelemetry/api';
 
-import { LoggerService } from '../logger/logger.service';
-
-interface TracingError extends Error {
-  message: string;
-  stack?: string;
-}
-
-// Static variable to track SDK initialization across instances
-let isTracingSdkInitialized = false;
-// Store a reference to the global SDK instance
-let globalSdkInstance: NodeSDK | null = null;
+import { getServiceAttributes, getServiceName, getServiceVersion } from '../register';
 
 /**
- * Service for OpenTelemetry distributed tracing setup
+ * Enhanced tracing service that integrates with OpenTelemetry global tracer provider
+ * Provides utility methods for creating spans and managing trace context
  */
 @Injectable()
-export class TracingService implements OnApplicationShutdown, OnModuleInit {
-  private sdk!: NodeSDK;
+export class TracingService {
+  private readonly tracer: Tracer;
 
-  constructor(
-    @Inject('OBSERVABILITY_CONFIG') private readonly config: ObservabilityConfig,
-    private readonly logger: LoggerService
-  ) {}
-
-  async onApplicationShutdown(): Promise<void> {
-    if (this.config.tracing.enabled && isTracingSdkInitialized) {
-      try {
-        // Only shutdown the SDK if we're the original instance that created it
-        if (this.sdk === globalSdkInstance) {
-          await this.sdk.shutdown();
-          // Reset the global state after shutdown
-          isTracingSdkInitialized = false;
-          globalSdkInstance = null;
-
-          this.logger.log('OpenTelemetry tracing shut down successfully', 'TracingService');
-        }
-      } catch (error: unknown) {
-        const shutdownError = error as TracingError;
-        this.logger.error(
-          `Error shutting down tracing: ${shutdownError.message}`,
-          shutdownError.stack ?? '',
-          'TracingService'
-        );
-      }
-    }
+  constructor() {
+    // Get OpenTelemetry tracer from global provider
+    const tracerProvider = typeof trace.getTracerProvider === 'function' ? trace.getTracerProvider() : undefined;
+    const resolvedTracer =
+      tracerProvider && typeof tracerProvider.getTracer === 'function'
+        ? tracerProvider.getTracer(getServiceName(), getServiceVersion())
+        : ({
+            startActiveSpan: (_name: string, fn: (span: unknown) => unknown) => {
+              const noOpSpan = {
+                addEvent: () => undefined,
+                end: () => undefined,
+                recordException: () => undefined,
+                setAttribute: () => undefined,
+                setAttributes: () => undefined,
+                setStatus: () => undefined,
+                spanContext: () => ({ spanId: '', traceFlags: 0, traceId: '' }),
+              };
+              return fn(noOpSpan);
+            },
+            startSpan: () => ({
+              addEvent: () => undefined,
+              end: () => undefined,
+              recordException: () => undefined,
+              setAttribute: () => undefined,
+              setAttributes: () => undefined,
+              setStatus: () => undefined,
+              spanContext: () => ({ spanId: '', traceFlags: 0, traceId: '' }),
+            }),
+          } as unknown as Tracer);
+    this.tracer = resolvedTracer;
   }
 
-  async onModuleInit(): Promise<void> {
-    if (!this.config.tracing.enabled) {
-      this.logger.log('Tracing is disabled', 'TracingService');
+  /**
+   * Add an event to the currently active span
+   * @param name Event name
+   * @param attributes Optional attributes for the event
+   */
+  addSpanEvent(name: string, attributes?: Record<string, boolean | number | string>): void {
+    const span = this.getActiveSpan();
+    if (!span) {
       return;
     }
 
-    try {
-      // Initialize the OpenTelemetry SDK
-      await this.initializeTracingSdk();
-      this.logger.log('OpenTelemetry tracing initialized successfully', 'TracingService');
-    } catch (error: unknown) {
-      const tracingError = error as TracingError;
-      this.logger.error(
-        `Failed to initialize tracing: ${tracingError.message}`,
-        tracingError.stack ?? '',
-        'TracingService'
-      );
-    }
+    span.addEvent(name, attributes);
   }
 
   /**
-   * Configure instrumentations using auto-instrumentations with blacklist/override support
-   * This provides maximum coverage out of the box while allowing fine-grained control
-   * @returns Configured OpenTelemetry instrumentations
+   * Create a new span with the given name and execute a function within its context
+   * @param spanName Name of the span
+   * @param fn Function to execute within the span context
+   * @returns The result of the function execution
    */
-  private configureInstrumentations(): ReturnType<typeof getNodeAutoInstrumentations> {
-    const { instrumentations } = this.config.tracing;
+  createSpan<T>(spanName: string, fn: (span: Span) => T): T {
+    return this.tracer.startActiveSpan(spanName, (span) => {
+      try {
+        span.setAttributes(getServiceAttributes());
 
-    if (!instrumentations.autoInstrumentations) {
-      this.logger.log('Auto-instrumentations disabled, no instrumentations will be loaded', 'TracingService');
-      return [];
-    }
+        const result = fn(span);
 
-    // Start with default auto-instrumentations configuration
-    const instrumentationConfig: Record<string, Record<string, unknown>> = {};
+        // Handle async results
+        if (result && typeof result === 'object' && 'then' in result) {
+          return (result as unknown as Promise<T>)
+            .then((value) => {
+              span.setStatus({ code: 1 }); // OK
+              return value;
+            })
+            .catch((error: unknown) => {
+              span.setStatus({ code: 2, message: (error as Error).message }); // ERROR
+              span.recordException(error as Error);
+              throw error;
+            })
+            .finally(() => {
+              span.end();
+            }) as T;
+        }
 
-    // Apply disabled instrumentations (blacklist approach)
-    if (instrumentations.disabled.length > 0) {
-      this.logger.log(`Disabling instrumentations: ${instrumentations.disabled.join(', ')}`, 'TracingService');
-
-      for (const instrumentationName of instrumentations.disabled) {
-        instrumentationConfig[instrumentationName] = { enabled: false };
+        // Handle sync results
+        span.setStatus({ code: 1 }); // OK
+        span.end();
+        return result;
+      } catch (error: unknown) {
+        span.setStatus({ code: 2, message: (error as Error).message }); // ERROR
+        span.recordException(error as Error);
+        span.end();
+        throw error;
       }
-    }
-
-    // Apply custom overrides for specific instrumentations
-    if (Object.keys(instrumentations.overrides).length > 0) {
-      this.logger.log(
-        `Applying instrumentation overrides: ${Object.keys(instrumentations.overrides).join(', ')}`,
-        'TracingService'
-      );
-
-      for (const [instrumentationName, config] of Object.entries(instrumentations.overrides)) {
-        instrumentationConfig[instrumentationName] = {
-          ...instrumentationConfig[instrumentationName],
-          ...config,
-        };
-      }
-    }
-
-    // Get all auto-instrumentations with our configuration
-    // This will include HTTP, Express, NestJS, databases, queues, etc.
-    return getNodeAutoInstrumentations(instrumentationConfig);
-  }
-
-  /**
-   * Configure the appropriate sampler based on configuration
-   * @returns Configured OpenTelemetry sampler
-   */
-  private configureSampler(): AlwaysOffSampler | AlwaysOnSampler | TraceIdRatioBasedSampler {
-    const { ratio, type } = this.config.tracing.sampler;
-
-    switch (type) {
-      case 'always_off':
-        return new AlwaysOffSampler();
-      case 'always_on':
-        return new AlwaysOnSampler();
-      case 'trace_id_ratio':
-        return new TraceIdRatioBasedSampler(ratio ?? 0.1);
-      default:
-        this.logger.warn(`Unknown sampler type: ${String(type)}, using AlwaysOnSampler`, 'TracingService');
-        return new AlwaysOnSampler();
-    }
-  }
-
-  /**
-   * Initialize OpenTelemetry SDK with configured options
-   */
-  private async initializeTracingSdk(): Promise<void> {
-    // If already initialized, use the existing SDK instance
-    if (isTracingSdkInitialized) {
-      if (globalSdkInstance) {
-        this.sdk = globalSdkInstance;
-        return;
-      }
-      // If globalSdkInstance is null but isTracingSdkInitialized is true,
-      // something went wrong, but we'll proceed to re-initialize
-      this.logger.warn(
-        'Tracing SDK was marked as initialized but no instance found. Reinitializing.',
-        'TracingService'
-      );
-    }
-
-    const { serviceName, tracing } = this.config;
-
-    // Configure the trace exporter with proper headers handling
-    const exporterConfig: { headers?: Record<string, string>; url: string } = {
-      url: tracing.exporter.endpoint,
-    };
-
-    if (tracing.exporter.headers) {
-      exporterConfig.headers = tracing.exporter.headers;
-    }
-
-    const traceExporter = new OTLPTraceExporter(exporterConfig);
-
-    // Configure the sampler based on configuration
-    const sampler = this.configureSampler();
-
-    // Configure instrumentations
-    const instrumentations = this.configureInstrumentations();
-
-    // Create span processor from exporter
-    const spanProcessor = new BatchSpanProcessor(traceExporter);
-
-    // Important: Add a delay before starting the SDK to allow resource attributes to settle
-    await new Promise((resolve) => setTimeout(resolve, 100));
-
-    // Create the SDK with proper resource attributes
-    this.sdk = new NodeSDK({
-      instrumentations,
-      sampler,
-      serviceName: serviceName || 'unknown-service',
-      spanProcessors: [spanProcessor] as never[], // Using type assertion to avoid compatibility issues
     });
+  }
 
-    // Store reference to the SDK instance globally
-    globalSdkInstance = this.sdk;
-
-    // Mark as initialized before starting to prevent race conditions
-    isTracingSdkInitialized = true;
-
-    try {
-      // Start the SDK after all async operations are complete
-      this.sdk.start();
-    } catch (error) {
-      // If there's an error starting the SDK, it's likely because it's already been started
-      // Just log the error but don't rethrow since the tracing should still work
-      this.logger.warn(
-        `Error starting tracing SDK (may be already started): ${(error as Error).message}`,
-        'TracingService'
-      );
+  /**
+   * End the currently active span
+   */
+  endActiveSpan(): void {
+    const span = this.getActiveSpan();
+    if (!span) {
+      return;
     }
+
+    span.end();
+  }
+
+  /**
+   * Get the currently active span
+   * @returns The active span or undefined if none exists
+   */
+  getActiveSpan(): Span | undefined {
+    return trace.getActiveSpan();
+  }
+
+  /**
+   * Get the current span ID from the active span
+   * @returns Span ID string or undefined if no active span
+   */
+  getSpanId(): string | undefined {
+    const span = this.getActiveSpan();
+    if (!span) {
+      return;
+    }
+
+    const spanContext = span.spanContext();
+    return spanContext.spanId;
+  }
+
+  /**
+   * Get the current trace ID from the active span
+   * @returns Trace ID string or undefined if no active span
+   */
+  getTraceId(): string | undefined {
+    const span = this.getActiveSpan();
+    if (!span) {
+      return;
+    }
+
+    const spanContext = span.spanContext();
+    return spanContext.traceId;
+  }
+
+  /**
+   * Get the OpenTelemetry tracer instance for advanced usage
+   * @returns OpenTelemetry Tracer instance
+   */
+  getTracer(): Tracer {
+    return this.tracer;
+  }
+
+  /**
+   * Check if tracing is enabled by checking if there's a valid tracer provider
+   * @returns True if tracing is available
+   */
+  isTracingEnabled(): boolean {
+    try {
+      const provider = trace.getTracerProvider();
+      return !!provider;
+    } catch {
+      return false;
+    }
+  }
+
+  /**
+   * Record an exception in the currently active span
+   * @param exception The exception to record
+   */
+  recordException(exception: Error): void {
+    const span = this.getActiveSpan();
+    if (!span) {
+      return;
+    }
+
+    span.recordException(exception);
+    span.setStatus({ code: 2, message: exception.message }); // ERROR
+  }
+
+  /**
+   * Set a single attribute on the currently active span
+   * @param key Attribute key
+   * @param value Attribute value
+   */
+  setSpanAttribute(key: string, value: boolean | number | string): void {
+    const span = this.getActiveSpan();
+    if (!span) {
+      return;
+    }
+
+    span.setAttribute(key, value);
+  }
+
+  /**
+   * Set attributes on the currently active span
+   * @param attributes Object containing key-value pairs of attributes
+   */
+  setSpanAttributes(attributes: Record<string, boolean | number | string>): void {
+    const span = this.getActiveSpan();
+    if (!span) {
+      return;
+    }
+
+    span.setAttributes(attributes);
+  }
+
+  /**
+   * Set the status of the currently active span
+   * @param status Span status (OK = 1, ERROR = 2)
+   * @param message Optional status message
+   */
+  setSpanStatus(status: 'ERROR' | 'OK', message?: string): void {
+    const span = this.getActiveSpan();
+    if (!span) {
+      return;
+    }
+
+    const code = status === 'OK' ? 1 : 2;
+    if (message) {
+      span.setStatus({ code, message });
+    } else {
+      span.setStatus({ code });
+    }
+  }
+
+  /**
+   * Create a span without automatically executing a function
+   * Useful when you need manual control over span lifecycle
+   * @param spanName Name of the span
+   * @returns The created span
+   */
+  startSpan(spanName: string): Span {
+    const span = this.tracer.startSpan(spanName);
+    span.setAttributes(getServiceAttributes());
+    return span;
+  }
+
+  /**
+   * Execute a function with a custom trace context
+   * @param spanName Name of the span
+   * @param attributes Initial attributes for the span
+   * @param fn Function to execute
+   */
+  withSpan<T>(spanName: string, attributes: Record<string, boolean | number | string> = {}, fn: () => T): T {
+    return this.tracer.startActiveSpan(spanName, (span) => {
+      // Set initial attributes
+      span.setAttributes({
+        ...getServiceAttributes(),
+        ...attributes,
+      });
+
+      try {
+        const result = fn();
+
+        // Handle async results
+        if (result && typeof result === 'object' && 'then' in result) {
+          return (result as unknown as Promise<T>)
+            .then((value) => {
+              span.setStatus({ code: 1 }); // OK
+              return value;
+            })
+            .catch((error: unknown) => {
+              span.setStatus({ code: 2, message: (error as Error).message }); // ERROR
+              span.recordException(error as Error);
+              throw error;
+            })
+            .finally(() => {
+              span.end();
+            }) as T;
+        }
+
+        // Handle sync results
+        span.setStatus({ code: 1 }); // OK
+        span.end();
+        return result;
+      } catch (error: unknown) {
+        span.setStatus({ code: 2, message: (error as Error).message }); // ERROR
+        span.recordException(error as Error);
+        span.end();
+        throw error;
+      }
+    });
   }
 }

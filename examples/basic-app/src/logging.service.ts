@@ -6,13 +6,20 @@ export class LoggingService {
   private readonly logger: LoggerService;
 
   constructor(private readonly loggerService: LoggerService) {
-    this.logger = this.loggerService.createChildLogger('LoggingService');
+    // Create child logger and set context for this service - ensure logger is available
+    if (this.loggerService && typeof this.loggerService.createChildLogger === 'function') {
+      this.logger = this.loggerService.createChildLogger();
+      this.logger.setContext({ service: 'LoggingService' });
+    } else {
+      // Fallback if logger service is not available
+      this.logger = this.loggerService;
+    }
   }
 
   // ==== BASIC LOGGING EXAMPLES ====
 
   async logInfo(message: string): Promise<void> {
-    this.logger.log(`Processing info: ${message}`);
+    this.logger.info(`Processing info: ${message}`);
 
     // Simulate some processing
     await this.delay(5);
@@ -20,11 +27,11 @@ export class LoggingService {
 
   async logError(error: string, context?: string): Promise<void> {
     // Log error with optional context
-    this.logger.error(`Error occurred: ${error}`, context);
+    this.logger.error(`Error occurred: ${error}`, { context: context || 'LoggingService' });
 
     // Log an actual Error object (shows stack trace)
     const errorObj = new Error(error);
-    this.logger.error(errorObj, 'ErrorHandler');
+    this.logger.error(errorObj, { context: 'ErrorHandler' });
 
     // Simulate error processing
     await this.delay(10);
@@ -44,8 +51,7 @@ export class LoggingService {
 
   async logActivity(activity: string, userId?: string): Promise<void> {
     // Log with structured data
-    this.logger.log({
-      message: 'User activity tracked',
+    this.logger.info('User activity tracked', {
       activity,
       userId,
       timestamp: new Date().toISOString(),
@@ -60,17 +66,14 @@ export class LoggingService {
 
   async logUserAction(action: string, userId: string, metadata?: Record<string, any>): Promise<void> {
     // Example of rich structured logging
-    this.logger.log(
-      {
-        message: `User performed action: ${action}`,
-        action,
-        userId,
-        timestamp: new Date().toISOString(),
-        sessionId: `session-${Date.now()}`,
-        ...metadata,
-      },
-      'UserActions'
-    );
+    this.logger.info(`User performed action: ${action}`, {
+      action,
+      userId,
+      timestamp: new Date().toISOString(),
+      sessionId: `session-${Date.now()}`,
+      context: 'UserActions',
+      ...metadata,
+    });
 
     await this.delay(5);
   }
@@ -79,41 +82,45 @@ export class LoggingService {
 
   async demonstrateContextPersistence(): Promise<void> {
     // Create a child logger with persistent context
-    const requestLogger = this.logger.createChildLogger('RequestHandler', {
+    const requestLogger = this.logger.createChildLogger();
+    requestLogger.setContext({
+      context: 'RequestHandler',
       requestId: `req-${Date.now()}`,
       userId: 'user-123',
-      traceId: 'trace-abc-123',
+      operation: 'request-processing',
     });
 
     // All subsequent logs from this logger will include the context
-    requestLogger.log('Processing user request');
-    requestLogger.log('Validating input parameters');
-    requestLogger.log('Request processing completed');
+    requestLogger.info('Processing user request');
+    requestLogger.info('Validating input parameters');
+    requestLogger.info('Request processing completed');
 
     await this.delay(15);
   }
 
   async demonstrateContextUpdates(): Promise<void> {
     // Demonstrate context management using child loggers
-    const operationLogger = this.logger.createChildLogger('OperationManager', {
+    const operationLogger = this.logger.createChildLogger();
+    operationLogger.setContext({
+      context: 'OperationManager',
       sessionId: `session-${Date.now()}`,
       operationId: 'op-456',
     });
 
     // These logs will include the session context
-    operationLogger.log('Starting operation');
-    operationLogger.log('Operation in progress');
+    operationLogger.info('Starting operation');
+    operationLogger.info('Operation in progress');
 
     // Create a new child logger with additional context
-    const validationLogger = operationLogger.createChildLogger('ValidationPhase', {
-      phase: 'validation',
-      attempts: 1,
-    });
+    const validationLogger = operationLogger.createChildLogger();
+    validationLogger.addContext('phase', 'validation');
+    validationLogger.addContext('attempts', 1);
+    validationLogger.addContext('context', 'ValidationPhase');
 
-    validationLogger.log('Validation phase started');
+    validationLogger.info('Validation phase started');
 
     // Use the original logger for logs without additional context
-    this.logger.log('Operation completed, no additional context');
+    this.logger.info('Operation completed, no additional context');
 
     await this.delay(20);
   }
@@ -121,18 +128,15 @@ export class LoggingService {
   // ==== PERFORMANCE MONITORING EXAMPLES ====
 
   async logPerformanceMetrics(operation: string, duration: number): Promise<void> {
-    this.logger.log(
-      {
-        message: `Performance metric recorded`,
-        operation,
-        duration,
-        unit: 'ms',
-        threshold: 1000,
-        status: duration > 1000 ? 'slow' : 'normal',
-        timestamp: new Date().toISOString(),
-      },
-      'PerformanceMonitor'
-    );
+    this.logger.info(`Performance metric recorded`, {
+      operation,
+      duration,
+      unit: 'ms',
+      threshold: 1000,
+      status: duration > 1000 ? 'slow' : 'normal',
+      timestamp: new Date().toISOString(),
+      context: 'PerformanceMonitor',
+    });
 
     await this.delay(3);
   }
@@ -141,18 +145,19 @@ export class LoggingService {
 
   async logExceptionWithContext(error: Error, context: Record<string, any>): Promise<void> {
     // Create a child logger with error context
-    const errorLogger = this.logger.createChildLogger('ErrorHandler', {
+    const errorLogger = this.logger.createChildLogger();
+    errorLogger.setContext({
+      context: 'ErrorHandler',
       errorId: `error-${Date.now()}`,
       severity: 'high',
       ...context,
     });
 
     // Log the error with full context
-    errorLogger.error(error, 'ExceptionHandler');
+    errorLogger.error(error);
 
     // Log additional debug information
-    errorLogger.debug({
-      message: 'Additional error context',
+    errorLogger.debug('Additional error context', {
       stack: error.stack,
       cause: error.cause,
       timestamp: new Date().toISOString(),
@@ -164,30 +169,28 @@ export class LoggingService {
   // ==== BUSINESS LOGIC EXAMPLES ====
 
   async logBusinessEvent(eventType: string, eventData: Record<string, any>): Promise<void> {
-    this.logger.log(
-      {
-        message: `Business event: ${eventType}`,
-        eventType,
-        eventData,
-        timestamp: new Date().toISOString(),
-        businessUnit: 'payments',
-        version: '2.0.0',
-      },
-      'BusinessEvents'
-    );
+    this.logger.info(`Business event: ${eventType}`, {
+      eventType,
+      eventData,
+      timestamp: new Date().toISOString(),
+      businessUnit: 'payments',
+      version: '2.0.0',
+      context: 'BusinessEvents',
+    });
 
     await this.delay(6);
   }
 
   async logSecurityEvent(event: string, userId: string, ipAddress: string): Promise<void> {
     // Security events should be logged with high priority
-    const securityLogger = this.logger.createChildLogger('SecurityMonitor', {
+    const securityLogger = this.logger.createChildLogger();
+    securityLogger.setContext({
+      context: 'SecurityMonitor',
       securityLevel: 'high',
       eventCategory: 'authentication',
     });
 
-    securityLogger.warn({
-      message: `Security event: ${event}`,
+    securityLogger.warn(`Security event: ${event}`, {
       event,
       userId,
       ipAddress,
@@ -202,7 +205,9 @@ export class LoggingService {
 
   async demonstrateComprehensiveLogging(): Promise<void> {
     // Create a transaction logger with full context
-    const transactionLogger = this.logger.createChildLogger('TransactionProcessor', {
+    const transactionLogger = this.logger.createChildLogger();
+    transactionLogger.setContext({
+      context: 'TransactionProcessor',
       transactionId: `txn-${Date.now()}`,
       userId: 'user-789',
       merchantId: 'merchant-456',
@@ -211,25 +216,22 @@ export class LoggingService {
     });
 
     // Log transaction start
-    transactionLogger.log('Transaction processing started');
+    transactionLogger.info('Transaction processing started');
 
     // Log validation steps
-    transactionLogger.debug({
-      message: 'Validating transaction parameters',
+    transactionLogger.debug('Validating transaction parameters', {
       validationSteps: ['amount', 'currency', 'merchant', 'user'],
     });
 
     // Log business logic
-    transactionLogger.log({
-      message: 'Processing payment',
+    transactionLogger.info('Processing payment', {
       paymentMethod: 'credit_card',
       processor: 'stripe',
       processingTime: 250,
     });
 
     // Log success
-    transactionLogger.log({
-      message: 'Transaction completed successfully',
+    transactionLogger.info('Transaction completed successfully', {
       result: 'success',
       confirmationCode: 'conf-123456',
       processingTime: 500,

@@ -4,6 +4,7 @@ import { LoggerService as NestLoggerService } from '@paystackhq/nestjs-observabi
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
+import { ExampleService } from './example.service';
 import { LoggingService } from './logging.service';
 import { PaymentService } from './payment.service';
 import { UserService } from './user.service';
@@ -15,6 +16,7 @@ describe('AppController', () => {
   let mockPaymentService: any;
   let mockLoggingService: any;
   let mockLoggerService: any;
+  let mockExampleService: any;
 
   beforeEach(async () => {
     // Create mock LoggerService (dependency of LoggingService)
@@ -85,10 +87,36 @@ describe('AppController', () => {
       demonstrateComprehensiveLogging: vi.fn().mockResolvedValue(undefined),
     };
 
+    mockExampleService = {
+      simpleOperation: vi.fn().mockResolvedValue({
+        operationId: 'test-op',
+        status: 'completed',
+        data: 'Processed: test data',
+      }),
+      complexOperation: vi.fn().mockResolvedValue({
+        operationId: 'complex-op',
+        userId: 'test-user',
+        result: { processed: true },
+        status: 'success',
+      }),
+      concurrentOperations: vi.fn().mockResolvedValue([
+        { index: 0, data: 'Processed: request1' },
+        { index: 1, data: 'Processed: request2' },
+      ]),
+      sensitiveOperation: vi.fn().mockResolvedValue({
+        status: 'processed',
+        message: 'Sensitive data processed securely',
+      }),
+      healthCheck: vi.fn().mockResolvedValue({
+        status: 'healthy',
+        service: 'ExampleService',
+      }),
+    };
+
     // Create testing module using overrideProvider pattern (NestJS best practice)
     const moduleBuilder = Test.createTestingModule({
       controllers: [AppController],
-      providers: [AppService, UserService, PaymentService, LoggingService, NestLoggerService],
+      providers: [AppService, UserService, PaymentService, LoggingService, ExampleService, NestLoggerService],
     })
       .overrideProvider(AppService)
       .useValue(mockAppService)
@@ -98,6 +126,8 @@ describe('AppController', () => {
       .useValue(mockPaymentService)
       .overrideProvider(LoggingService)
       .useValue(mockLoggingService)
+      .overrideProvider(ExampleService)
+      .useValue(mockExampleService)
       .overrideProvider(NestLoggerService)
       .useValue(mockLoggerService);
 

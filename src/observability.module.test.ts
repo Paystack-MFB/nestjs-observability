@@ -1,247 +1,149 @@
-import { describe, expect, it, vi } from 'vitest';
+import 'reflect-metadata';
+/**
+ * Unit tests for ObservabilityModule - Lightweight Version
+ */
+import { APP_INTERCEPTOR } from '@nestjs/core';
+import { Test, TestingModule } from '@nestjs/testing';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import * as configModule from './config/observability.config.js';
-import { type SimpleObservabilityConfig } from './config/observability.config.js';
-import { ObservabilityModule } from './observability.module.js';
+// Mock OpenTelemetry modules
+vi.mock('@opentelemetry/api', () => ({
+  metrics: {
+    getMeterProvider: vi.fn().mockReturnValue({
+      getMeter: vi.fn().mockReturnValue({
+        createCounter: vi.fn(),
+        createHistogram: vi.fn(),
+        createObservableGauge: vi.fn(),
+      }),
+    }),
+  },
+  trace: {
+    getActiveSpan: vi.fn(),
+    getTracer: vi.fn().mockReturnValue({
+      startSpan: vi.fn().mockReturnValue({
+        end: vi.fn(),
+        recordException: vi.fn(),
+        setAttributes: vi.fn(),
+        setStatus: vi.fn(),
+      }),
+    }),
+    getTracerProvider: vi.fn().mockReturnValue({
+      getTracer: vi.fn().mockReturnValue({
+        startSpan: vi.fn().mockReturnValue({
+          end: vi.fn(),
+          recordException: vi.fn(),
+          setAttributes: vi.fn(),
+          setStatus: vi.fn(),
+        }),
+      }),
+    }),
+  },
+}));
 
-// Mock ConfigService
-const mockConfigService = {
-  get: vi.fn((key: string, defaultValue?: unknown) => {
-    // Return default values for common environment variables
-    switch (key) {
-      case 'LOG_LEVEL':
-        return 'info';
-      case 'METRICS_ENDPOINT':
-        return '/metrics';
-      case 'NODE_ENV':
-        return 'test';
-      case 'OTLP_LOGS_ENDPOINT':
-        return 'http://localhost:4318/v1/logs';
-      case 'OTLP_TRACES_ENDPOINT':
-        return 'http://localhost:4318/v1/traces';
-      case 'SERVICE_NAME':
-        return 'test-service';
-      case 'SERVICE_VERSION':
-        return '1.0.0';
-      default:
-        return defaultValue;
-    }
-  }),
+vi.mock('@opentelemetry/api-logs', () => ({
+  logs: {
+    getLoggerProvider: vi.fn().mockReturnValue({
+      getLogger: vi.fn().mockReturnValue({
+        emit: vi.fn(),
+      }),
+    }),
+  },
+}));
+
+import { MetricsController } from './controllers/metrics.controller';
+import { LoggerService } from './logger/logger.service';
+import { MetricsService } from './metrics/metrics.service';
+import { ObservabilityModule } from './observability.module';
+import { TracingService } from './tracing/tracing.service';
+
+// Mock environment variables
+const mockEnv = {
+  NODE_ENV: 'test',
+  OTEL_SERVICE_NAME: 'test-service',
+  OTEL_SERVICE_VERSION: '1.0.0',
 };
 
-describe('ObservabilityModule', () => {
-  it('should be defined', () => {
-    expect(ObservabilityModule).toBeDefined();
+describe('ObservabilityModule - Lightweight', () => {
+  let module: TestingModule;
+
+  beforeEach(() => {
+    // Set up environment variables
+    Object.entries(mockEnv).forEach(([key, value]) => {
+      process.env[key] = value;
+    });
   });
 
-  it('should create a module with forRoot', () => {
-    const testConfig: SimpleObservabilityConfig = {
-      environment: 'test',
-      serviceName: 'test-service',
-      serviceVersion: '1.0.0',
-    };
+  describe('forRoot()', () => {
+    it('should create module without configuration parameters', () => {
+      const moduleDefinition = ObservabilityModule.forRoot();
 
-    const module = ObservabilityModule.forRoot(testConfig);
-
-    expect(module).toBeDefined();
-    expect(module.module).toBe(ObservabilityModule);
-    expect(module.providers).toBeDefined();
-    expect(module.exports).toBeDefined();
-  });
-
-  it('should create a module with forRootAsync', () => {
-    const module = ObservabilityModule.forRootAsync({
-      useFactory: (): SimpleObservabilityConfig => ({
-        environment: 'test',
-        serviceName: 'test-service',
-        serviceVersion: '1.0.0',
-      }),
+      expect(moduleDefinition).toBeDefined();
+      expect(moduleDefinition.module).toBe(ObservabilityModule);
+      expect(moduleDefinition.providers).toBeDefined();
+      expect(moduleDefinition.controllers).toContain(MetricsController);
+      expect(moduleDefinition.exports).toContain(LoggerService);
+      expect(moduleDefinition.exports).toContain(MetricsService);
+      expect(moduleDefinition.exports).toContain(TracingService);
     });
 
-    expect(module).toBeDefined();
-    expect(module.module).toBe(ObservabilityModule);
-    expect(module.providers).toBeDefined();
-    expect(module.exports).toBeDefined();
-  });
+    it('should provide all required services', async () => {
+      module = await Test.createTestingModule({
+        imports: [ObservabilityModule.forRoot()],
+      }).compile();
 
-  it('should call ensureServiceLabels in forRoot', () => {
-    const ensureServiceLabelsSpy = vi.spyOn(configModule, 'ensureServiceLabels');
+      // Verify all services are available
+      const loggerService = module.get<LoggerService>(LoggerService);
+      const metricsService = module.get<MetricsService>(MetricsService);
+      const tracingService = module.get<TracingService>(TracingService);
 
-    const testConfig: SimpleObservabilityConfig = {
-      metrics: {
-        defaultLabels: {
-          customLabel: 'customValue',
-          environment: 'test',
-        },
-      },
-      serviceName: 'test-service',
-      serviceVersion: '2.0.0',
-    };
-
-    const module = ObservabilityModule.forRoot(testConfig);
-
-    // Get the config provider and execute its useFactory
-    const configProvider = module.providers?.find(
-      (p) => typeof p === 'object' && 'provide' in p && p.provide === 'OBSERVABILITY_CONFIG'
-    );
-
-    expect(configProvider).toBeDefined();
-
-    // Execute the useFactory to trigger ensureServiceLabels
-    if (configProvider && typeof configProvider === 'object' && 'useFactory' in configProvider) {
-      (configProvider.useFactory as (...args: unknown[]) => unknown)(mockConfigService);
-    }
-
-    expect(ensureServiceLabelsSpy).toHaveBeenCalledOnce();
-    expect(ensureServiceLabelsSpy).toHaveBeenCalledWith(
-      expect.objectContaining({
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
-        metrics: expect.objectContaining({
-          // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
-          defaultLabels: expect.objectContaining({
-            customLabel: 'customValue',
-            environment: 'test',
-          }),
-        }),
-        serviceName: 'test-service',
-        serviceVersion: '2.0.0',
-      })
-    );
-
-    ensureServiceLabelsSpy.mockRestore();
-  });
-
-  it('should call ensureServiceLabels in forRootAsync', () => {
-    const ensureServiceLabelsSpy = vi.spyOn(configModule, 'ensureServiceLabels');
-
-    const testConfig: SimpleObservabilityConfig = {
-      metrics: {
-        defaultLabels: {
-          environment: 'staging',
-          team: 'backend',
-        },
-      },
-      serviceName: 'async-service',
-      serviceVersion: '3.0.0',
-    };
-
-    const module = ObservabilityModule.forRootAsync({
-      useFactory: () => testConfig,
+      expect(loggerService).toBeDefined();
+      expect(metricsService).toBeDefined();
+      expect(tracingService).toBeDefined();
     });
 
-    expect(module).toBeDefined();
+    it('should register AutoTraceInterceptor as APP_INTERCEPTOR', () => {
+      const moduleDefinition = ObservabilityModule.forRoot();
 
-    // Get the config provider
-    const configProvider = module.providers?.find(
-      (p) => typeof p === 'object' && 'provide' in p && p.provide === 'OBSERVABILITY_CONFIG'
-    );
+      // Check that APP_INTERCEPTOR provider is included
+      const interceptorProvider = moduleDefinition.providers?.find(
+        (provider) => typeof provider === 'object' && 'provide' in provider && provider.provide === APP_INTERCEPTOR
+      );
 
-    expect(configProvider).toBeDefined();
-
-    // Call the useFactory to trigger ensureServiceLabels
-    if (configProvider && typeof configProvider === 'object' && 'useFactory' in configProvider) {
-      (configProvider.useFactory as (...args: unknown[]) => unknown)(mockConfigService);
-    }
-
-    ensureServiceLabelsSpy.mockRestore();
+      expect(interceptorProvider).toBeDefined();
+    });
   });
 
-  it('should ensure service labels are present in forRoot config', () => {
-    const ensureServiceLabelsSpy = vi.spyOn(configModule, 'ensureServiceLabels');
+  describe('Module Registration', () => {
+    it('should be marked as Global', () => {
+      const moduleMetadata = Reflect.getMetadata('__module:global__', ObservabilityModule) as boolean;
+      expect(moduleMetadata).toBe(true);
+    });
 
-    const testConfig: SimpleObservabilityConfig = {
-      metrics: {
-        defaultLabels: {
-          environment: 'production',
-          region: 'us-west-2',
-          // Note: not providing service and version here
-        },
-      },
-      serviceName: 'label-test-service',
-      serviceVersion: '1.5.0',
-    };
+    it('should export required services', () => {
+      const moduleDefinition = ObservabilityModule.forRoot();
 
-    const module = ObservabilityModule.forRoot(testConfig);
+      expect(moduleDefinition.exports).toContain(LoggerService);
+      expect(moduleDefinition.exports).toContain(MetricsService);
+      expect(moduleDefinition.exports).toContain(TracingService);
+    });
 
-    // Get the config provider and execute its useFactory
-    const configProvider = module.providers?.find(
-      (p) => typeof p === 'object' && 'provide' in p && p.provide === 'OBSERVABILITY_CONFIG'
-    );
+    it('should include MetricsController', () => {
+      const moduleDefinition = ObservabilityModule.forRoot();
 
-    expect(configProvider).toBeDefined();
-
-    // Execute the useFactory to trigger ensureServiceLabels
-    if (configProvider && typeof configProvider === 'object' && 'useFactory' in configProvider) {
-      (configProvider.useFactory as (...args: unknown[]) => unknown)(mockConfigService);
-    }
-
-    // Verify that ensureServiceLabels was called
-    expect(ensureServiceLabelsSpy).toHaveBeenCalledOnce();
-    expect(ensureServiceLabelsSpy).toHaveBeenCalledWith(
-      expect.objectContaining({
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
-        metrics: expect.objectContaining({
-          // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
-          defaultLabels: expect.objectContaining({
-            environment: 'production',
-            region: 'us-west-2',
-          }),
-        }),
-        serviceName: 'label-test-service',
-        serviceVersion: '1.5.0',
-      })
-    );
-
-    ensureServiceLabelsSpy.mockRestore();
+      expect(moduleDefinition.controllers).toContain(MetricsController);
+    });
   });
 
-  it('should preserve user labels while ensuring service labels in forRoot', () => {
-    const ensureServiceLabelsSpy = vi.spyOn(configModule, 'ensureServiceLabels');
+  describe('Integration', () => {
+    it('should work with NestJS dependency injection', async () => {
+      module = await Test.createTestingModule({
+        imports: [ObservabilityModule.forRoot()],
+      }).compile();
 
-    const testConfig: SimpleObservabilityConfig = {
-      metrics: {
-        defaultLabels: {
-          customLabel: 'preserved',
-          environment: 'test',
-          service: 'wrong-service', // This should be overridden
-          version: '1.0.0', // This should be overridden
-        },
-      },
-      serviceName: 'override-service',
-      serviceVersion: '4.0.0',
-    };
+      await module.init();
 
-    const module = ObservabilityModule.forRoot(testConfig);
-
-    // Get the config provider and execute its useFactory
-    const configProvider = module.providers?.find(
-      (p) => typeof p === 'object' && 'provide' in p && p.provide === 'OBSERVABILITY_CONFIG'
-    );
-
-    expect(configProvider).toBeDefined();
-
-    // Execute the useFactory to trigger ensureServiceLabels
-    if (configProvider && typeof configProvider === 'object' && 'useFactory' in configProvider) {
-      (configProvider.useFactory as (...args: unknown[]) => unknown)(mockConfigService);
-    }
-
-    // Verify that ensureServiceLabels was called
-    expect(ensureServiceLabelsSpy).toHaveBeenCalledOnce();
-    expect(ensureServiceLabelsSpy).toHaveBeenCalledWith(
-      expect.objectContaining({
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
-        metrics: expect.objectContaining({
-          // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
-          defaultLabels: expect.objectContaining({
-            customLabel: 'preserved',
-            environment: 'test',
-          }),
-        }),
-        serviceName: 'override-service',
-        serviceVersion: '4.0.0',
-      })
-    );
-
-    ensureServiceLabelsSpy.mockRestore();
+      // Verify module initializes without errors
+      expect(module).toBeDefined();
+    });
   });
 });
