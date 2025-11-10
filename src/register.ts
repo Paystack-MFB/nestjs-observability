@@ -18,6 +18,8 @@ import { NodeSDK } from '@opentelemetry/sdk-node';
 import { ConsoleSpanExporter } from '@opentelemetry/sdk-trace-node';
 import { ATTR_SERVICE_NAME, ATTR_SERVICE_VERSION } from '@opentelemetry/semantic-conventions';
 
+import { JSONStdoutLogExporter } from './exporters/json-log-exporter';
+
 // OTLP Exporters imported eagerly so constructor calls are observable in tests
 
 // SDK instance for global access and cleanup
@@ -63,6 +65,13 @@ function createLogProcessor(): BatchLogRecordProcessor | undefined {
   const exporterType = process.env['OTEL_LOGS_EXPORTER'] ?? 'console';
 
   switch (exporterType) {
+    case 'json':
+      try {
+        return new BatchLogRecordProcessor(new JSONStdoutLogExporter());
+      } catch (error) {
+        console.warn('Failed to create JSON log processor, logs will not be exported:', error);
+        return undefined;
+      }
     case 'otlp':
       try {
         const endpoint =
@@ -99,10 +108,13 @@ function createLogProcessor(): BatchLogRecordProcessor | undefined {
 /**
  * Create metric reader based on environment variables
  */
-function createMetricReader(): import('@opentelemetry/sdk-metrics').MetricReader {
+function createMetricReader(): import('@opentelemetry/sdk-metrics').MetricReader | undefined {
   const exporterType = process.env['OTEL_METRICS_EXPORTER'] ?? 'console';
 
   switch (exporterType) {
+    case 'none':
+      // Explicitly disabled
+      return undefined;
     case 'otlp':
       try {
         const endpoint =
@@ -172,6 +184,10 @@ function createTraceExporter():
   const exporterType = process.env['OTEL_TRACES_EXPORTER'] ?? 'console';
 
   switch (exporterType) {
+    case 'none':
+      // Explicitly disable trace exporting
+      // @ts-expect-error allow undefined sentinel for omission downstream
+      return undefined;
     case 'otlp':
       try {
         const endpoint =
@@ -247,7 +263,7 @@ function initializeSDK(): NodeSDK {
 
   // Only add custom metric reader if not using NodeSDK's automatic OTLP configuration
   const metricsExporter = process.env['OTEL_METRICS_EXPORTER'];
-  if (metricsExporter !== 'otlp') {
+  if (metricsExporter !== 'otlp' && metricReader) {
     sdkConfig.metricReader = metricReader;
   }
 
@@ -265,6 +281,7 @@ function initializeSDK(): NodeSDK {
     ...(sdkConfig.resource ? { resource: sdkConfig.resource } : {}),
     ...(sdkConfig.traceExporter ? { traceExporter: sdkConfig.traceExporter } : {}),
     ...(sdkConfig.metricReader ? { metricReader: sdkConfig.metricReader } : {}),
+    ...(sdkConfig.logRecordProcessors ? { logRecordProcessors: sdkConfig.logRecordProcessors } : {}),
   };
 
   const sdkInstance = new NodeSDK(normalizedConfig);

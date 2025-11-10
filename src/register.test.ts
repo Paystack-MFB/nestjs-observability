@@ -432,4 +432,48 @@ describe('Register Module', () => {
       });
     });
   });
+
+  describe('Exporter none/json behavior', () => {
+    it('disables trace exporter when OTEL_TRACES_EXPORTER=none', async () => {
+      process.env['OTEL_TRACES_EXPORTER'] = 'none';
+
+      const { NodeSDK } = await import('@opentelemetry/sdk-node');
+
+      await import('./register');
+
+      expect(NodeSDK).toHaveBeenCalledWith(
+        expect.not.objectContaining({
+          traceExporter: expect.anything(),
+        })
+      );
+    });
+
+    it('disables metrics reader when OTEL_METRICS_EXPORTER=none', async () => {
+      process.env['OTEL_METRICS_EXPORTER'] = 'none';
+
+      const { NodeSDK } = await import('@opentelemetry/sdk-node');
+      const { PeriodicExportingMetricReader } = await import('@opentelemetry/sdk-metrics');
+
+      await import('./register');
+
+      expect(PeriodicExportingMetricReader).not.toHaveBeenCalled();
+      expect(NodeSDK).toHaveBeenCalledWith(
+        expect.not.objectContaining({
+          metricReader: expect.anything(),
+        })
+      );
+    });
+
+    it('creates batch JSON log processor when OTEL_LOGS_EXPORTER=json', async () => {
+      process.env['OTEL_LOGS_EXPORTER'] = 'json';
+
+      const { BatchLogRecordProcessor, ConsoleLogRecordExporter } = await import('@opentelemetry/sdk-logs');
+
+      await import('./register');
+
+      expect(BatchLogRecordProcessor).toHaveBeenCalled();
+      expect(ConsoleLogRecordExporter).not.toHaveBeenCalled();
+      // Note: In tests we do not attach logRecordProcessors to NodeSDK config (guarded by NODE_ENV=test)
+    });
+  });
 });

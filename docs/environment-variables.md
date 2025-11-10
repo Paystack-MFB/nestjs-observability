@@ -111,9 +111,9 @@ export NODE_ENV="production"
 
 ### Logs Exporters
 
-| Variable             | Description        | Default   | Options                   |
-| -------------------- | ------------------ | --------- | ------------------------- |
-| `OTEL_LOGS_EXPORTER` | Logs exporter type | `console` | `console`, `otlp`, `none` |
+| Variable             | Description        | Default   | Options                           |
+| -------------------- | ------------------ | --------- | --------------------------------- |
+| `OTEL_LOGS_EXPORTER` | Logs exporter type | `console` | `console`, `otlp`, `json`, `none` |
 
 #### OTLP Logs Exporter
 
