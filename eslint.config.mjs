@@ -1,6 +1,5 @@
 import eslint from '@eslint/js';
 import eslintConfigPrettier from 'eslint-config-prettier';
-import perfectionist from 'eslint-plugin-perfectionist';
 import prettier from 'eslint-plugin-prettier';
 import tseslint from 'typescript-eslint';
 
@@ -31,7 +30,6 @@ export default tseslint.config(
       },
     },
   },
-  perfectionist.configs['recommended-natural'],
   {
     plugins: {
       prettier: prettier,

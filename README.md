@@ -273,11 +273,63 @@ export class OrderService {
   }
 
   @NoTrace() // This method won't be traced (for sensitive operations)
+  @NoLog() // This method won't be logged (for sensitive operations)
   async validatePaymentDetails(creditCard: string) {
-    // Sensitive payment validation - not traced for security
+    // Sensitive payment validation - not traced or logged for security
     return this.encryptPaymentData(creditCard);
   }
 }
+```
+
+### Request/Response Logging with Automatic Masking
+
+The package automatically logs all HTTP requests and responses with sensitive data masking:
+
+```typescript
+// health.controller.ts
+import { Controller, Get } from '@nestjs/common';
+import { NoLog, NoLogClass } from '@paystackhq/nestjs-observability';
+
+@Controller('health')
+@NoLogClass() // Exclude entire controller from request/response logging
+export class HealthController {
+  @Get()
+  getHealth() {
+    // This endpoint won't generate request/response logs
+    return { status: 'ok' };
+  }
+}
+
+@Controller('users')
+export class UserController {
+  @Get()
+  getUsers() {
+    // Automatically logged with masked sensitive fields
+    return this.userService.findAll();
+  }
+
+  @NoLog() // Exclude specific endpoint from logging
+  @Get('/internal')
+  getInternalData() {
+    // This endpoint won't generate request/response logs
+    return this.internalService.getData();
+  }
+}
+```
+
+**Default Masked Fields:**
+
+- **Authentication**: password, token, secret, key, apikey, bearer, jwt
+- **Payment Data**: card, pan, cvv, accountnumber, credit
+- **PII**: email, phone, address, ssn, surname
+
+**Add Custom Sensitive Fields:**
+
+```typescript
+// main.ts
+import { addSensitiveFields } from '@paystackhq/nestjs-observability';
+
+addSensitiveFields(['customField', 'internalSecret']);
 ```
 
 ## 🌐 Platform Integration

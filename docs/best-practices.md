@@ -818,6 +818,162 @@ console.log(isSensitiveKey('user_email')); // false (not sensitive)
 console.log(isSensitiveKey('password')); // true (default pattern)
 ```
 
+### Request/Response Logging with Automatic Data Masking
+
+The package automatically logs all HTTP requests and responses with sensitive data masking. This provides comprehensive request audit trails while protecting sensitive information.
+
+#### ✅ **DO: Exclude Health Checks and Internal Endpoints**
+
+```typescript
+import { Controller, Get } from '@nestjs/common';
+import { NoLog, NoLogClass } from '@paystackhq/nestjs-observability';
+
+// Exclude entire controller from logging (e.g., health checks)
+@Controller('health')
+@NoLogClass()
+export class HealthController {
+  @Get()
+  getHealth() {
+    // This endpoint won't generate request/response logs
+    return { status: 'ok', timestamp: Date.now() };
+  }
+
+  @Get('/ready')
+  getReadiness() {
+    // This endpoint also won't be logged
+    return { ready: true };
+  }
+}
+
+// Log most endpoints, but exclude specific ones
+@Controller('users')
+export class UserController {
+  @Get()
+  getUsers() {
+    // Automatically logged with masked sensitive fields
+    return this.userService.findAll();
+  }
+
+  @Post()
+  createUser(@Body() userData: CreateUserDto) {
+    // Request/response logged with automatic masking of sensitive fields
+    return this.userService.create(userData);
+  }
+
+  @NoLog() // Exclude specific endpoint from logging
+  @Get('/internal')
+  getInternalData() {
+    // This endpoint won't generate request/response logs
+    return this.internalService.getData();
+  }
+}
+```
+
+#### ✅ **DO: Add Custom Sensitive Fields for Your Domain**
+
+```typescript
+// main.ts
+import { addSensitiveFields } from '@paystackhq/nestjs-observability';
+
+async function bootstrap() {
+  const app = await NestFactory.create(AppModule);
+
+  // Add domain-specific sensitive fields (uses fast string matching, not regex)
+  addSensitiveFields([
+    'identifiervalue',
+    'identitynumber',
+    'bvn',
+    'nin',
+    'customerId',
+    'merchantId',
+    'deviceFingerprint',
+  ]);
+
+  await app.listen(3000);
+}
+```
+
+#### 📝 **Default Masked Fields in Request/Response Logs**
+
+The following fields are automatically masked in request/response logs:
+
+**Authentication:**
+
+- `access_token`, `accesstoken`, `apikey`, `bearer`, `jwt`, `key`, `password`, `pin`, `secret`, `secretkey`, `token`, `webhook_authentication_token`, `securitycredential`
+
+**Payment Data:**
+
+- `accountnumber`, `card`, `credit`, `cvc`, `cvv`, `number`, `pan`
+
+**Personal Identifiable Information (PII):**
+
+- `address`, `email`, `identifiervalue`, `identitynumber`, `idnumber`, `phone`, `social`, `ssn`, `surname`
+
+#### ✅ **DO: Use @NoLog for Sensitive Operations**
+
+```typescript
+@Controller('auth')
+export class AuthController {
+  @Post('/login')
+  @NoLog() // Don't log sensitive authentication requests
+  async login(@Body() credentials: LoginDto) {
+    // Authentication logic - not logged for security
+    return this.authService.login(credentials);
+  }
+
+  @Get('/profile')
+  async getProfile() {
+    // Regular endpoints are logged with masked sensitive fields
+    return this.authService.getProfile();
+  }
+}
+```
+
+#### 🔍 **Log Format**
+
+Request/response logs follow the Paystack log format with automatic trace correlation:
+
+```typescript
+// Request log
+{
+  service: 'my-service',
+  type: 'request',
+  level: 'info',
+  created: '2025-11-10T12:00:00.000Z',
+  environment: 'production',
+  age: 0,
+  endpoint: '/api/users',
+  traceId: 'abc123',
+  spanId: 'def456',
+  payload: {
+    verb: 'POST',
+    client: '192.168.1.1',
+    headers: { 'user-agent': 'Mozilla/5.0', 'authorization': '[MASKED]' },
+    query: { page: '1' },
+    body: { email: '[MASKED]', password: '[MASKED]', name: 'John Doe' }
+  }
+}
+
+// Response log
+{
+  service: 'my-service',
+  type: 'response',
+  level: 'info',
+  created: '2025-11-10T12:00:00.123Z',
+  environment: 'production',
+  age: 123,
+  endpoint: '/api/users',
+  traceId: 'abc123',
+  spanId: 'def456',
+  payload: {
+    verb: 'POST',
+    client: '192.168.1.1',
+    status: 201,
+    body: { id: 'user-123', email: '[MASKED]', token: '[MASKED]' }
+  }
+}
+```
+
 ### Configuration Security
 
 #### ✅ **DO: Secure Configuration**

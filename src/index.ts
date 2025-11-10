@@ -5,9 +5,13 @@ export { MetricsController } from './controllers/metrics.controller';
 // Decorators
 export {
   getTraceOptions,
+  isNoLogClassEnabled,
+  isNoLogEnabled,
   isNoTraceClassEnabled,
   isNoTraceEnabled,
   isTraceClassEnabled,
+  NoLog,
+  NoLogClass,
   NoTrace,
   NoTraceClass,
   Trace,
@@ -17,6 +21,7 @@ export {
 export type { TraceClassOptions, TraceOptions } from './decorators/auto-trace.decorators';
 // Interceptors
 export { AutoTraceInterceptor } from './interceptors/auto-trace.interceptor';
+export { RequestLoggingInterceptor } from './interceptors/request-logging.interceptor';
 
 export { LoggerService } from './logger/logger.service';
 
@@ -47,3 +52,6 @@ export {
 export { addSensitivePatterns, configureAttributeSanitization, getSanitizationConfig } from './utils/span-attributes';
 
 export type { AttributeSanitizationConfig } from './utils/span-attributes';
+
+// Request/response logging utilities
+export { addSensitiveFields, getAllSensitiveFields, maskSensitiveFields } from './utils/mask-sensitive-fields';

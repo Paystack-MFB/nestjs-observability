@@ -3,6 +3,7 @@ import { APP_INTERCEPTOR } from '@nestjs/core';
 
 import { MetricsController } from './controllers/metrics.controller';
 import { AutoTraceInterceptor } from './interceptors/auto-trace.interceptor';
+import { RequestLoggingInterceptor } from './interceptors/request-logging.interceptor';
 import { LoggerService } from './logger/logger.service';
 import { MetricsService } from './metrics/metrics.service';
 import { TracingService } from './tracing/tracing.service';
@@ -29,6 +30,10 @@ export class ObservabilityModule {
       {
         provide: APP_INTERCEPTOR,
         useClass: AutoTraceInterceptor,
+      },
+      {
+        provide: APP_INTERCEPTOR,
+        useClass: RequestLoggingInterceptor,
       },
     ];
 
