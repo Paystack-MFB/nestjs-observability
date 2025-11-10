@@ -60,7 +60,9 @@
     "changeset": "changeset",
     "changeset:version": "changeset version",
     "changeset:publish": "changeset publish",
-    "prepare": "husky"
+    "prepare": "husky",
+    "rules:sync": "ai-coding-rules sync",
+    "rules:check": "ai-coding-rules check"
   },
   "keywords": [
     "nestjs",
@@ -142,6 +144,7 @@
     "@changesets/cli": "^2.28.0",
     "@eslint/js": "^9.17.0",
     "@nestjs/testing": "^11.0.0",
+    "@paystackhq/pkg-ai-coding-rules": "^1.0.13",
     "@types/express": "^5.0.2",
     "@types/node": "^22.10.2",
     "@vitest/coverage-v8": "^2.1.8",
@@ -161,10 +164,10 @@
   "lint-staged": {
     "*.{js,jsx,ts,tsx}": [
       "eslint",
-      "prettier --check"
+      "prettier --write"
     ],
     "*.{json,yml,yaml,md}": [
-      "prettier --check"
+      "prettier --write"
     ]
   }
 }

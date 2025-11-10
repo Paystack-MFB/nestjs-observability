@@ -1,0 +1,25 @@
+{
+  "lastSync": "2025-11-10T09:58:33.601Z",
+  "files": [
+    {
+      "filename": "00-company-paystack.managed.mdc",
+      "source": "bundles/company/paystack.md",
+      "hash": "b9d9cd937a39e8bd785dbfa10dbd6e797a3a848a8a4874f11057e8fc896fd926"
+    },
+    {
+      "filename": "10-competency-backend.managed.mdc",
+      "source": "bundles/competency/backend.md",
+      "hash": "0c1c745936bd3ad111389f77b5310fa2e04961b1327be8b6d9b8d1eccc8d2cb7"
+    },
+    {
+      "filename": "20-framework-nestjs.managed.mdc",
+      "source": "bundles/framework/nestjs.md",
+      "hash": "1cb792b41ae4bbbbcbb185d5b21f4adec1d6b6385e9d79480fb3de414500631b"
+    },
+    {
+      "filename": "90-repo-overrides.managed.mdc",
+      "source": ".github/instructions/90-repo.instructions.md",
+      "hash": "25db5d524a46c5eb8a98e9dbce1ff0fccc45c818ac8a648ed2b4b8d88be2f324"
+    }
+  ]
+}
