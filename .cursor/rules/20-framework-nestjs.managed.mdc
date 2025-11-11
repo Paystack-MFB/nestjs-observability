@@ -1,0 +1,15 @@
+---
+_managed:
+  package: "@paystackhq/pkg-ai-coding-rules"
+  source: bundles/framework/nestjs.md
+  doNotEdit: true
+alwaysApply: true
+description: NestJS framework-specific rules
+---
+
+
+# NestJS Framework Rules
+
+## Module Organization
+
+- Each feature should have its own module with clear boundaries

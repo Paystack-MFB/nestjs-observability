@@ -347,11 +347,11 @@ export OTEL_EXPORTER_OTLP_HEADERS="authorization=Bearer your-token"
 
 ### Exporter Configuration
 
-| Variable                | Description           | Options                               | Default     |
-| ----------------------- | --------------------- | ------------------------------------- | ----------- |
-| `OTEL_TRACES_EXPORTER`  | Traces exporter type  | `console`, `otlp`, `jaeger`, `zipkin` | `"console"` |
-| `OTEL_METRICS_EXPORTER` | Metrics exporter type | `console`, `otlp`, `prometheus`       | `"console"` |
-| `OTEL_LOGS_EXPORTER`    | Logs exporter type    | `console`, `otlp`                     | `"console"` |
+| Variable                | Description           | Options                   | Default     |
+| ----------------------- | --------------------- | ------------------------- | ----------- |
+| `OTEL_TRACES_EXPORTER`  | Traces exporter type  | `console`, `otlp`, `none` | `"console"` |
+| `OTEL_METRICS_EXPORTER` | Metrics exporter type | `console`, `otlp`, `none` | `"console"` |
+| `OTEL_LOGS_EXPORTER`    | Logs exporter type    | `console`, `otlp`, `json` | `"console"` |
 
 ### OTLP Configuration
 
@@ -393,6 +393,13 @@ export OTEL_RESOURCE_ATTRIBUTES="deployment.environment=staging,service.namespac
 # Solution: Check environment variables
 echo $OTEL_SERVICE_NAME
 echo $OTEL_TRACES_EXPORTER
+
+# For local JSON logs to stdout (for shippers like Filebeat)
+export OTEL_LOGS_EXPORTER="json"
+
+# To disable signals entirely
+export OTEL_TRACES_EXPORTER="none"
+export OTEL_METRICS_EXPORTER="none"
 
 # Enable debug logging
 export OTEL_LOG_LEVEL="debug"

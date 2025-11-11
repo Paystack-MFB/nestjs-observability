@@ -1,0 +1,20 @@
+{
+  "lastSync": "2025-11-10T09:58:33.630Z",
+  "files": [
+    {
+      "filename": "00-company-paystack.managed.md",
+      "source": "bundles/company/paystack.md",
+      "hash": "117c45f4c85090b023aaee9f470c769c9b5966225c60cb4fa8aefdf1c6871b81"
+    },
+    {
+      "filename": "10-competency-backend.managed.md",
+      "source": "bundles/competency/backend.md",
+      "hash": "3c03a15e6cb1dd8df62353787ff7794ed4144712b1599e498344019dcecc5870"
+    },
+    {
+      "filename": "20-framework-nestjs.managed.md",
+      "source": "bundles/framework/nestjs.md",
+      "hash": "f488c22f40e29243be41eb180ec8e416b1c5c97497e5815e444a2b998e9152ce"
+    }
+  ]
+}
