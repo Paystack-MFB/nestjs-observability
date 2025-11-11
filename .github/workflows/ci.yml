@@ -25,6 +25,21 @@ jobs:
           node-version: ${{ matrix.node-version }}
           cache: 'pnpm'
 
+      - name: Create .npmrc file
+        run: |
+          cat << EOF > ${HOME}/.npmrc
+          # Default registry for unscoped packages (npm)
+          registry=https://registry.npmjs.org/
+
+          # GitHub registry for scoped packages (for organizations using GitHub packages)
+          @paystackhq:registry=https://npm.pkg.github.com
+
+          # Authentication placeholder (will be set by CI/CD)
+          //npm.pkg.github.com/:_authToken=${NODE_AUTH_TOKEN}
+          EOF
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
@@ -72,6 +87,21 @@ jobs:
         with:
           node-version: 22
           cache: 'pnpm'
+
+      - name: Create .npmrc file
+        run: |
+          cat << EOF > ${HOME}/.npmrc
+          # Default registry for unscoped packages (npm)
+          registry=https://registry.npmjs.org/
+
+          # GitHub registry for scoped packages (for organizations using GitHub packages)
+          @paystackhq:registry=https://npm.pkg.github.com
+
+          # Authentication placeholder (will be set by CI/CD)
+          //npm.pkg.github.com/:_authToken=${NODE_AUTH_TOKEN}
+          EOF
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
