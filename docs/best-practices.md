@@ -909,7 +909,11 @@ HTTP request/response logging is a **separate opt-in feature** controlled by the
 export OTEL_LOG_HTTP_REQUESTS="true"
 ```
 
-**Note:** This feature is **disabled by default** to prevent unexpected log volume. Services must explicitly opt-in by setting the environment variable.
+**Important Notes:**
+
+- This feature is **disabled by default** to prevent unexpected log volume. Services must explicitly opt-in by setting the environment variable.
+- This setting is evaluated **at application startup**. To enable or disable request/response logging, you must **restart the application**.
+- When disabled, the request logging interceptor is not registered, providing zero runtime overhead.
 
 #### ✅ **DO: Exclude Health Checks and Internal Endpoints**
 

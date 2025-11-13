@@ -117,6 +117,7 @@ export OTEL_METRICS_EXPORTER="console"
 export OTEL_LOGS_EXPORTER="console"
 
 # Optional: Enable HTTP request/response logging (disabled by default)
+# Note: This is evaluated at startup - changing it requires an application restart
 export OTEL_LOG_HTTP_REQUESTS="true"
 ```
 
@@ -338,6 +339,8 @@ HTTP request/response logging is **opt-in** via environment variable:
 # Enable request/response logging (disabled by default)
 export OTEL_LOG_HTTP_REQUESTS="true"
 ```
+
+**Important:** This setting is evaluated at application startup. To enable or disable request/response logging, you must restart the application.
 
 When enabled, all HTTP requests and responses are logged with the same automatic masking applied:
 

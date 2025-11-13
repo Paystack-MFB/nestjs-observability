@@ -176,12 +176,23 @@ These variables control enhanced features specific to this NestJS observability 
 
 ### Enhanced Features
 
-| Variable                                   | Description                        | Default      | Options           |
-| ------------------------------------------ | ---------------------------------- | ------------ | ----------------- |
-| `OTEL_METRICS_ENABLED`                     | Enable/disable metrics endpoints   | `true`       | `true`, `false`   |
-| `OTEL_METRICS_ENDPOINT`                    | Custom metrics endpoint path       | `/metrics`   | `/custom-metrics` |
-| `OTEL_SPAN_ATTRIBUTE_SANITIZATION_ENABLED` | Enable span attribute sanitization | `true`       | `true`, `false`   |
-| `OTEL_SPAN_ATTRIBUTE_REDACTED_PLACEHOLDER` | Placeholder for redacted values    | `[REDACTED]` | `[HIDDEN]`        |
+| Variable                                   | Description                                    | Default      | Options           |
+| ------------------------------------------ | ---------------------------------------------- | ------------ | ----------------- |
+| `OTEL_LOG_HTTP_REQUESTS`                   | Enable automatic HTTP request/response logging | `false`      | `true`, `false`   |
+| `OTEL_METRICS_ENABLED`                     | Enable/disable metrics endpoints               | `true`       | `true`, `false`   |
+| `OTEL_METRICS_ENDPOINT`                    | Custom metrics endpoint path                   | `/metrics`   | `/custom-metrics` |
+| `OTEL_SPAN_ATTRIBUTE_SANITIZATION_ENABLED` | Enable span attribute sanitization             | `true`       | `true`, `false`   |
+| `OTEL_SPAN_ATTRIBUTE_REDACTED_PLACEHOLDER` | Placeholder for redacted values                | `[REDACTED]` | `[HIDDEN]`        |
+
+**`OTEL_LOG_HTTP_REQUESTS`**
+
+Controls whether HTTP requests and responses are automatically logged. When enabled, the `RequestLoggingInterceptor` is registered at application startup.
+
+- **Default:** `false` (disabled to prevent unexpected log volume)
+- **Values:** `"true"` or `"1"` to enable, any other value disables
+- **⚠️ Important:** This setting is evaluated at application startup. Changing it requires an application restart to take effect.
+- **Performance:** When disabled, the interceptor is not registered, providing zero runtime overhead.
+- **Masking:** All logged request/response data is automatically masked using the same sensitive field detection as regular logs.
 
 ### Performance Tuning
 
