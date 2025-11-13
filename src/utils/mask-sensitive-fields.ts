@@ -113,10 +113,10 @@ export function maskSensitiveFields(data: unknown, visited = new WeakSet()): unk
   }
 
   // Handle objects
-  return Object.entries(data).reduce((accumulator, [key, value]) => {
+  return Object.entries(data).reduce<Record<string, unknown>>((accumulator, [key, value]) => {
     // Check if the key (case-insensitive) should be masked
     if (isSensitiveField(key)) {
-      return { ...accumulator, [key]: '[MASKED]' };
+      return { ...accumulator, [key]: '****' };
     }
 
     // Recursively process the value

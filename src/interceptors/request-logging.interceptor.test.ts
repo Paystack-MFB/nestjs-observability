@@ -80,17 +80,17 @@ describe('RequestLoggingInterceptor', () => {
           // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
           headers: expect.objectContaining({
             'user-agent': 'test-agent',
-            token: '[MASKED]',
+            token: '****',
           }),
           // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
           query: expect.objectContaining({
             page: '1',
-            apiKey: '[MASKED]',
+            apiKey: '****',
           }),
           // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
           body: expect.objectContaining({
             amount: 1000,
-            password: '[MASKED]',
+            password: '****',
           }),
         }),
       })
@@ -116,7 +116,7 @@ describe('RequestLoggingInterceptor', () => {
           // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
           body: expect.objectContaining({
             success: true,
-            token: '[MASKED]',
+            token: '****',
           }),
         }),
       })

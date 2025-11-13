@@ -3,6 +3,7 @@ import { trace } from '@opentelemetry/api';
 import { Logger, logs } from '@opentelemetry/api-logs';
 
 import { getServiceName, getServiceVersion } from '../register';
+import { maskSensitiveFields } from '../utils/mask-sensitive-fields';
 
 /**
  * Enhanced NestJS logger that integrates with OpenTelemetry global providers
@@ -93,14 +94,17 @@ export class LoggerService {
       ...this.getTraceContext(),
     };
 
+    // Mask sensitive fields in all log data
+    const maskedData = maskSensitiveFields(enrichedData);
+
     // Determine the log body and sanitize it to prevent log injection
     const rawBody = message instanceof Error ? message.message : message;
     const sanitizedBody = this.sanitizeLogMessage(rawBody);
 
     try {
-      // Emit structured log record
+      // Emit structured log record with masked data
       this.otelLogger.emit({
-        attributes: enrichedData as Record<string, boolean | number | string | string[]>,
+        attributes: maskedData as Record<string, boolean | number | string | string[]>,
         body: sanitizedBody,
         severityText: level,
         ...(message instanceof Error && { exception: message }),

@@ -818,11 +818,102 @@ console.log(isSensitiveKey('user_email')); // false (not sensitive)
 console.log(isSensitiveKey('password')); // true (default pattern)
 ```
 
-### Request/Response Logging with Automatic Data Masking
+### Sensitive Data Masking in All Logs
 
-The package automatically logs all HTTP requests and responses with sensitive data masking. This provides comprehensive request audit trails while protecting sensitive information.
+The package **automatically masks sensitive data in all logs** using the `maskSensitiveFields` utility. This applies to:
+
+- All structured log data (info, error, warn, debug)
+- Request/response logs (when `OTEL_LOG_HTTP_REQUESTS=true`)
+- Persistent context data
+- Any data passed to the logger
+
+#### ✅ **DO: Add Custom Sensitive Fields for Your Domain**
+
+You can configure domain-specific fields that should be masked across all logging:
+
+```typescript
+// main.ts
+import { addSensitiveFields } from '@paystackhq/nestjs-observability';
+
+async function bootstrap() {
+  const app = await NestFactory.create(AppModule);
+
+  // Add domain-specific sensitive fields (uses fast string matching, not regex)
+  // These will be automatically masked in ALL logs throughout your application
+  addSensitiveFields([
+    'identifiervalue',
+    'identitynumber',
+    'bvn',
+    'nin',
+    'customerId',
+    'merchantId',
+    'deviceFingerprint',
+  ]);
+
+  await app.listen(3000);
+}
+```
+
+#### 📝 **Default Masked Fields in All Logs**
+
+The following fields are automatically masked in all logs:
+
+**Authentication:**
+
+- `access_token`, `accesstoken`, `apikey`, `bearer`, `jwt`, `key`, `password`, `pin`, `secret`, `secretkey`, `token`, `webhook_authentication_token`, `securitycredential`
+
+**Payment Data:**
+
+- `accountnumber`, `card`, `credit`, `cvc`, `cvv`, `number`, `pan`
+
+**Personal Identifiable Information (PII):**
+
+- `address`, `email`, `identifiervalue`, `identitynumber`, `idnumber`, `phone`, `social`, `ssn`, `surname`
+
+#### ✅ **Example: Masking in Application Logs**
+
+```typescript
+@Injectable()
+export class UserService {
+  constructor(private readonly logger: LoggerService) {
+    this.logger.setContext('UserService');
+  }
+
+  async createUser(userData: CreateUserDto): Promise<User> {
+    // Sensitive fields are automatically masked in the log output
+    this.logger.info('Creating user', {
+      email: 'user@example.com', // Will be masked as [MASKED]
+      password: 'secret123', // Will be masked as [MASKED]
+      name: 'John Doe', // Not masked
+      apiKey: 'key123', // Will be masked as [MASKED]
+    });
+
+    const user = await this.userRepository.create(userData);
+    return user;
+  }
+}
+```
+
+### Request/Response Logging
+
+HTTP request/response logging is a **separate opt-in feature** controlled by the `OTEL_LOG_HTTP_REQUESTS` environment variable. When enabled, it logs HTTP requests and responses with the same automatic masking applied.
+
+### Request/Response Logging
+
+HTTP request/response logging is a **separate opt-in feature** controlled by the `OTEL_LOG_HTTP_REQUESTS` environment variable. When enabled, it logs HTTP requests and responses with the same automatic masking applied.
+
+**Enable HTTP Request/Response Logging:**
+
+```bash
+# Opt-in to enable request/response logging (disabled by default)
+export OTEL_LOG_HTTP_REQUESTS="true"
+```
+
+**Note:** This feature is **disabled by default** to prevent unexpected log volume. Services must explicitly opt-in by setting the environment variable.
 
 #### ✅ **DO: Exclude Health Checks and Internal Endpoints**
+
+When HTTP request/response logging is enabled, you should exclude high-frequency endpoints like health checks to reduce log volume.
 
 ```typescript
 import { Controller, Get } from '@nestjs/common';
@@ -830,11 +921,11 @@ import { NoLog, NoLogClass } from '@paystackhq/nestjs-observability';
 
 // Exclude entire controller from logging (e.g., health checks)
 @Controller('health')
-@NoLogClass()
+@NoLogClass() // Disables logs for the whole class
 export class HealthController {
   @Get()
   getHealth() {
-    // This endpoint won't generate request/response logs
+    // This endpoint won't generate request/response logs (even when OTEL_LOG_HTTP_REQUESTS=true)
     return { status: 'ok', timestamp: Date.now() };
   }
 
@@ -850,72 +941,34 @@ export class HealthController {
 export class UserController {
   @Get()
   getUsers() {
-    // Automatically logged with masked sensitive fields
+    // Logged with masked sensitive fields (when OTEL_LOG_HTTP_REQUESTS=true)
     return this.userService.findAll();
   }
 
   @Post()
   createUser(@Body() userData: CreateUserDto) {
-    // Request/response logged with automatic masking of sensitive fields
+    // Request/response logged with automatic masking of sensitive fields (when enabled)
     return this.userService.create(userData);
   }
 
   @NoLog() // Exclude specific endpoint from logging
   @Get('/internal')
   getInternalData() {
-    // This endpoint won't generate request/response logs
+    // This endpoint won't generate request/response logs (even when OTEL_LOG_HTTP_REQUESTS=true)
     return this.internalService.getData();
   }
 }
 ```
 
-#### ✅ **DO: Add Custom Sensitive Fields for Your Domain**
-
-```typescript
-// main.ts
-import { addSensitiveFields } from '@paystackhq/nestjs-observability';
-
-async function bootstrap() {
-  const app = await NestFactory.create(AppModule);
-
-  // Add domain-specific sensitive fields (uses fast string matching, not regex)
-  addSensitiveFields([
-    'identifiervalue',
-    'identitynumber',
-    'bvn',
-    'nin',
-    'customerId',
-    'merchantId',
-    'deviceFingerprint',
-  ]);
-
-  await app.listen(3000);
-}
-```
-
-#### 📝 **Default Masked Fields in Request/Response Logs**
-
-The following fields are automatically masked in request/response logs:
-
-**Authentication:**
-
-- `access_token`, `accesstoken`, `apikey`, `bearer`, `jwt`, `key`, `password`, `pin`, `secret`, `secretkey`, `token`, `webhook_authentication_token`, `securitycredential`
-
-**Payment Data:**
-
-- `accountnumber`, `card`, `credit`, `cvc`, `cvv`, `number`, `pan`
-
-**Personal Identifiable Information (PII):**
-
-- `address`, `email`, `identifiervalue`, `identitynumber`, `idnumber`, `phone`, `social`, `ssn`, `surname`
-
 #### ✅ **DO: Use @NoLog for Sensitive Operations**
+
+Even when HTTP request/response logging is enabled, you can exclude specific endpoints from being logged:
 
 ```typescript
 @Controller('auth')
 export class AuthController {
   @Post('/login')
-  @NoLog() // Don't log sensitive authentication requests
+  @NoLog() // Don't log this endpoint at all (even when OTEL_LOG_HTTP_REQUESTS=true)
   async login(@Body() credentials: LoginDto) {
     // Authentication logic - not logged for security
     return this.authService.login(credentials);
@@ -923,7 +976,7 @@ export class AuthController {
 
   @Get('/profile')
   async getProfile() {
-    // Regular endpoints are logged with masked sensitive fields
+    // Regular endpoints will be logged with masked sensitive fields (when OTEL_LOG_HTTP_REQUESTS=true)
     return this.authService.getProfile();
   }
 }
@@ -931,11 +984,11 @@ export class AuthController {
 
 #### 🔍 **Log Format**
 
-Request/response logs follow the Paystack log format with automatic trace correlation:
+When HTTP request/response logging is enabled (`OTEL_LOG_HTTP_REQUESTS=true`), the logs follow the Paystack log format with automatic trace correlation and sensitive data masking:
 
 ```typescript
 // Request log
-{
+const req = {
   service: 'my-service',
   type: 'request',
   level: 'info',
@@ -948,14 +1001,14 @@ Request/response logs follow the Paystack log format with automatic trace correl
   payload: {
     verb: 'POST',
     client: '192.168.1.1',
-    headers: { 'user-agent': 'Mozilla/5.0', 'authorization': '[MASKED]' },
+    headers: { 'user-agent': 'Mozilla/5.0', authorization: '[MASKED]' },
     query: { page: '1' },
-    body: { email: '[MASKED]', password: '[MASKED]', name: 'John Doe' }
-  }
-}
+    body: { email: '[MASKED]', password: '[MASKED]', name: 'John Doe' },
+  },
+};
 
 // Response log
-{
+const res = {
   service: 'my-service',
   type: 'response',
   level: 'info',
@@ -969,9 +1022,9 @@ Request/response logs follow the Paystack log format with automatic trace correl
     verb: 'POST',
     client: '192.168.1.1',
     status: 201,
-    body: { id: 'user-123', email: '[MASKED]', token: '[MASKED]' }
-  }
-}
+    body: { id: 'user-123', email: '[MASKED]', token: '[MASKED]' },
+  },
+};
 ```
 
 ### Configuration Security

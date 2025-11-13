@@ -26,10 +26,10 @@ describe('maskSensitiveFields', () => {
 
     expect(result).toEqual({
       username: 'john_doe',
-      password: '[MASKED]',
-      apiKey: '[MASKED]',
-      email: '[MASKED]',
-      token: '[MASKED]',
+      password: '****',
+      apiKey: '****',
+      email: '****',
+      token: '****',
     });
   });
 
@@ -42,8 +42,8 @@ describe('maskSensitiveFields', () => {
     const result = maskSensitiveFields(data);
 
     expect(result).toEqual([
-      { name: 'user1', password: '[MASKED]' },
-      { name: 'user2', secret: '[MASKED]' },
+      { name: 'user1', password: '****' },
+      { name: 'user2', secret: '****' },
     ]);
   });
 
@@ -68,13 +68,13 @@ describe('maskSensitiveFields', () => {
       user: {
         name: 'John',
         credentials: {
-          password: '[MASKED]',
-          apiKey: '[MASKED]',
+          password: '****',
+          apiKey: '****',
         },
       },
       settings: {
         public: true,
-        secret: '[MASKED]',
+        secret: '****',
       },
     });
   });
@@ -114,9 +114,9 @@ describe('maskSensitiveFields', () => {
     const result = maskSensitiveFields(data);
 
     expect(result).toEqual({
-      PASSWORD: '[MASKED]',
-      ApiKey: '[MASKED]',
-      TOKEN: '[MASKED]',
+      PASSWORD: '****',
+      ApiKey: '****',
+      TOKEN: '****',
       normalField: 'value',
     });
   });
@@ -142,10 +142,10 @@ describe('maskSensitiveFields', () => {
     expect(result).toEqual({
       transaction: {
         amount: 10000,
-        pan: '[MASKED]',
-        cvv: '[MASKED]',
-        card: '[MASKED]',
-        accountNumber: '[MASKED]',
+        pan: '****',
+        cvv: '****',
+        card: '****',
+        accountNumber: '****',
       },
     });
   });
@@ -164,11 +164,11 @@ describe('maskSensitiveFields', () => {
 
     expect(result).toEqual({
       name: 'John Doe',
-      email: '[MASKED]',
-      phone: '[MASKED]',
-      address: '[MASKED]',
-      ssn: '[MASKED]',
-      surname: '[MASKED]',
+      email: '****',
+      phone: '****',
+      address: '****',
+      ssn: '****',
+      surname: '****',
     });
   });
 
@@ -187,8 +187,8 @@ describe('maskSensitiveFields', () => {
 
       expect(result).toEqual({
         username: 'john',
-        customField: '[MASKED]',
-        internalSecret: '[MASKED]',
+        customField: '****',
+        internalSecret: '****',
         normalField: 'visible',
       });
     });
@@ -204,8 +204,8 @@ describe('maskSensitiveFields', () => {
       const result = maskSensitiveFields(data);
 
       expect(result).toEqual({
-        customfield: '[MASKED]',
-        CUSTOMFIELD: '[MASKED]',
+        customfield: '****',
+        CUSTOMFIELD: '****',
       });
     });
   });
