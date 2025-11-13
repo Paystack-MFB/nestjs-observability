@@ -59,6 +59,15 @@ export function getServiceVersion(): string {
 }
 
 /**
+ * Check if HTTP request/response logging is enabled
+ * Defaults to false (opt-in)
+ */
+export function getHttpRequestLoggingEnabled(): boolean {
+  const value = process.env['OTEL_LOG_HTTP_REQUESTS'];
+  return value === 'true' || value === '1';
+}
+
+/**
  * Create log processor based on environment variables
  */
 function createLogProcessor(): BatchLogRecordProcessor | undefined {

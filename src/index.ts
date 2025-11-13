@@ -31,7 +31,13 @@ export { MetricsService } from './metrics/metrics.service';
 export { ObservabilityModule } from './observability.module';
 
 // Service helper functions
-export { getServiceAttributes, getServiceEnvironment, getServiceName, getServiceVersion } from './register';
+export {
+  getHttpRequestLoggingEnabled,
+  getServiceAttributes,
+  getServiceEnvironment,
+  getServiceName,
+  getServiceVersion,
+} from './register';
 
 export { TracingService } from './tracing/tracing.service';
 

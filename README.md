@@ -115,6 +115,9 @@ export OTEL_SERVICE_ENV="dev"
 export OTEL_TRACES_EXPORTER="console"
 export OTEL_METRICS_EXPORTER="console"
 export OTEL_LOGS_EXPORTER="console"
+
+# Optional: Enable HTTP request/response logging (disabled by default)
+export OTEL_LOG_HTTP_REQUESTS="true"
 ```
 
 **Production Environment:**

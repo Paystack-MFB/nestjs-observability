@@ -53,6 +53,7 @@ describe('RequestLoggingInterceptor', () => {
     // Mock utility functions
     vi.spyOn(register, 'getServiceName').mockReturnValue('test-service');
     vi.spyOn(register, 'getServiceEnvironment').mockReturnValue('test');
+    vi.spyOn(register, 'getHttpRequestLoggingEnabled').mockReturnValue(true);
     vi.spyOn(spanUtils, 'getCurrentTraceId').mockReturnValue('trace-123');
     vi.spyOn(spanUtils, 'getCurrentSpanId').mockReturnValue('span-456');
   });
@@ -207,6 +208,15 @@ describe('RequestLoggingInterceptor', () => {
     await lastValueFrom(interceptor.intercept(executionContext, callHandler));
 
     expect(loggerInfoSpy).not.toHaveBeenCalled();
+  });
+
+  it('should skip logging when OTEL_LOG_HTTP_REQUESTS is disabled', async () => {
+    vi.spyOn(register, 'getHttpRequestLoggingEnabled').mockReturnValue(false);
+
+    await lastValueFrom(interceptor.intercept(executionContext, callHandler));
+
+    expect(loggerInfoSpy).not.toHaveBeenCalled();
+    expect(loggerErrorSpy).not.toHaveBeenCalled();
   });
 
   it('should respect @NoLogClass decorator', async () => {

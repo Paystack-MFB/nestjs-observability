@@ -4,7 +4,7 @@ import { tap } from 'rxjs/operators';
 
 import { isNoLogClassEnabled, isNoLogEnabled } from '../decorators/auto-trace.decorators';
 import { LoggerService } from '../logger/logger.service';
-import { getServiceEnvironment, getServiceName } from '../register';
+import { getHttpRequestLoggingEnabled, getServiceEnvironment, getServiceName } from '../register';
 import { getCurrentSpanId, getCurrentTraceId } from '../utils/span-attributes';
 import { maskSensitiveFields } from '../utils/mask-sensitive-fields';
 
@@ -26,6 +26,7 @@ interface Response {
  * Logs all HTTP requests and responses with sensitive data masking
  *
  * Features:
+ * - Opt-in via OTEL_LOG_HTTP_REQUESTS=true environment variable (disabled by default)
  * - Logs request on entry with masked headers, query, and body
  * - Logs response on completion with masked body
  * - Follows Paystack log format standards
@@ -38,6 +39,11 @@ export class RequestLoggingInterceptor implements NestInterceptor {
   constructor(private readonly logger: LoggerService) {}
 
   intercept(context: ExecutionContext, next: CallHandler): Observable<unknown> {
+    // Check if HTTP request logging is enabled (opt-in via OTEL_LOG_HTTP_REQUESTS=true)
+    if (!getHttpRequestLoggingEnabled()) {
+      return next.handle();
+    }
+
     if (context.getType() !== 'http') {
       return next.handle();
     }
