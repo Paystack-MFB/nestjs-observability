@@ -184,16 +184,6 @@ These variables control enhanced features specific to this NestJS observability 
 | `OTEL_SPAN_ATTRIBUTE_SANITIZATION_ENABLED` | Enable span attribute sanitization             | `true`       | `true`, `false`   |
 | `OTEL_SPAN_ATTRIBUTE_REDACTED_PLACEHOLDER` | Placeholder for redacted values                | `[REDACTED]` | `[HIDDEN]`        |
 
-**`OTEL_LOG_HTTP_REQUESTS`**
-
-Controls whether HTTP requests and responses are automatically logged. When enabled, the `RequestLoggingInterceptor` is registered at application startup.
-
-- **Default:** `false` (disabled to prevent unexpected log volume)
-- **Values:** `"true"` or `"1"` to enable, any other value disables
-- **⚠️ Important:** This setting is evaluated at application startup. Changing it requires an application restart to take effect.
-- **Performance:** When disabled, the interceptor is not registered, providing zero runtime overhead.
-- **Masking:** All logged request/response data is automatically masked using the same sensitive field detection as regular logs.
-
 ### Performance Tuning
 
 | Variable                         | Description                          | Default | Example |

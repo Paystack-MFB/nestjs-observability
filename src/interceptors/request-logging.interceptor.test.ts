@@ -4,8 +4,6 @@ import { of, throwError, lastValueFrom } from 'rxjs';
 
 import { LoggerService } from '../logger/logger.service';
 import { RequestLoggingInterceptor } from './request-logging.interceptor';
-import * as spanUtils from '../utils/span-attributes';
-import * as register from '../register';
 
 describe('RequestLoggingInterceptor', () => {
   let interceptor: RequestLoggingInterceptor;
@@ -49,12 +47,6 @@ describe('RequestLoggingInterceptor', () => {
     callHandler = {
       handle: vi.fn().mockReturnValue(of({ success: true, token: 'response-token' })),
     } as unknown as CallHandler;
-
-    // Mock utility functions
-    vi.spyOn(register, 'getServiceName').mockReturnValue('test-service');
-    vi.spyOn(register, 'getServiceEnvironment').mockReturnValue('test');
-    vi.spyOn(spanUtils, 'getCurrentTraceId').mockReturnValue('trace-123');
-    vi.spyOn(spanUtils, 'getCurrentSpanId').mockReturnValue('span-456');
   });
 
   it('should log request and response with masked sensitive data', async () => {
@@ -65,13 +57,8 @@ describe('RequestLoggingInterceptor', () => {
       'HTTP Request',
 
       expect.objectContaining({
-        service: 'test-service',
-        type: 'request',
-        level: 'info',
-        environment: 'test',
         endpoint: '/api/test',
-        traceId: 'trace-123',
-        spanId: 'span-456',
+        type: 'request',
         // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
         payload: expect.objectContaining({
           verb: 'POST',
@@ -100,13 +87,8 @@ describe('RequestLoggingInterceptor', () => {
       'HTTP Response',
 
       expect.objectContaining({
-        service: 'test-service',
-        type: 'response',
-        level: 'info',
-        environment: 'test',
         endpoint: '/api/test',
-        traceId: 'trace-123',
-        spanId: 'span-456',
+        type: 'response',
         // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
         payload: expect.objectContaining({
           verb: 'POST',
@@ -137,11 +119,15 @@ describe('RequestLoggingInterceptor', () => {
       'HTTP Response Error',
 
       expect.objectContaining({
-        service: 'test-service',
-        type: 'response',
-        level: 'error',
         endpoint: '/api/test',
+        type: 'response',
         error: 'Test error',
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+        payload: expect.objectContaining({
+          verb: 'POST',
+          client: '127.0.0.1',
+          status: 200,
+        }),
       })
     );
   });
@@ -172,35 +158,6 @@ describe('RequestLoggingInterceptor', () => {
     );
   });
 
-  it('should calculate age with Age header', async () => {
-    executionContext.switchToHttp = vi.fn().mockReturnValue({
-      getRequest: vi.fn().mockReturnValue({
-        body: {},
-        connection: { remoteAddress: '127.0.0.1' },
-        headers: { age: '100' },
-        method: 'GET',
-        url: '/api/test',
-      }),
-      getResponse: vi.fn().mockReturnValue({ statusCode: 200 }),
-    });
-
-    await lastValueFrom(interceptor.intercept(executionContext, callHandler));
-
-    expect(loggerInfoSpy).toHaveBeenCalledWith(
-      'HTTP Request',
-      expect.objectContaining({
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
-        age: expect.any(Number),
-      })
-    );
-
-    // Age should be at least 100 (from header)
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
-    const requestLog = loggerInfoSpy.mock.calls[0][1];
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
-    expect(requestLog.age).toBeGreaterThanOrEqual(100);
-  });
-
   it('should skip logging for non-HTTP contexts', async () => {
     executionContext.getType = vi.fn().mockReturnValue('rpc');
 
@@ -227,15 +184,6 @@ describe('RequestLoggingInterceptor', () => {
     // Since we're using the real isNoLogClassEnabled function which checks metadata,
     // and we've set the metadata, logging should be skipped
     expect(loggerInfoSpy).not.toHaveBeenCalled();
-  });
-
-  it('should include created timestamp in ISO format', async () => {
-    await lastValueFrom(interceptor.intercept(executionContext, callHandler));
-
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
-    const requestLog = loggerInfoSpy.mock.calls[0][1];
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
-    expect(requestLog.created).toMatch(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/);
   });
 
   it('should handle missing headers gracefully', async () => {

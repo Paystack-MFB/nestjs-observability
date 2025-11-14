@@ -4,8 +4,6 @@ import { tap } from 'rxjs/operators';
 
 import { isNoLogClassEnabled, isNoLogEnabled } from '../decorators/auto-trace.decorators';
 import { LoggerService } from '../logger/logger.service';
-import { getServiceEnvironment, getServiceName } from '../register';
-import { getCurrentSpanId, getCurrentTraceId } from '../utils/span-attributes';
 import { maskSensitiveFields } from '../utils/mask-sensitive-fields';
 
 // Express types for better typing
@@ -58,32 +56,20 @@ export class RequestLoggingInterceptor implements NestInterceptor {
 
     const request = context.switchToHttp().getRequest<Request>();
     const response = context.switchToHttp().getResponse<Response>();
-    const startTime = Date.now();
 
     // Log the request
-    this.logRequest(request, startTime);
+    this.logRequest(request);
 
     return next.handle().pipe(
       tap({
         error: (error: Error) => {
-          const duration = Date.now() - startTime;
-          this.logResponse(request, response, undefined, duration, error);
+          this.logResponse(request, response, undefined, error);
         },
         next: (responseBody: unknown) => {
-          const duration = Date.now() - startTime;
-          this.logResponse(request, response, responseBody, duration);
+          this.logResponse(request, response, responseBody);
         },
       })
     );
-  }
-
-  /**
-   * Calculate request age including Age header if present
-   */
-  private calculateAge(request: Request, additionalAge: number): number {
-    const ageHeader = request.headers?.['age'];
-    const headerAge = ageHeader ? parseInt(String(ageHeader), 10) : 0;
-    return headerAge + additionalAge;
   }
 
   /**
@@ -101,20 +87,15 @@ export class RequestLoggingInterceptor implements NestInterceptor {
   /**
    * Log HTTP request with masked sensitive data
    */
-  private logRequest(request: Request, startTime: number): void {
-    const service = getServiceName();
-    const environment = getServiceEnvironment();
-    const age = this.calculateAge(request, Date.now() - startTime);
+  private logRequest(request: Request): void {
     const client = this.getClientIp(request);
-    const traceId = getCurrentTraceId();
-    const spanId = getCurrentSpanId();
+
+    // Parse URL to extract pathname only (without query params)
+    const url = new URL(request.url ?? '/', 'http://localhost');
+    const endpoint = url.pathname;
 
     const logData = {
-      age,
-      created: new Date().toISOString(),
-      endpoint: request.url,
-      environment,
-      level: 'info',
+      endpoint,
       payload: {
         body: maskSensitiveFields(request.body),
         client,
@@ -122,10 +103,6 @@ export class RequestLoggingInterceptor implements NestInterceptor {
         query: maskSensitiveFields(request.query),
         verb: request.method,
       },
-      service,
-      spanId,
-      // tag: request.tag, // TODO: implement tag
-      traceId,
       type: 'request',
     };
 
@@ -135,36 +112,21 @@ export class RequestLoggingInterceptor implements NestInterceptor {
   /**
    * Log HTTP response with masked sensitive data
    */
-  private logResponse(
-    request: Request,
-    response: Response,
-    responseBody: unknown,
-    duration: number,
-    error?: Error
-  ): void {
-    const service = getServiceName();
-    const environment = getServiceEnvironment();
-    const age = this.calculateAge(request, duration);
+  private logResponse(request: Request, response: Response, responseBody: unknown, error?: Error): void {
     const client = this.getClientIp(request);
-    const traceId = getCurrentTraceId();
-    const spanId = getCurrentSpanId();
+
+    // Parse URL to extract pathname only (without query params)
+    const url = new URL(request.url ?? '/', 'http://localhost');
+    const endpoint = url.pathname;
 
     const logData = {
-      age,
-      created: new Date().toISOString(),
-      endpoint: request.url,
-      environment,
-      level: error ? 'error' : 'info',
+      endpoint,
       payload: {
         body: maskSensitiveFields(responseBody),
         client,
         status: response.statusCode,
         verb: request.method,
       },
-      service,
-      spanId,
-      // tag: request.tag, // TODO: implement tag
-      traceId,
       type: 'response',
     };
 

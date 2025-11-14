@@ -10,15 +10,17 @@ export class JSONStdoutLogExporter implements LogRecordExporter {
   ): void {
     try {
       for (const record of logs) {
-        // Build a minimal, flat JSON suitable for log collectors
+        const traceId = record.spanContext?.traceId;
+        const spanId = record.spanContext?.spanId;
+
         const payload: Record<string, unknown> = {
-          attributes: record.attributes,
           body: record.body,
-          resource: record.resource.attributes,
           severityText: record.severityText,
-          spanId: (record as unknown as { spanId?: string }).spanId,
-          timestamp: record.hrTime, // high-resolution time tuple
-          traceId: (record as unknown as { traceId?: string }).traceId,
+          timestamp: record.hrTime,
+          ...(traceId && { traceId }),
+          ...(spanId && { spanId }),
+          attributes: record.attributes,
+          resource: record.resource.attributes,
         };
         console.log(JSON.stringify(payload));
       }
