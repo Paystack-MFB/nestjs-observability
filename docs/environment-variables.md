@@ -176,12 +176,13 @@ These variables control enhanced features specific to this NestJS observability 
 
 ### Enhanced Features
 
-| Variable                                   | Description                        | Default      | Options           |
-| ------------------------------------------ | ---------------------------------- | ------------ | ----------------- |
-| `OTEL_METRICS_ENABLED`                     | Enable/disable metrics endpoints   | `true`       | `true`, `false`   |
-| `OTEL_METRICS_ENDPOINT`                    | Custom metrics endpoint path       | `/metrics`   | `/custom-metrics` |
-| `OTEL_SPAN_ATTRIBUTE_SANITIZATION_ENABLED` | Enable span attribute sanitization | `true`       | `true`, `false`   |
-| `OTEL_SPAN_ATTRIBUTE_REDACTED_PLACEHOLDER` | Placeholder for redacted values    | `[REDACTED]` | `[HIDDEN]`        |
+| Variable                                   | Description                                    | Default      | Options           |
+| ------------------------------------------ | ---------------------------------------------- | ------------ | ----------------- |
+| `OTEL_LOG_HTTP_REQUESTS`                   | Enable automatic HTTP request/response logging | `false`      | `true`, `false`   |
+| `OTEL_METRICS_ENABLED`                     | Enable/disable metrics endpoints               | `true`       | `true`, `false`   |
+| `OTEL_METRICS_ENDPOINT`                    | Custom metrics endpoint path                   | `/metrics`   | `/custom-metrics` |
+| `OTEL_SPAN_ATTRIBUTE_SANITIZATION_ENABLED` | Enable span attribute sanitization             | `true`       | `true`, `false`   |
+| `OTEL_SPAN_ATTRIBUTE_REDACTED_PLACEHOLDER` | Placeholder for redacted values                | `[REDACTED]` | `[HIDDEN]`        |
 
 ### Performance Tuning
 

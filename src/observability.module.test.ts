@@ -51,9 +51,12 @@ vi.mock('@opentelemetry/api-logs', () => ({
 }));
 
 import { MetricsController } from './controllers/metrics.controller';
+import { AutoTraceInterceptor } from './interceptors/auto-trace.interceptor';
+import { RequestLoggingInterceptor } from './interceptors/request-logging.interceptor';
 import { LoggerService } from './logger/logger.service';
 import { MetricsService } from './metrics/metrics.service';
 import { ObservabilityModule } from './observability.module';
+import * as register from './register';
 import { TracingService } from './tracing/tracing.service';
 
 // Mock environment variables
@@ -104,12 +107,57 @@ describe('ObservabilityModule - Lightweight', () => {
     it('should register AutoTraceInterceptor as APP_INTERCEPTOR', () => {
       const moduleDefinition = ObservabilityModule.forRoot();
 
-      // Check that APP_INTERCEPTOR provider is included
-      const interceptorProvider = moduleDefinition.providers?.find(
+      // Check that AutoTraceInterceptor is registered
+      const interceptorProviders = moduleDefinition.providers?.filter(
         (provider) => typeof provider === 'object' && 'provide' in provider && provider.provide === APP_INTERCEPTOR
       );
 
-      expect(interceptorProvider).toBeDefined();
+      expect(interceptorProviders).toBeDefined();
+      expect(interceptorProviders?.length).toBeGreaterThan(0);
+
+      const autoTraceInterceptor = interceptorProviders?.find(
+        (provider) =>
+          typeof provider === 'object' && 'useClass' in provider && provider.useClass === AutoTraceInterceptor
+      );
+      expect(autoTraceInterceptor).toBeDefined();
+    });
+
+    it('should register RequestLoggingInterceptor when OTEL_LOG_HTTP_REQUESTS=true', () => {
+      vi.spyOn(register, 'getHttpRequestLoggingEnabled').mockReturnValue(true);
+
+      const moduleDefinition = ObservabilityModule.forRoot();
+
+      const interceptorProviders = moduleDefinition.providers?.filter(
+        (provider) => typeof provider === 'object' && 'provide' in provider && provider.provide === APP_INTERCEPTOR
+      );
+
+      const requestLoggingInterceptor = interceptorProviders?.find(
+        (provider) =>
+          typeof provider === 'object' && 'useClass' in provider && provider.useClass === RequestLoggingInterceptor
+      );
+
+      expect(requestLoggingInterceptor).toBeDefined();
+
+      vi.restoreAllMocks();
+    });
+
+    it('should NOT register RequestLoggingInterceptor when OTEL_LOG_HTTP_REQUESTS=false', () => {
+      vi.spyOn(register, 'getHttpRequestLoggingEnabled').mockReturnValue(false);
+
+      const moduleDefinition = ObservabilityModule.forRoot();
+
+      const interceptorProviders = moduleDefinition.providers?.filter(
+        (provider) => typeof provider === 'object' && 'provide' in provider && provider.provide === APP_INTERCEPTOR
+      );
+
+      const requestLoggingInterceptor = interceptorProviders?.find(
+        (provider) =>
+          typeof provider === 'object' && 'useClass' in provider && provider.useClass === RequestLoggingInterceptor
+      );
+
+      expect(requestLoggingInterceptor).toBeUndefined();
+
+      vi.restoreAllMocks();
     });
   });
 

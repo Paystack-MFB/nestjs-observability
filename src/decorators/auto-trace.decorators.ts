@@ -7,6 +7,8 @@ const TRACE_ALL_METHODS_KEY = 'trace:all-methods';
 const TRACE_METHOD_KEY = 'trace:method';
 const NO_TRACE_KEY = 'trace:no-trace';
 const NO_TRACE_CLASS_KEY = 'trace:no-trace-class';
+const NO_LOG_KEY = 'log:no-log';
+const NO_LOG_CLASS_KEY = 'log:no-log-class';
 
 // Interface for TraceClass options
 export interface TraceClassOptions {
@@ -160,6 +162,27 @@ export function isNoTraceEnabled(target: object, propertyKey: string): boolean {
   return Reflect.getMetadata(NO_TRACE_KEY, target, propertyKey) === true;
 }
 
+/**
+ * Checks if a class has the @NoLogClass decorator applied.
+ *
+ * @param target - The class constructor to check
+ * @returns true if the class is decorated with @NoLogClass
+ */
+export function isNoLogClassEnabled(target: Type): boolean {
+  return Reflect.getMetadata(NO_LOG_CLASS_KEY, target) === true;
+}
+
+/**
+ * Checks if a method has the @NoLog decorator applied.
+ *
+ * @param target - The class prototype or instance
+ * @param propertyKey - The method name
+ * @returns true if the method is decorated with @NoLog
+ */
+export function isNoLogEnabled(target: object, propertyKey: string): boolean {
+  return Reflect.getMetadata(NO_LOG_KEY, target, propertyKey) === true;
+}
+
 // Helper functions for metadata reading
 
 /**
@@ -212,6 +235,49 @@ export function NoTrace() {
 export function NoTraceClass() {
   return function <T extends Type>(target: T): T {
     Reflect.defineMetadata(NO_TRACE_CLASS_KEY, true, target);
+    return target;
+  };
+}
+
+/**
+ * Method decorator that excludes a method from request/response logging.
+ * Use this to exclude specific methods from auto-logging.
+ *
+ * @example
+ * ```typescript
+ * @Controller('users')
+ * class UserController {
+ *   getUser(id: string) { ... } // Will be logged
+ *
+ *   @NoLog()
+ *   getHealth() { ... } // Will NOT be logged
+ * }
+ * ```
+ */
+export function NoLog() {
+  return function (target: object, propertyKey: string, descriptor: PropertyDescriptor) {
+    Reflect.defineMetadata(NO_LOG_KEY, true, target, propertyKey);
+    return descriptor;
+  };
+}
+
+/**
+ * Class decorator that excludes an entire class from request/response logging.
+ * Use this to exclude specific controllers or providers from auto-logging.
+ *
+ * @example
+ * ```typescript
+ * @Controller('health')
+ * @NoLogClass()
+ * class HealthController {
+ *   // No methods will be logged automatically
+ *   getHealth() { ... }
+ * }
+ * ```
+ */
+export function NoLogClass() {
+  return function <T extends Type>(target: T): T {
+    Reflect.defineMetadata(NO_LOG_CLASS_KEY, true, target);
     return target;
   };
 }

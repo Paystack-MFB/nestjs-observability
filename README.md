@@ -115,6 +115,10 @@ export OTEL_SERVICE_ENV="dev"
 export OTEL_TRACES_EXPORTER="console"
 export OTEL_METRICS_EXPORTER="console"
 export OTEL_LOGS_EXPORTER="console"
+
+# Optional: Enable HTTP request/response logging (disabled by default)
+# Note: This is evaluated at startup - changing it requires an application restart
+export OTEL_LOG_HTTP_REQUESTS="true"
 ```
 
 **Production Environment:**
@@ -273,9 +277,101 @@ export class OrderService {
   }
 
   @NoTrace() // This method won't be traced (for sensitive operations)
+  @NoLog() // This method won't be logged (for sensitive operations)
   async validatePaymentDetails(creditCard: string) {
-    // Sensitive payment validation - not traced for security
+    // Sensitive payment validation - not traced or logged for security
     return this.encryptPaymentData(creditCard);
+  }
+}
+```
+
+### Automatic Sensitive Data Masking
+
+The package **automatically masks sensitive data in all logs** throughout your application:
+
+```typescript
+// Example: All structured logs are automatically masked
+import { LoggerService } from '@paystackhq/nestjs-observability';
+
+@Injectable()
+export class UserService {
+  constructor(private readonly logger: LoggerService) {}
+
+  async createUser(userData: CreateUserDto) {
+    // Sensitive fields are automatically masked in log output
+    this.logger.info('Creating user', {
+      email: 'user@example.com', // Will be masked as [MASKED]
+      password: 'secret123', // Will be masked as [MASKED]
+      name: 'John Doe', // Not masked
+      apiKey: 'key123', // Will be masked as [MASKED]
+    });
+  }
+}
+```
+
+**Default Masked Fields:**
+
+- **Authentication**: password, token, secret, key, apikey, bearer, jwt, pin, securitycredential
+- **Payment Data**: card, pan, cvv, accountnumber, credit, cvc
+- **PII**: email, phone, address, ssn, surname, identifiervalue, identitynumber
+
+**Add Custom Sensitive Fields:**
+
+```typescript
+// main.ts
+import { addSensitiveFields } from '@paystackhq/nestjs-observability';
+
+async function bootstrap() {
+  const app = await NestFactory.create(AppModule);
+
+  // Add domain-specific fields to mask across ALL logs
+  addSensitiveFields(['bvn', 'nin', 'customerId', 'merchantId']);
+
+  await app.listen(3000);
+}
+```
+
+### Request/Response Logging (Opt-In)
+
+HTTP request/response logging is **opt-in** via environment variable:
+
+```bash
+# Enable request/response logging (disabled by default)
+export OTEL_LOG_HTTP_REQUESTS="true"
+```
+
+**Important:** This setting is evaluated at application startup. To enable or disable request/response logging, you must restart the application.
+
+When enabled, all HTTP requests and responses are logged with the same automatic masking applied:
+
+```typescript
+// health.controller.ts
+import { Controller, Get } from '@nestjs/common';
+import { NoLog, NoLogClass } from '@paystackhq/nestjs-observability';
+
+@Controller('health')
+@NoLogClass() // Exclude entire controller from request/response logging
+export class HealthController {
+  @Get()
+  getHealth() {
+    // This endpoint won't generate request/response logs (even when OTEL_LOG_HTTP_REQUESTS=true)
+    return { status: 'ok' };
+  }
+}
+
+@Controller('users')
+export class UserController {
+  @Get()
+  getUsers() {
+    // Logged with masked sensitive fields (when OTEL_LOG_HTTP_REQUESTS=true)
+    return this.userService.findAll();
+  }
+
+  @NoLog() // Exclude specific endpoint from logging
+  @Get('/internal')
+  getInternalData() {
+    // This endpoint won't generate request/response logs (even when OTEL_LOG_HTTP_REQUESTS=true)
+    return this.internalService.getData();
   }
 }
 ```

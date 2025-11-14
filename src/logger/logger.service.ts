@@ -1,8 +1,9 @@
 import { Injectable } from '@nestjs/common';
-import { trace } from '@opentelemetry/api';
+import { context, trace } from '@opentelemetry/api';
 import { Logger, logs } from '@opentelemetry/api-logs';
 
 import { getServiceName, getServiceVersion } from '../register';
+import { maskSensitiveFields } from '../utils/mask-sensitive-fields';
 
 /**
  * Enhanced NestJS logger that integrates with OpenTelemetry global providers
@@ -90,18 +91,24 @@ export class LoggerService {
     const enrichedData = {
       ...data,
       ...this.persistentContext,
-      ...this.getTraceContext(),
     };
+
+    // Mask sensitive fields in all log data
+    const maskedData = maskSensitiveFields(enrichedData);
 
     // Determine the log body and sanitize it to prevent log injection
     const rawBody = message instanceof Error ? message.message : message;
     const sanitizedBody = this.sanitizeLogMessage(rawBody);
 
+    const activeSpan = trace.getActiveSpan();
+    const logContext = activeSpan ? trace.setSpan(context.active(), activeSpan) : context.active();
+
     try {
-      // Emit structured log record
+      // Emit structured log record with masked data
       this.otelLogger.emit({
-        attributes: enrichedData as Record<string, boolean | number | string | string[]>,
+        attributes: maskedData as Record<string, boolean | number | string | string[]>,
         body: sanitizedBody,
+        context: logContext,
         severityText: level,
         ...(message instanceof Error && { exception: message }),
       });
@@ -110,26 +117,6 @@ export class LoggerService {
       console.error('LoggerService emit failed:', error);
       // Note: Console fallback logging removed to avoid potential log injection
     }
-  }
-
-  /**
-   * Get current OpenTelemetry trace context
-   */
-  private getTraceContext(): Record<string, unknown> {
-    try {
-      const activeSpan = trace.getActiveSpan();
-      if (activeSpan) {
-        const spanContext = activeSpan.spanContext();
-        return {
-          spanId: spanContext.spanId,
-          traceFlags: spanContext.traceFlags,
-          traceId: spanContext.traceId,
-        };
-      }
-    } catch (_error) {
-      // Silently ignore tracing errors to prevent affecting application flow
-    }
-    return {};
   }
 
   /**
