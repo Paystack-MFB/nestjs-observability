@@ -11,7 +11,13 @@ import { getNodeAutoInstrumentations } from '@opentelemetry/auto-instrumentation
 import { OTLPLogExporter } from '@opentelemetry/exporter-logs-otlp-http';
 import { OTLPMetricExporter } from '@opentelemetry/exporter-metrics-otlp-http';
 import { OTLPTraceExporter } from '@opentelemetry/exporter-trace-otlp-http';
-import { resourceFromAttributes } from '@opentelemetry/resources';
+import {
+  envDetector,
+  hostDetector,
+  osDetector,
+  resourceFromAttributes,
+  serviceInstanceIdDetector,
+} from '@opentelemetry/resources';
 import { BatchLogRecordProcessor, ConsoleLogRecordExporter } from '@opentelemetry/sdk-logs';
 import { ConsoleMetricExporter, PeriodicExportingMetricReader } from '@opentelemetry/sdk-metrics';
 import { NodeSDK } from '@opentelemetry/sdk-node';
@@ -267,6 +273,9 @@ function initializeSDK(): NodeSDK {
   const sdkConfig: Partial<import('@opentelemetry/sdk-node').NodeSDKConfiguration> = {
     instrumentations,
     resource,
+    // Exclude processDetector to avoid noisy process.* attributes
+    // Keep: envDetector, hostDetector, osDetector, serviceInstanceIdDetector
+    resourceDetectors: [envDetector, hostDetector, osDetector, serviceInstanceIdDetector],
     traceExporter,
   };
 
@@ -288,6 +297,7 @@ function initializeSDK(): NodeSDK {
   const normalizedConfig: Partial<import('@opentelemetry/sdk-node').NodeSDKConfiguration> = {
     instrumentations: sdkConfig.instrumentations ?? [],
     ...(sdkConfig.resource ? { resource: sdkConfig.resource } : {}),
+    ...(sdkConfig.resourceDetectors ? { resourceDetectors: sdkConfig.resourceDetectors } : {}),
     ...(sdkConfig.traceExporter ? { traceExporter: sdkConfig.traceExporter } : {}),
     ...(sdkConfig.metricReader ? { metricReader: sdkConfig.metricReader } : {}),
     ...(sdkConfig.logRecordProcessors ? { logRecordProcessors: sdkConfig.logRecordProcessors } : {}),
