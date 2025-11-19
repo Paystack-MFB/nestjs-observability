@@ -1,9 +1,11 @@
 import { CallHandler, ExecutionContext, Injectable, NestInterceptor } from '@nestjs/common';
+import * as api from '@opentelemetry/api';
 import { Observable } from 'rxjs';
 import { tap } from 'rxjs/operators';
 
 import { isNoLogClassEnabled, isNoLogEnabled } from '../decorators/auto-trace.decorators';
-import { LoggerService } from '../logger/logger.service';
+import { LOGGER_CONTEXT_KEY, LoggerService } from '../logger/logger.service';
+import { getHttpRequestLoggingEnabled } from '../register';
 import { maskSensitiveFields } from '../utils/mask-sensitive-fields';
 
 // Express types for better typing
@@ -21,17 +23,19 @@ interface Response {
 }
 
 /**
- * Logs all HTTP requests and responses with sensitive data masking
+ * Initializes request-scoped logging context for all HTTP requests
+ * Logs all HTTP requests and responses with sensitive data masking (respecting configuration)
  *
  * Features:
+ * - Always initializes request-scoped logger context for HTTP requests (available for internal logging)
+ * - Logs request/response only when OTEL_LOG_HTTP_REQUESTS=true AND @NoLog/@NoLogClass decorators allow
  * - Logs request on entry with masked headers, query, and body
  * - Logs response on completion with masked body
  * - Follows Paystack log format standards
  * - Includes trace correlation (traceId, spanId)
- * - Respects @NoLog and @NoLogClass decorators to skip logging
+ * - Respects @NoLog and @NoLogClass decorators to skip HTTP logging
  * - Calculates request age from Age header if present
- *
- * Note: This interceptor is only registered when OTEL_LOG_HTTP_REQUESTS=true
+ * - Context automatically propagates through async operations
  */
 @Injectable()
 export class RequestLoggingInterceptor implements NestInterceptor {
@@ -42,35 +46,65 @@ export class RequestLoggingInterceptor implements NestInterceptor {
       return next.handle();
     }
 
+    const request = context.switchToHttp().getRequest<Request>();
+    const response = context.switchToHttp().getResponse<Response>();
+
+    // Initialize request-scoped logger context for all HTTP requests
+    const loggerContextMap = new Map<string, unknown>();
+    const otelContext = api.context.active().setValue(LOGGER_CONTEXT_KEY, loggerContextMap);
+
+    // Wrap entire request handling in context to ensure logger context is available
+    return new Observable((subscriber) => {
+      api.context.with(otelContext, () => {
+        // Only log if conditions are met
+        if (this.shouldLog(context)) {
+          this.logRequest(request);
+        }
+
+        // Handle response
+        next
+          .handle()
+          .pipe(
+            tap({
+              error: (error: Error) => {
+                if (this.shouldLog(context)) {
+                  this.logResponse(request, response, undefined, error);
+                }
+              },
+              next: (responseBody: unknown) => {
+                if (this.shouldLog(context)) {
+                  this.logResponse(request, response, responseBody);
+                }
+              },
+            })
+          )
+          .subscribe(subscriber);
+      });
+    });
+  }
+
+  /**
+   * Determines whether to log this request based on configuration and decorators
+   */
+  private shouldLog(context: ExecutionContext): boolean {
+    // Check if HTTP request logging is enabled
+    if (!getHttpRequestLoggingEnabled()) {
+      return false;
+    }
+
     const handler = context.getHandler();
     const controllerClass = context.getClass();
 
     // Respect @NoLog decorators
     if (isNoLogClassEnabled(controllerClass)) {
-      return next.handle();
+      return false;
     }
 
     if (isNoLogEnabled(controllerClass.prototype as object, handler.name)) {
-      return next.handle();
+      return false;
     }
 
-    const request = context.switchToHttp().getRequest<Request>();
-    const response = context.switchToHttp().getResponse<Response>();
-
-    // Log the request (context already initialized by AutoTraceInterceptor)
-    this.logRequest(request);
-
-    // Simple RxJS pipe - context already exists from AutoTraceInterceptor
-    return next.handle().pipe(
-      tap({
-        error: (error: Error) => {
-          this.logResponse(request, response, undefined, error);
-        },
-        next: (responseBody: unknown) => {
-          this.logResponse(request, response, responseBody);
-        },
-      })
-    );
+    return true;
   }
 
   /**

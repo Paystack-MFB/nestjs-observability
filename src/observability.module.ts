@@ -6,7 +6,6 @@ import { AutoTraceInterceptor } from './interceptors/auto-trace.interceptor';
 import { RequestLoggingInterceptor } from './interceptors/request-logging.interceptor';
 import { LoggerService } from './logger/logger.service';
 import { MetricsService } from './metrics/metrics.service';
-import { getHttpRequestLoggingEnabled } from './register';
 import { TracingService } from './tracing/tracing.service';
 
 /**
@@ -30,17 +29,13 @@ export class ObservabilityModule {
       TracingService,
       {
         provide: APP_INTERCEPTOR,
+        useClass: RequestLoggingInterceptor,
+      },
+      {
+        provide: APP_INTERCEPTOR,
         useClass: AutoTraceInterceptor,
       },
     ];
-
-    // Only register RequestLoggingInterceptor if HTTP request logging is enabled
-    if (getHttpRequestLoggingEnabled()) {
-      providers.push({
-        provide: APP_INTERCEPTOR,
-        useClass: RequestLoggingInterceptor,
-      });
-    }
 
     return {
       controllers: [MetricsController],
