@@ -1,11 +1,20 @@
 import { Injectable } from '@nestjs/common';
-import { Context, context, createContextKey, trace } from '@opentelemetry/api';
+import { createContextKey, trace, context } from '@opentelemetry/api';
 import { Logger, logs } from '@opentelemetry/api-logs';
 
 import { getServiceName, getServiceVersion } from '../register';
 import { maskSensitiveFields } from '../utils/mask-sensitive-fields';
+import {
+  getLoggerContext as getAsyncLoggerContext,
+  setLoggerContextValue,
+  isLoggerContextAvailable as isAsyncLoggerContextAvailable,
+  runWithLoggerContext,
+  runWithSpecificLoggerContext,
+  LoggerContextMap,
+} from './logger-context-storage';
 
 // Context key for storing request-scoped logger context
+// Kept for backward compatibility with OpenTelemetry API but AsyncLocalStorage is now primary
 export const LOGGER_CONTEXT_KEY = createContextKey('logger-context');
 
 /**
@@ -16,7 +25,7 @@ export const LOGGER_CONTEXT_KEY = createContextKey('logger-context');
 @Injectable()
 export class LoggerService {
   private readonly otelLogger: Logger;
-  private isolatedContext?: Context;
+  private childContextMap?: LoggerContextMap;
 
   constructor() {
     // Get OpenTelemetry logger from global provider
@@ -31,21 +40,24 @@ export class LoggerService {
   /**
    * Execute function within the logger's isolated context (for child loggers)
    * or in the active context (for root loggers)
+   * Uses AsyncLocalStorage to ensure context persists through async operations
    */
   private executeInContext<T>(fn: () => T): T {
-    if (this.isolatedContext) {
-      return context.with(this.isolatedContext, fn);
+    if (this.childContextMap) {
+      // Child logger: run within isolated AsyncLocalStorage scope
+      return runWithSpecificLoggerContext(this.childContextMap, fn) as T;
     }
+    // Root logger: run in current scope
     return fn();
   }
 
   /**
    * Get the current logger context as a plain object
+   * Reads from AsyncLocalStorage (primary) for reliability in Express/Fastify
    */
   getContext(): Record<string, unknown> {
     return this.executeInContext(() => {
-      const ctx = context.active();
-      const map = ctx.getValue(LOGGER_CONTEXT_KEY) as Map<string, unknown> | undefined;
+      const map = getAsyncLoggerContext();
 
       if (!map) {
         return {};
@@ -58,39 +70,36 @@ export class LoggerService {
   /**
    * Check if logger context is currently available
    * Useful for debugging context issues
+   * Checks AsyncLocalStorage (primary) for reliability
    */
   isContextAvailable(): boolean {
-    const ctx = context.active();
-    const map = ctx.getValue(LOGGER_CONTEXT_KEY) as Map<string, unknown> | undefined;
-    return map !== undefined;
+    return this.executeInContext(() => {
+      return isAsyncLoggerContextAvailable();
+    });
   }
 
   /**
    * Execute a function within a new logger context (useful for background jobs)
+   * Uses AsyncLocalStorage for reliable context propagation through async operations
    */
   withContext<T>(fn: () => T | Promise<T>): T | Promise<T> {
-    const loggerMap = new Map<string, unknown>();
-    const ctx = context.active().setValue(LOGGER_CONTEXT_KEY, loggerMap);
-    return context.with(ctx, fn);
+    return runWithLoggerContext(fn);
   }
 
   /**
    * Add a single context key-value pair
+   * Uses AsyncLocalStorage for reliable context propagation
    */
   addContext(key: string, value: unknown): void {
     this.executeInContext(() => {
-      const ctx = context.active();
-      const map = ctx.getValue(LOGGER_CONTEXT_KEY) as Map<string, unknown> | undefined;
+      const success = setLoggerContextValue(key, value);
 
-      if (!map) {
+      if (!success) {
         this.warn(`Logger context unavailable: addContext('${key}') called outside HTTP request`, {
           guidance: 'For background jobs, use logger.withContext(() => { ... })',
           location: 'This occurs in: app startup, cron jobs, message queue handlers, WebSocket/gRPC handlers',
         });
-        return;
       }
-
-      map.set(key, value);
     });
   }
 
@@ -99,8 +108,7 @@ export class LoggerService {
    */
   clearContext(): void {
     this.executeInContext(() => {
-      const ctx = context.active();
-      const map = ctx.getValue(LOGGER_CONTEXT_KEY) as Map<string, unknown> | undefined;
+      const map = getAsyncLoggerContext();
 
       if (!map) {
         // Silently skip - clearing non-existent context is not an error
@@ -114,20 +122,21 @@ export class LoggerService {
   /**
    * Create a child logger with inherited context
    * Child logger has isolated context - modifications don't affect parent
+   * Uses AsyncLocalStorage to ensure proper isolation through async operations
    */
   createChildLogger(): LoggerService {
     return this.executeInContext(() => {
-      const ctx = context.active();
-      const parentMap = ctx.getValue(LOGGER_CONTEXT_KEY) as Map<string, unknown> | undefined;
+      // Get parent's context from AsyncLocalStorage
+      const parentMap = getAsyncLoggerContext();
 
       const childLogger = new LoggerService();
 
       // If parent has context, clone it for the child with isolated context
       if (parentMap) {
         // Create isolated clone so child modifications don't affect parent
+        // This map will be used by the child logger via AsyncLocalStorage.run()
         const childMap = new Map(parentMap);
-        const childContext = ctx.setValue(LOGGER_CONTEXT_KEY, childMap);
-        childLogger.isolatedContext = childContext;
+        childLogger.childContextMap = childMap;
       } else {
         // Warn when creating child logger without parent context
         this.warn('Creating child logger without parent context - child will have no inherited context', {
@@ -171,8 +180,7 @@ export class LoggerService {
    */
   setContext(newContext: Record<string, unknown>): void {
     this.executeInContext(() => {
-      const ctx = context.active();
-      const map = ctx.getValue(LOGGER_CONTEXT_KEY) as Map<string, unknown> | undefined;
+      const map = getAsyncLoggerContext();
 
       if (!map) {
         this.warn('Logger context unavailable: setContext() called outside HTTP request', {

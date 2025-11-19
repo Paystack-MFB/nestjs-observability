@@ -1,11 +1,11 @@
 /* eslint-disable @typescript-eslint/no-unsafe-assignment */
-import * as api from '@opentelemetry/api';
 import type { LoggerProvider } from '@opentelemetry/api-logs';
 import { logs } from '@opentelemetry/api-logs';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import * as maskUtils from '../utils/mask-sensitive-fields';
-import { LOGGER_CONTEXT_KEY, LoggerService } from './logger.service';
+import { runWithLoggerContext } from './logger-context-storage';
+import { LoggerService } from './logger.service';
 
 describe('LoggerService', () => {
   let loggerService: LoggerService;
@@ -154,11 +154,8 @@ describe('LoggerService', () => {
       );
     });
 
-    it('should mask sensitive fields in persistent context', () => {
-      const loggerMap = new Map<string, unknown>();
-      const ctx = api.context.active().setValue(LOGGER_CONTEXT_KEY, loggerMap);
-
-      api.context.with(ctx, () => {
+    it('should mask sensitive fields in persistent context', async () => {
+      await runWithLoggerContext(() => {
         loggerService.setContext({
           userId: '123',
           token: 'secret_token',
@@ -202,12 +199,9 @@ describe('LoggerService', () => {
   });
 
   describe('context management', () => {
-    it('should maintain persistent context within request scope', () => {
+    it('should maintain persistent context within request scope', async () => {
       // Initialize request-scoped context
-      const loggerMap = new Map<string, unknown>();
-      const ctx = api.context.active().setValue(LOGGER_CONTEXT_KEY, loggerMap);
-
-      api.context.with(ctx, () => {
+      await runWithLoggerContext(() => {
         loggerService.setContext({ requestId: 'req-123' });
 
         loggerService.info('First log', { step: 1 });
@@ -235,11 +229,8 @@ describe('LoggerService', () => {
       });
     });
 
-    it('should clear context', () => {
-      const loggerMap = new Map<string, unknown>();
-      const ctx = api.context.active().setValue(LOGGER_CONTEXT_KEY, loggerMap);
-
-      api.context.with(ctx, () => {
+    it('should clear context', async () => {
+      await runWithLoggerContext(() => {
         loggerService.setContext({ requestId: 'req-123' });
         loggerService.clearContext();
 
@@ -255,11 +246,8 @@ describe('LoggerService', () => {
       });
     });
 
-    it('should get context as plain object', () => {
-      const loggerMap = new Map<string, unknown>();
-      const ctx = api.context.active().setValue(LOGGER_CONTEXT_KEY, loggerMap);
-
-      api.context.with(ctx, () => {
+    it('should get context as plain object', async () => {
+      await runWithLoggerContext(() => {
         loggerService.addContext('userId', '123');
         loggerService.addContext('requestId', 'req-456');
 
@@ -326,11 +314,8 @@ describe('LoggerService', () => {
       expect(loggerService.isContextAvailable()).toBe(false);
     });
 
-    it('should return true when context exists', () => {
-      const loggerMap = new Map<string, unknown>();
-      const ctx = api.context.active().setValue(LOGGER_CONTEXT_KEY, loggerMap);
-
-      api.context.with(ctx, () => {
+    it('should return true when context exists', async () => {
+      await runWithLoggerContext(() => {
         expect(loggerService.isContextAvailable()).toBe(true);
       });
     });
@@ -387,10 +372,7 @@ describe('LoggerService', () => {
       const delay = (ms: number): Promise<void> => new Promise((resolve) => setTimeout(resolve, ms));
 
       const request1Promise = (async () => {
-        const loggerMap1 = new Map<string, unknown>();
-        const ctx1 = api.context.active().setValue(LOGGER_CONTEXT_KEY, loggerMap1);
-
-        return api.context.with(ctx1, async () => {
+        return runWithLoggerContext(async () => {
           loggerService.addContext('requestId', 'req-1');
           await delay(10);
           const context = loggerService.getContext();
@@ -399,10 +381,7 @@ describe('LoggerService', () => {
       })();
 
       const request2Promise = (async () => {
-        const loggerMap2 = new Map<string, unknown>();
-        const ctx2 = api.context.active().setValue(LOGGER_CONTEXT_KEY, loggerMap2);
-
-        return api.context.with(ctx2, async () => {
+        return runWithLoggerContext(async () => {
           loggerService.addContext('requestId', 'req-2');
           await delay(5);
           const context = loggerService.getContext();
@@ -414,10 +393,7 @@ describe('LoggerService', () => {
     });
 
     it('should maintain context through async operations', async () => {
-      const loggerMap = new Map<string, unknown>();
-      const ctx = api.context.active().setValue(LOGGER_CONTEXT_KEY, loggerMap);
-
-      await api.context.with(ctx, async () => {
+      await runWithLoggerContext(async () => {
         loggerService.addContext('requestId', 'req-async');
 
         // Simulate async operation
@@ -441,11 +417,8 @@ describe('LoggerService', () => {
   });
 
   describe('child logger', () => {
-    it('should create child logger with isolated context', () => {
-      const loggerMap = new Map<string, unknown>();
-      const ctx = api.context.active().setValue(LOGGER_CONTEXT_KEY, loggerMap);
-
-      api.context.with(ctx, () => {
+    it('should create child logger with isolated context', async () => {
+      await runWithLoggerContext(() => {
         loggerService.addContext('parent', 'value');
 
         const childLogger = loggerService.createChildLogger();
@@ -459,11 +432,8 @@ describe('LoggerService', () => {
       });
     });
 
-    it('should isolate child logger modifications from parent', () => {
-      const loggerMap = new Map<string, unknown>();
-      const ctx = api.context.active().setValue(LOGGER_CONTEXT_KEY, loggerMap);
-
-      api.context.with(ctx, () => {
+    it('should isolate child logger modifications from parent', async () => {
+      await runWithLoggerContext(() => {
         loggerService.addContext('shared', 'initial');
 
         const childLogger = loggerService.createChildLogger();
@@ -481,11 +451,8 @@ describe('LoggerService', () => {
       });
     });
 
-    it('should support multiple child loggers with isolated contexts', () => {
-      const loggerMap = new Map<string, unknown>();
-      const ctx = api.context.active().setValue(LOGGER_CONTEXT_KEY, loggerMap);
-
-      api.context.with(ctx, () => {
+    it('should support multiple child loggers with isolated contexts', async () => {
+      await runWithLoggerContext(() => {
         loggerService.addContext('parent', 'value');
 
         const child1 = loggerService.createChildLogger();
@@ -546,14 +513,11 @@ describe('LoggerService', () => {
     });
 
     it('should isolate withContext from external context', async () => {
-      const loggerMap = new Map<string, unknown>();
-      const ctx = api.context.active().setValue(LOGGER_CONTEXT_KEY, loggerMap);
-
-      await api.context.with(ctx, async () => {
+      await runWithLoggerContext(async () => {
         loggerService.addContext('external', 'value');
 
         await loggerService.withContext(async () => {
-          // Should not see external context
+          // Should not see external context (withContext creates isolated context)
           expect(loggerService.getContext()).toEqual({});
 
           loggerService.addContext('internal', 'value');

@@ -25,6 +25,7 @@ import { ConsoleSpanExporter } from '@opentelemetry/sdk-trace-node';
 import { ATTR_SERVICE_NAME, ATTR_SERVICE_VERSION } from '@opentelemetry/semantic-conventions';
 
 import { JSONStdoutLogExporter } from './exporters/json-log-exporter';
+import { NestJSLoggerContextInstrumentation } from './instrumentation/nestjs-logger-context.instrumentation';
 
 // OTLP Exporters imported eagerly so constructor calls are observable in tests
 
@@ -266,8 +267,23 @@ function initializeSDK(): NodeSDK {
     'service.environment': getServiceEnvironment(),
   });
 
-  // Get auto-instrumentations
-  const instrumentations = getNodeAutoInstrumentations();
+  // Get auto-instrumentations and add custom logger context instrumentation
+  // The custom instrumentation should run first to inject middleware early
+  const customInstrumentation = (() => {
+    try {
+      return new NestJSLoggerContextInstrumentation();
+    } catch {
+      // In test environments where instrumentation may not be fully loaded yet
+      return undefined;
+    }
+  })();
+
+  const instrumentations: (
+    | import('@opentelemetry/instrumentation').Instrumentation
+    | import('@opentelemetry/instrumentation').Instrumentation[]
+  )[] = customInstrumentation
+    ? [customInstrumentation, ...getNodeAutoInstrumentations()]
+    : getNodeAutoInstrumentations();
 
   // Create SDK configuration
   const sdkConfig: Partial<import('@opentelemetry/sdk-node').NodeSDKConfiguration> = {
@@ -282,6 +298,7 @@ function initializeSDK(): NodeSDK {
   // Only add custom metric reader if not using NodeSDK's automatic OTLP configuration
   const metricsExporter = process.env['OTEL_METRICS_EXPORTER'];
   if (metricsExporter !== 'otlp' && metricReader) {
+    // eslint-disable-next-line @typescript-eslint/no-deprecated
     sdkConfig.metricReader = metricReader;
   }
 
@@ -299,6 +316,7 @@ function initializeSDK(): NodeSDK {
     ...(sdkConfig.resource ? { resource: sdkConfig.resource } : {}),
     ...(sdkConfig.resourceDetectors ? { resourceDetectors: sdkConfig.resourceDetectors } : {}),
     ...(sdkConfig.traceExporter ? { traceExporter: sdkConfig.traceExporter } : {}),
+    // eslint-disable-next-line @typescript-eslint/no-deprecated
     ...(sdkConfig.metricReader ? { metricReader: sdkConfig.metricReader } : {}),
     ...(sdkConfig.logRecordProcessors ? { logRecordProcessors: sdkConfig.logRecordProcessors } : {}),
   };

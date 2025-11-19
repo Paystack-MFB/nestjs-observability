@@ -28,12 +28,20 @@ interface MockTracerProvider {
 type SpanCallback<T = unknown> = (span: MockSpan) => T;
 
 // Mock OpenTelemetry API
-vi.mock('@opentelemetry/api', () => ({
-  trace: {
-    getActiveSpan: vi.fn(),
-    getTracerProvider: vi.fn(),
-  },
-}));
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+vi.mock('@opentelemetry/api', async (importOriginal: () => Promise<any>) => {
+  // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+  const actual = await importOriginal();
+  // eslint-disable-next-line @typescript-eslint/no-unsafe-return
+  return {
+    ...actual,
+    trace: {
+      getActiveSpan: vi.fn(),
+      getTracerProvider: vi.fn(),
+    },
+    createContextKey: vi.fn((key: string) => ({ key })),
+  };
+});
 
 describe('TracingService', () => {
   // Helper functions to get mocked versions

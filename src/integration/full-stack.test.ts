@@ -15,11 +15,11 @@ const globalMocks = new OtelProviderMocks();
 globalMocks.setupMocks();
 
 import { Test, TestingModule } from '@nestjs/testing';
-import * as api from '@opentelemetry/api';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import { MetricsController } from '../controllers/metrics.controller';
-import { LOGGER_CONTEXT_KEY, LoggerService } from '../logger/logger.service';
+import { runWithLoggerContext } from '../logger/logger-context-storage';
+import { LoggerService } from '../logger/logger.service';
 import { MetricsService } from '../metrics/metrics.service';
 import { ObservabilityModule } from '../observability.module';
 import { AsyncTestUtils, MockFactory, TestSetup } from '../test-helpers/otel-mocks';
@@ -270,10 +270,7 @@ describe('Full-Stack Integration Tests', () => {
       const operations = [
         async () => {
           // Initialize request-scoped context for operation 1
-          const loggerMap1 = new Map<string, unknown>();
-          const ctx1 = api.context.active().setValue(LOGGER_CONTEXT_KEY, loggerMap1);
-
-          return api.context.with(ctx1, async () => {
+          return runWithLoggerContext(async () => {
             const childLogger = loggerService.createChildLogger();
             childLogger.setContext({ operationId: 'op-1', requestId: 'req-1' });
             childLogger.info('Operation 1 message');
@@ -291,10 +288,7 @@ describe('Full-Stack Integration Tests', () => {
         },
         async () => {
           // Initialize request-scoped context for operation 2
-          const loggerMap2 = new Map<string, unknown>();
-          const ctx2 = api.context.active().setValue(LOGGER_CONTEXT_KEY, loggerMap2);
-
-          return api.context.with(ctx2, async () => {
+          return runWithLoggerContext(async () => {
             const childLogger = loggerService.createChildLogger();
             childLogger.setContext({ operationId: 'op-2', requestId: 'req-2' });
             childLogger.info('Operation 2 message');
@@ -312,10 +306,7 @@ describe('Full-Stack Integration Tests', () => {
         },
         async () => {
           // Initialize request-scoped context for operation 3
-          const loggerMap3 = new Map<string, unknown>();
-          const ctx3 = api.context.active().setValue(LOGGER_CONTEXT_KEY, loggerMap3);
-
-          return api.context.with(ctx3, async () => {
+          return runWithLoggerContext(async () => {
             const childLogger = loggerService.createChildLogger();
             childLogger.setContext({ operationId: 'op-3', requestId: 'req-3' });
             childLogger.info('Operation 3 message');
