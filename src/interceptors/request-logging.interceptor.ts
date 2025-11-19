@@ -1,10 +1,9 @@
 import { CallHandler, ExecutionContext, Injectable, NestInterceptor } from '@nestjs/common';
-import * as api from '@opentelemetry/api';
 import { Observable } from 'rxjs';
 import { tap } from 'rxjs/operators';
 
 import { isNoLogClassEnabled, isNoLogEnabled } from '../decorators/auto-trace.decorators';
-import { LOGGER_CONTEXT_KEY, LoggerService } from '../logger/logger.service';
+import { LoggerService } from '../logger/logger.service';
 import { getHttpRequestLoggingEnabled } from '../register';
 import { maskSensitiveFields } from '../utils/mask-sensitive-fields';
 
@@ -23,18 +22,16 @@ interface Response {
 }
 
 /**
- * Initializes request-scoped logging context for all HTTP requests
  * Logs all HTTP requests and responses with sensitive data masking (respecting configuration)
  *
  * Features:
- * - Always initializes request-scoped logger context for HTTP requests (available for internal logging)
  * - Logs request/response only when OTEL_LOG_HTTP_REQUESTS=true AND @NoLog/@NoLogClass decorators allow
  * - Logs request on entry with masked headers, query, and body
  * - Logs response on completion with masked body
  * - Follows Paystack log format standards
  * - Includes trace correlation (traceId, spanId)
  * - Respects @NoLog and @NoLogClass decorators to skip HTTP logging
- * - Calculates request age from Age header if present
+ * - Note: Request-scoped logger context is initialized in LoggerContextMiddleware
  * - Context automatically propagates through async operations
  */
 @Injectable()
@@ -49,38 +46,29 @@ export class RequestLoggingInterceptor implements NestInterceptor {
     const request = context.switchToHttp().getRequest<Request>();
     const response = context.switchToHttp().getResponse<Response>();
 
-    // Initialize request-scoped logger context for all HTTP requests
-    const loggerContextMap = new Map<string, unknown>();
-    const otelContext = api.context.active().setValue(LOGGER_CONTEXT_KEY, loggerContextMap);
+    // Logger context is already initialized by LoggerContextMiddleware
+    // No need to wrap in api.context.with() again - just handle logging
 
-    // Wrap entire request handling in context to ensure logger context is available
-    return new Observable((subscriber) => {
-      api.context.with(otelContext, () => {
-        // Only log if conditions are met
-        if (this.shouldLog(context)) {
-          this.logRequest(request);
-        }
+    // Only log if conditions are met
+    if (this.shouldLog(context)) {
+      this.logRequest(request);
+    }
 
-        // Handle response
-        next
-          .handle()
-          .pipe(
-            tap({
-              error: (error: Error) => {
-                if (this.shouldLog(context)) {
-                  this.logResponse(request, response, undefined, error);
-                }
-              },
-              next: (responseBody: unknown) => {
-                if (this.shouldLog(context)) {
-                  this.logResponse(request, response, responseBody);
-                }
-              },
-            })
-          )
-          .subscribe(subscriber);
-      });
-    });
+    // Handle response
+    return next.handle().pipe(
+      tap({
+        error: (error: Error) => {
+          if (this.shouldLog(context)) {
+            this.logResponse(request, response, undefined, error);
+          }
+        },
+        next: (responseBody: unknown) => {
+          if (this.shouldLog(context)) {
+            this.logResponse(request, response, responseBody);
+          }
+        },
+      })
+    );
   }
 
   /**

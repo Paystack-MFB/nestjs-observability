@@ -39,7 +39,6 @@ describe('RequestLoggingInterceptor', () => {
     };
     vi.spyOn(api.context, 'active').mockReturnValue(mockContext);
     vi.spyOn(api.context, 'with').mockImplementation((_context: unknown, fn: () => unknown) => {
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-return
       return fn();
     });
 
@@ -223,15 +222,31 @@ describe('RequestLoggingInterceptor', () => {
     expect(loggerInfoSpy).toHaveBeenCalledTimes(2);
   });
 
-  it('should initialize request-scoped logger context', async () => {
+  it('should work with context already initialized by middleware', async () => {
+    // The LoggerContextMiddleware initializes the context before the interceptor runs
+    // This test verifies that the interceptor works correctly when context is already initialized
+
     await lastValueFrom(interceptor.intercept(executionContext, callHandler));
 
-    // Verify that api.context.active().setValue was called with LOGGER_CONTEXT_KEY
-    // eslint-disable-next-line @typescript-eslint/unbound-method
-    expect(api.context.active().setValue).toHaveBeenCalledWith(LOGGER_CONTEXT_KEY, expect.any(Map));
+    // Verify request and response logging still works
+    expect(loggerInfoSpy).toHaveBeenCalledWith(
+      'HTTP Request',
+      expect.objectContaining({
+        endpoint: '/api/test',
+        type: 'request',
+      })
+    );
+
+    expect(loggerInfoSpy).toHaveBeenCalledWith(
+      'HTTP Response',
+      expect.objectContaining({
+        endpoint: '/api/test',
+        type: 'response',
+      })
+    );
   });
 
-  it('should skip logging when OTEL_LOG_HTTP_REQUESTS is disabled, but still initialize context', async () => {
+  it('should skip logging when OTEL_LOG_HTTP_REQUESTS is disabled', async () => {
     vi.spyOn(register, 'getHttpRequestLoggingEnabled').mockReturnValue(false);
 
     await lastValueFrom(interceptor.intercept(executionContext, callHandler));
@@ -239,13 +254,9 @@ describe('RequestLoggingInterceptor', () => {
     // Verify logging was skipped
     expect(loggerInfoSpy).not.toHaveBeenCalled();
     expect(loggerErrorSpy).not.toHaveBeenCalled();
-
-    // But context should still be initialized
-    // eslint-disable-next-line @typescript-eslint/unbound-method
-    expect(api.context.active().setValue).toHaveBeenCalledWith(LOGGER_CONTEXT_KEY, expect.any(Map));
   });
 
-  it('should skip logging for @NoLogClass decorated class, but still initialize context', async () => {
+  it('should skip logging for @NoLogClass decorated class', async () => {
     // eslint-disable-next-line @typescript-eslint/no-extraneous-class
     class TestControllerWithNoLogClass {}
     Reflect.defineMetadata('log:no-log-class', true, TestControllerWithNoLogClass);
@@ -256,13 +267,9 @@ describe('RequestLoggingInterceptor', () => {
 
     // Verify logging was skipped
     expect(loggerInfoSpy).not.toHaveBeenCalled();
-
-    // But context should still be initialized
-    // eslint-disable-next-line @typescript-eslint/unbound-method
-    expect(api.context.active().setValue).toHaveBeenCalledWith(LOGGER_CONTEXT_KEY, expect.any(Map));
   });
 
-  it('should skip logging for @NoLog decorated method, but still initialize context', async () => {
+  it('should skip logging for @NoLog decorated method', async () => {
     // eslint-disable-next-line @typescript-eslint/no-extraneous-class
     class TestController {}
     Reflect.defineMetadata('log:no-log', true, TestController.prototype, 'testMethod');
@@ -274,9 +281,5 @@ describe('RequestLoggingInterceptor', () => {
 
     // Verify logging was skipped
     expect(loggerInfoSpy).not.toHaveBeenCalled();
-
-    // But context should still be initialized
-    // eslint-disable-next-line @typescript-eslint/unbound-method
-    expect(api.context.active().setValue).toHaveBeenCalledWith(LOGGER_CONTEXT_KEY, expect.any(Map));
   });
 });

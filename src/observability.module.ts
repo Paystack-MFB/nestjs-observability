@@ -1,4 +1,4 @@
-import { DynamicModule, Global, Module, Provider } from '@nestjs/common';
+import { DynamicModule, Global, MiddlewareConsumer, Module, NestModule, Provider } from '@nestjs/common';
 import { APP_INTERCEPTOR } from '@nestjs/core';
 
 import { MetricsController } from './controllers/metrics.controller';
@@ -6,6 +6,7 @@ import { AutoTraceInterceptor } from './interceptors/auto-trace.interceptor';
 import { RequestLoggingInterceptor } from './interceptors/request-logging.interceptor';
 import { LoggerService } from './logger/logger.service';
 import { MetricsService } from './metrics/metrics.service';
+import { LoggerContextMiddleware } from './middleware/logger-context.middleware';
 import { TracingService } from './tracing/tracing.service';
 
 /**
@@ -15,8 +16,7 @@ import { TracingService } from './tracing/tracing.service';
  */
 @Global()
 @Module({})
-// eslint-disable-next-line @typescript-eslint/no-extraneous-class
-export class ObservabilityModule {
+export class ObservabilityModule implements NestModule {
   /**
    * Register the module with core observability services
    * All configuration comes from environment variables via the register module
@@ -27,6 +27,7 @@ export class ObservabilityModule {
       LoggerService,
       MetricsService,
       TracingService,
+      LoggerContextMiddleware,
       {
         provide: APP_INTERCEPTOR,
         useClass: RequestLoggingInterceptor,
@@ -43,5 +44,16 @@ export class ObservabilityModule {
       module: ObservabilityModule,
       providers,
     };
+  }
+
+  /**
+   * Configure global middleware for request-scoped logging context initialization
+   * This middleware runs at the earliest stage of request processing,
+   * ensuring logger context is available for all downstream handlers
+   */
+  // eslint-disable-next-line @typescript-eslint/explicit-function-return-type
+  configure(consumer: MiddlewareConsumer) {
+    // Apply LoggerContextMiddleware to all routes
+    consumer.apply(LoggerContextMiddleware).forRoutes('*');
   }
 }
