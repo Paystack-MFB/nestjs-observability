@@ -1,12 +1,13 @@
 import type { AttributeValue } from '@opentelemetry/api';
 
 import { CallHandler, ExecutionContext, Injectable, NestInterceptor } from '@nestjs/common';
+import * as api from '@opentelemetry/api';
 import { Exception, Span, SpanStatusCode, trace } from '@opentelemetry/api';
 import { Observable } from 'rxjs';
 import { tap } from 'rxjs/operators';
 
 import { getTraceOptions, isNoTraceClassEnabled, isNoTraceEnabled } from '../decorators/auto-trace.decorators';
-import { LoggerService } from '../logger/logger.service';
+import { LOGGER_CONTEXT_KEY, LoggerService } from '../logger/logger.service';
 import { MetricsService } from '../metrics/metrics.service';
 
 // Express types for better typing
@@ -65,7 +66,66 @@ export class AutoTraceInterceptor implements NestInterceptor {
     const methodName = handler.name;
     const spanName = traceOptions?.spanName ?? `${className}.${methodName}`;
 
-    // Create span with full context
+    // Initialize logger context for HTTP requests
+    if (context.getType() === 'http') {
+      const loggerContextMap = new Map<string, unknown>();
+      const otelContext = api.context.active().setValue(LOGGER_CONTEXT_KEY, loggerContextMap);
+
+      // Wrap span creation in context.with() to ensure logger context is available
+      return new Observable((subscriber) => {
+        api.context.with(otelContext, () => {
+          this.tracer.startActiveSpan(spanName, (span: Span) => {
+            const startTime = Date.now();
+
+            // Add controller-specific attributes
+            span.setAttribute('controller.name', className as AttributeValue);
+            span.setAttribute('controller.method', methodName as AttributeValue);
+            span.setAttribute('instrumentation.type', 'auto-trace-interceptor' as AttributeValue);
+
+            // Add HTTP attributes if this is an HTTP request
+            this.addHttpAttributes(span, context);
+
+            next
+              .handle()
+              .pipe(
+                tap({
+                  error: (error: Error) => {
+                    const duration = (Date.now() - startTime) / 1000;
+
+                    // Handle error in span
+                    this.handleError(span, error);
+
+                    // Update metrics
+                    this.updateMetrics(context, duration);
+
+                    this.logger.error(`Error in ${spanName} after ${duration.toFixed(3)}s: ${error.message}`, {
+                      context: 'AutoTraceInterceptor',
+                      stack: error.stack,
+                    });
+                  },
+                  finalize: () => {
+                    // Always end the span
+                    span.end();
+                  },
+                  next: (value: unknown) => {
+                    const duration = (Date.now() - startTime) / 1000;
+
+                    // Set span status to OK
+                    span.setStatus({ code: SpanStatusCode.OK });
+
+                    // Update metrics
+                    this.updateMetrics(context, duration);
+                    return value;
+                  },
+                })
+              )
+              .subscribe(subscriber);
+          });
+        });
+      });
+    }
+
+    // For non-HTTP requests, use original pattern without logger context initialization
     return this.tracer.startActiveSpan(spanName, (span: Span) => {
       const startTime = Date.now();
 

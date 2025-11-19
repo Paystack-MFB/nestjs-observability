@@ -8,6 +8,14 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 // Mock OpenTelemetry modules
 vi.mock('@opentelemetry/api', () => ({
+  context: {
+    active: vi.fn().mockReturnValue({
+      getValue: vi.fn(),
+      setValue: vi.fn().mockReturnValue({}),
+    }),
+    with: vi.fn((_ctx: unknown, fn: () => unknown) => fn()),
+  },
+  createContextKey: vi.fn((name: string) => Symbol(name)),
   metrics: {
     getMeterProvider: vi.fn().mockReturnValue({
       getMeter: vi.fn().mockReturnValue({

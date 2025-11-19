@@ -15,10 +15,11 @@ const globalMocks = new OtelProviderMocks();
 globalMocks.setupMocks();
 
 import { Test, TestingModule } from '@nestjs/testing';
+import * as api from '@opentelemetry/api';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import { MetricsController } from '../controllers/metrics.controller';
-import { LoggerService } from '../logger/logger.service';
+import { LOGGER_CONTEXT_KEY, LoggerService } from '../logger/logger.service';
 import { MetricsService } from '../metrics/metrics.service';
 import { ObservabilityModule } from '../observability.module';
 import { AsyncTestUtils, MockFactory, TestSetup } from '../test-helpers/otel-mocks';
@@ -268,37 +269,67 @@ describe('Full-Stack Integration Tests', () => {
     it('should handle concurrent operations with context isolation', async () => {
       const operations = [
         async () => {
-          const childLogger = loggerService.createChildLogger();
-          childLogger.setContext({ operationId: 'op-1', requestId: 'req-1' });
-          childLogger.info('Operation 1 message');
+          // Initialize request-scoped context for operation 1
+          const loggerMap1 = new Map<string, unknown>();
+          const ctx1 = api.context.active().setValue(LOGGER_CONTEXT_KEY, loggerMap1);
 
-          const span = tracingService.startSpan('operation-1');
-          await AsyncTestUtils.delay(10);
-          span.end();
+          return api.context.with(ctx1, async () => {
+            const childLogger = loggerService.createChildLogger();
+            childLogger.setContext({ operationId: 'op-1', requestId: 'req-1' });
+            childLogger.info('Operation 1 message');
 
-          return 'result-1';
+            const span = tracingService.startSpan('operation-1');
+            await AsyncTestUtils.delay(10);
+            span.end();
+
+            // Verify context is isolated
+            expect(loggerService.getContext()).toEqual({});
+            expect(childLogger.getContext()).toEqual({ operationId: 'op-1', requestId: 'req-1' });
+
+            return 'result-1';
+          });
         },
         async () => {
-          const childLogger = loggerService.createChildLogger();
-          childLogger.setContext({ operationId: 'op-2', requestId: 'req-2' });
-          childLogger.info('Operation 2 message');
+          // Initialize request-scoped context for operation 2
+          const loggerMap2 = new Map<string, unknown>();
+          const ctx2 = api.context.active().setValue(LOGGER_CONTEXT_KEY, loggerMap2);
 
-          const span = tracingService.startSpan('operation-2');
-          await AsyncTestUtils.delay(15);
-          span.end();
+          return api.context.with(ctx2, async () => {
+            const childLogger = loggerService.createChildLogger();
+            childLogger.setContext({ operationId: 'op-2', requestId: 'req-2' });
+            childLogger.info('Operation 2 message');
 
-          return 'result-2';
+            const span = tracingService.startSpan('operation-2');
+            await AsyncTestUtils.delay(15);
+            span.end();
+
+            // Verify context is isolated
+            expect(loggerService.getContext()).toEqual({});
+            expect(childLogger.getContext()).toEqual({ operationId: 'op-2', requestId: 'req-2' });
+
+            return 'result-2';
+          });
         },
         async () => {
-          const childLogger = loggerService.createChildLogger();
-          childLogger.setContext({ operationId: 'op-3', requestId: 'req-3' });
-          childLogger.info('Operation 3 message');
+          // Initialize request-scoped context for operation 3
+          const loggerMap3 = new Map<string, unknown>();
+          const ctx3 = api.context.active().setValue(LOGGER_CONTEXT_KEY, loggerMap3);
 
-          const span = tracingService.startSpan('operation-3');
-          await AsyncTestUtils.delay(5);
-          span.end();
+          return api.context.with(ctx3, async () => {
+            const childLogger = loggerService.createChildLogger();
+            childLogger.setContext({ operationId: 'op-3', requestId: 'req-3' });
+            childLogger.info('Operation 3 message');
 
-          return 'result-3';
+            const span = tracingService.startSpan('operation-3');
+            await AsyncTestUtils.delay(5);
+            span.end();
+
+            // Verify context is isolated
+            expect(loggerService.getContext()).toEqual({});
+            expect(childLogger.getContext()).toEqual({ operationId: 'op-3', requestId: 'req-3' });
+
+            return 'result-3';
+          });
         },
       ];
 

@@ -179,16 +179,10 @@ import { LoggerService } from '@paystackhq/nestjs-observability';
 
 @Injectable()
 export class UserService {
-  constructor(private readonly logger: LoggerService) {
-    // Set service-level context
-    this.logger.setContext({
-      service: 'UserService',
-      version: '1.0.0',
-    });
-  }
+  constructor(private readonly logger: LoggerService) {}
 
   async createUser(userData: any) {
-    // Add operation-specific context
+    // Add request-scoped context (automatically isolated per request)
     this.logger.addContext('operation', 'createUser');
     this.logger.addContext('userId', userData.id);
 
@@ -203,7 +197,207 @@ export class UserService {
       userId: userData.id,
       duration: '245ms',
     });
+
+    // Context added in this request won't leak to other requests!
   }
+}
+```
+
+#### Request-Scoped Context
+
+Logger context is **automatically scoped to each HTTP request**. Context added in one request will not leak into other requests, even under high concurrency.
+
+**How it works:**
+
+- The `RequestLoggingInterceptor` initializes a request-scoped context using OpenTelemetry's Context API
+- All logger context operations within that request share the same isolated storage
+- Context is automatically cleaned up when the request completes
+
+**Adding Context:**
+
+```typescript
+@Injectable()
+export class UserService {
+  constructor(private logger: LoggerService) {}
+
+  async getUser(userId: string) {
+    // Add context - scoped to this request only
+    this.logger.addContext('userId', userId);
+    this.logger.addContext('operation', 'getUser');
+
+    // All subsequent logs in this request include the context
+    this.logger.info('Fetching user');
+    // Output: { userId: '123', operation: 'getUser', message: 'Fetching user', trace_id: '...', span_id: '...' }
+  }
+}
+```
+
+**Context Isolation:**
+
+```typescript
+// Request 1
+logger.addContext('userId', '123');
+logger.info('User action'); // userId: '123'
+
+// Request 2 (concurrent with Request 1)
+logger.addContext('userId', '456');
+logger.info('User action'); // userId: '456'
+
+// No interference between requests!
+```
+
+**Child Loggers:**
+
+Create isolated child loggers that inherit parent context but modifications are isolated:
+
+```typescript
+@Injectable()
+export class OrderService {
+  constructor(private logger: LoggerService) {}
+
+  async processOrder(orderId: string) {
+    this.logger.addContext('orderId', orderId);
+
+    // Create child logger with inherited context
+    const childLogger = this.logger.createChildLogger();
+    childLogger.addContext('step', 'validation');
+
+    // Parent logger context
+    console.log(this.logger.getContext());
+    // { orderId: 'abc' }
+
+    // Child logger has both parent and child context
+    console.log(childLogger.getContext());
+    // { orderId: 'abc', step: 'validation' }
+
+    // Child modifications don't affect parent!
+  }
+}
+```
+
+**Background Jobs:**
+
+Use `withContext()` utility for background jobs or operations outside HTTP requests:
+
+```typescript
+@Injectable()
+export class BatchJobService {
+  constructor(private logger: LoggerService) {}
+
+  async runBatchJob() {
+    // Create isolated context for background job
+    this.logger.withContext(() => {
+      this.logger.addContext('jobId', 'batch-001');
+      this.logger.addContext('jobType', 'data-sync');
+
+      this.logger.info('Starting batch job');
+      // Process job...
+      this.logger.info('Batch job completed');
+    });
+  }
+
+  // Async version
+  async runAsyncBatchJob() {
+    await this.logger.withContext(async () => {
+      this.logger.addContext('jobId', 'batch-002');
+
+      await this.processData();
+
+      this.logger.info('Async batch job completed');
+    });
+  }
+}
+```
+
+**Trace Correlation:**
+
+Logger context automatically includes trace correlation (trace_id, span_id) from active spans:
+
+```typescript
+// Within a traced request
+logger.addContext('userId', '123');
+logger.info('User logged in');
+
+// Output includes both logger context and trace correlation:
+// {
+//   userId: '123',
+//   trace_id: '4bf92f3577b34da6a3ce929d0e0e4736',
+//   span_id: '00f067aa0ba902b7',
+//   message: 'User logged in'
+// }
+```
+
+## Troubleshooting Logger Context
+
+### "Logger context unavailable" Warning
+
+This warning appears when you try to use `addContext()` or `setContext()` outside an HTTP request context.
+
+**Common scenarios:**
+
+1. **App Startup/Module Initialization**
+
+   ```typescript
+   // ❌ Won't work - no request context during startup
+   constructor(private logger: LoggerService) {
+     this.logger.setContext({ service: 'MyService' });
+   }
+
+   // ✅ Use context within HTTP requests only
+   async handleRequest() {
+     this.logger.addContext('operation', 'handleRequest');
+   }
+   ```
+
+2. **Cron Jobs/Scheduled Tasks**
+
+   ```typescript
+   @Cron('0 0 * * *')
+   async dailySync() {
+     // ✅ Create context for cron job
+     await this.logger.withContext(async () => {
+       this.logger.addContext('jobId', 'daily-sync');
+       this.logger.info('Starting sync');
+       // ... job logic
+     });
+   }
+   ```
+
+3. **Message Queue Handlers**
+
+   ```typescript
+   @EventPattern('user.created')
+   handleUserCreated(data: any) {
+     // ✅ Wrap handler in context
+     this.logger.withContext(() => {
+       this.logger.addContext('eventType', 'user.created');
+       this.logger.addContext('userId', data.userId);
+       // ... handler logic
+     });
+   }
+   ```
+
+4. **WebSocket/gRPC/GraphQL Handlers**
+   ```typescript
+   @SubscribeMessage('message')
+   handleMessage(client: Socket, payload: any) {
+     // ✅ Create context for WebSocket message
+     this.logger.withContext(() => {
+       this.logger.addContext('socketId', client.id);
+       this.logger.addContext('messageType', payload.type);
+       // ... handler logic
+     });
+   }
+   ```
+
+**Diagnostic helper:**
+
+```typescript
+// Check if context is available
+if (this.logger.isContextAvailable()) {
+  this.logger.addContext('key', 'value');
+} else {
+  console.log('Use logger.withContext() here');
 }
 ```
 

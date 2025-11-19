@@ -57,9 +57,10 @@ export class RequestLoggingInterceptor implements NestInterceptor {
     const request = context.switchToHttp().getRequest<Request>();
     const response = context.switchToHttp().getResponse<Response>();
 
-    // Log the request
+    // Log the request (context already initialized by AutoTraceInterceptor)
     this.logRequest(request);
 
+    // Simple RxJS pipe - context already exists from AutoTraceInterceptor
     return next.handle().pipe(
       tap({
         error: (error: Error) => {

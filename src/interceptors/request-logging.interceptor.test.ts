@@ -1,8 +1,9 @@
+import * as api from '@opentelemetry/api';
 import { CallHandler, ExecutionContext } from '@nestjs/common';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { of, throwError, lastValueFrom } from 'rxjs';
 
-import { LoggerService } from '../logger/logger.service';
+import { LOGGER_CONTEXT_KEY, LoggerService } from '../logger/logger.service';
 import { RequestLoggingInterceptor } from './request-logging.interceptor';
 
 describe('RequestLoggingInterceptor', () => {
@@ -21,6 +22,15 @@ describe('RequestLoggingInterceptor', () => {
     } as unknown as LoggerService;
 
     interceptor = new RequestLoggingInterceptor(logger);
+
+    // Initialize logger context for tests (AutoTraceInterceptor would do this in real requests)
+    const loggerMap = new Map<string, unknown>();
+    const mockContext = {
+      getValue: vi.fn((key) => (key === LOGGER_CONTEXT_KEY ? loggerMap : undefined)),
+      setValue: vi.fn().mockReturnValue({}),
+      deleteValue: vi.fn().mockReturnValue({}),
+    };
+    vi.spyOn(api.context, 'active').mockReturnValue(mockContext);
 
     // Mock execution context
     executionContext = {

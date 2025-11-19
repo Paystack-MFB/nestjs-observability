@@ -1,9 +1,12 @@
 import { Injectable } from '@nestjs/common';
-import { context, trace } from '@opentelemetry/api';
+import { Context, context, createContextKey, trace } from '@opentelemetry/api';
 import { Logger, logs } from '@opentelemetry/api-logs';
 
 import { getServiceName, getServiceVersion } from '../register';
 import { maskSensitiveFields } from '../utils/mask-sensitive-fields';
+
+// Context key for storing request-scoped logger context
+export const LOGGER_CONTEXT_KEY = createContextKey('logger-context');
 
 /**
  * Enhanced NestJS logger that integrates with OpenTelemetry global providers
@@ -13,7 +16,7 @@ import { maskSensitiveFields } from '../utils/mask-sensitive-fields';
 @Injectable()
 export class LoggerService {
   private readonly otelLogger: Logger;
-  private persistentContext: Record<string, unknown> = {};
+  private isolatedContext?: Context;
 
   constructor() {
     // Get OpenTelemetry logger from global provider
@@ -26,71 +29,183 @@ export class LoggerService {
   }
 
   /**
+   * Execute function within the logger's isolated context (for child loggers)
+   * or in the active context (for root loggers)
+   */
+  private executeInContext<T>(fn: () => T): T {
+    if (this.isolatedContext) {
+      return context.with(this.isolatedContext, fn);
+    }
+    return fn();
+  }
+
+  /**
+   * Get the current logger context as a plain object
+   */
+  getContext(): Record<string, unknown> {
+    return this.executeInContext(() => {
+      const ctx = context.active();
+      const map = ctx.getValue(LOGGER_CONTEXT_KEY) as Map<string, unknown> | undefined;
+
+      if (!map) {
+        return {};
+      }
+
+      return Object.fromEntries(map);
+    });
+  }
+
+  /**
+   * Check if logger context is currently available
+   * Useful for debugging context issues
+   */
+  isContextAvailable(): boolean {
+    const ctx = context.active();
+    const map = ctx.getValue(LOGGER_CONTEXT_KEY) as Map<string, unknown> | undefined;
+    return map !== undefined;
+  }
+
+  /**
+   * Execute a function within a new logger context (useful for background jobs)
+   */
+  withContext<T>(fn: () => T | Promise<T>): T | Promise<T> {
+    const loggerMap = new Map<string, unknown>();
+    const ctx = context.active().setValue(LOGGER_CONTEXT_KEY, loggerMap);
+    return context.with(ctx, fn);
+  }
+
+  /**
    * Add a single context key-value pair
    */
   addContext(key: string, value: unknown): void {
-    this.persistentContext[key] = value;
+    this.executeInContext(() => {
+      const ctx = context.active();
+      const map = ctx.getValue(LOGGER_CONTEXT_KEY) as Map<string, unknown> | undefined;
+
+      if (!map) {
+        this.warn(`Logger context unavailable: addContext('${key}') called outside HTTP request`, {
+          guidance: 'For background jobs, use logger.withContext(() => { ... })',
+          location: 'This occurs in: app startup, cron jobs, message queue handlers, WebSocket/gRPC handlers',
+        });
+        return;
+      }
+
+      map.set(key, value);
+    });
   }
 
   /**
    * Clear all persistent context
    */
   clearContext(): void {
-    this.persistentContext = {};
+    this.executeInContext(() => {
+      const ctx = context.active();
+      const map = ctx.getValue(LOGGER_CONTEXT_KEY) as Map<string, unknown> | undefined;
+
+      if (!map) {
+        // Silently skip - clearing non-existent context is not an error
+        return;
+      }
+
+      map.clear();
+    });
   }
 
   /**
    * Create a child logger with inherited context
+   * Child logger has isolated context - modifications don't affect parent
    */
   createChildLogger(): LoggerService {
-    const childLogger = new LoggerService();
-    childLogger.setContext(this.persistentContext);
-    return childLogger;
+    return this.executeInContext(() => {
+      const ctx = context.active();
+      const parentMap = ctx.getValue(LOGGER_CONTEXT_KEY) as Map<string, unknown> | undefined;
+
+      const childLogger = new LoggerService();
+
+      // If parent has context, clone it for the child with isolated context
+      if (parentMap) {
+        // Create isolated clone so child modifications don't affect parent
+        const childMap = new Map(parentMap);
+        const childContext = ctx.setValue(LOGGER_CONTEXT_KEY, childMap);
+        childLogger.isolatedContext = childContext;
+      } else {
+        // Warn when creating child logger without parent context
+        this.warn('Creating child logger without parent context - child will have no inherited context', {
+          guidance: 'Create child loggers within HTTP requests or logger.withContext() blocks',
+        });
+      }
+
+      return childLogger;
+    });
   }
 
   /**
    * Log debug level message
    */
   debug(message: string, data?: Record<string, unknown>): void {
-    this.emit('DEBUG', message, data);
+    this.executeInContext(() => {
+      this.emit('DEBUG', message, data);
+    });
   }
 
   /**
    * Log error level message
    */
   error(message: Error | string, data?: Record<string, unknown>): void {
-    this.emit('ERROR', message, data);
+    this.executeInContext(() => {
+      this.emit('ERROR', message, data);
+    });
   }
 
   /**
    * Log info level message
    */
   info(message: string, data?: Record<string, unknown>): void {
-    this.emit('INFO', message, data);
+    this.executeInContext(() => {
+      this.emit('INFO', message, data);
+    });
   }
 
   /**
-   * Set context that persists across log calls
+   * Set context that persists across log calls (merges with existing context)
    */
-  setContext(context: Record<string, unknown>): void {
-    Object.assign(this.persistentContext, context);
+  setContext(newContext: Record<string, unknown>): void {
+    this.executeInContext(() => {
+      const ctx = context.active();
+      const map = ctx.getValue(LOGGER_CONTEXT_KEY) as Map<string, unknown> | undefined;
+
+      if (!map) {
+        this.warn('Logger context unavailable: setContext() called outside HTTP request', {
+          contextKeys: Object.keys(newContext),
+          guidance: 'Wrap non-HTTP operations in logger.withContext(() => { ... })',
+        });
+        return;
+      }
+
+      // Merge new context into existing map
+      Object.entries(newContext).forEach(([key, value]) => {
+        map.set(key, value);
+      });
+    });
   }
 
   /**
    * Log warning level message
    */
   warn(message: string, data?: Record<string, unknown>): void {
-    this.emit('WARN', message, data);
+    this.executeInContext(() => {
+      this.emit('WARN', message, data);
+    });
   }
 
   /**
    * Core method that emits logs to OpenTelemetry
    */
   private emit(level: string, message: Error | string, data?: Record<string, unknown>): void {
-    // Prepare enriched attributes
+    // Prepare enriched attributes with request-scoped context
     const enrichedData = {
       ...data,
-      ...this.persistentContext,
+      ...this.getContext(),
     };
 
     // Mask sensitive fields in all log data
