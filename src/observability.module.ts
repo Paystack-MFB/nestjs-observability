@@ -6,7 +6,6 @@ import { AutoTraceInterceptor } from './interceptors/auto-trace.interceptor';
 import { RequestLoggingInterceptor } from './interceptors/request-logging.interceptor';
 import { LoggerService } from './logger/logger.service';
 import { MetricsService } from './metrics/metrics.service';
-import { getHttpRequestLoggingEnabled } from './register';
 import { TracingService } from './tracing/tracing.service';
 
 /**
@@ -22,6 +21,11 @@ export class ObservabilityModule {
    * Register the module with core observability services
    * All configuration comes from environment variables via the register module
    * No configuration objects needed - everything is environment-driven
+   *
+   * Note: LoggerContextMiddleware is automatically applied globally via the
+   * NestJSLoggerContextInstrumentation when using the register.ts entrypoint.
+   * This ensures request-scoped logger context is available without requiring
+   * explicit module import or configuration.
    */
   static forRoot(): DynamicModule {
     const providers: Provider[] = [
@@ -30,17 +34,13 @@ export class ObservabilityModule {
       TracingService,
       {
         provide: APP_INTERCEPTOR,
+        useClass: RequestLoggingInterceptor,
+      },
+      {
+        provide: APP_INTERCEPTOR,
         useClass: AutoTraceInterceptor,
       },
     ];
-
-    // Only register RequestLoggingInterceptor if HTTP request logging is enabled
-    if (getHttpRequestLoggingEnabled()) {
-      providers.push({
-        provide: APP_INTERCEPTOR,
-        useClass: RequestLoggingInterceptor,
-      });
-    }
 
     return {
       controllers: [MetricsController],

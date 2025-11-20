@@ -1,9 +1,21 @@
 import { Injectable } from '@nestjs/common';
-import { context, trace } from '@opentelemetry/api';
+import { createContextKey, trace, context } from '@opentelemetry/api';
 import { Logger, logs } from '@opentelemetry/api-logs';
 
 import { getServiceName, getServiceVersion } from '../register';
 import { maskSensitiveFields } from '../utils/mask-sensitive-fields';
+import {
+  getLoggerContext as getAsyncLoggerContext,
+  setLoggerContextValue,
+  isLoggerContextAvailable as isAsyncLoggerContextAvailable,
+  runWithLoggerContext,
+  runWithSpecificLoggerContext,
+  LoggerContextMap,
+} from './logger-context-storage';
+
+// Context key for storing request-scoped logger context
+// Kept for backward compatibility with OpenTelemetry API but AsyncLocalStorage is now primary
+export const LOGGER_CONTEXT_KEY = createContextKey('logger-context');
 
 /**
  * Enhanced NestJS logger that integrates with OpenTelemetry global providers
@@ -13,7 +25,7 @@ import { maskSensitiveFields } from '../utils/mask-sensitive-fields';
 @Injectable()
 export class LoggerService {
   private readonly otelLogger: Logger;
-  private persistentContext: Record<string, unknown> = {};
+  private childContextMap?: LoggerContextMap;
 
   constructor() {
     // Get OpenTelemetry logger from global provider
@@ -26,71 +38,182 @@ export class LoggerService {
   }
 
   /**
+   * Execute function within the logger's isolated context (for child loggers)
+   * or in the active context (for root loggers)
+   * Uses AsyncLocalStorage to ensure context persists through async operations
+   */
+  private executeInContext<T>(fn: () => T): T {
+    if (this.childContextMap) {
+      // Child logger: run within isolated AsyncLocalStorage scope
+      return runWithSpecificLoggerContext(this.childContextMap, fn) as T;
+    }
+    // Root logger: run in current scope
+    return fn();
+  }
+
+  /**
+   * Get the current logger context as a plain object
+   * Reads from AsyncLocalStorage (primary) for reliability in Express/Fastify
+   */
+  getContext(): Record<string, unknown> {
+    return this.executeInContext(() => {
+      const map = getAsyncLoggerContext();
+
+      if (!map) {
+        return {};
+      }
+
+      return Object.fromEntries(map);
+    });
+  }
+
+  /**
+   * Check if logger context is currently available
+   * Useful for debugging context issues
+   * Checks AsyncLocalStorage (primary) for reliability
+   */
+  isContextAvailable(): boolean {
+    return this.executeInContext(() => {
+      return isAsyncLoggerContextAvailable();
+    });
+  }
+
+  /**
+   * Execute a function within a new logger context (useful for background jobs)
+   * Uses AsyncLocalStorage for reliable context propagation through async operations
+   */
+  withContext<T>(fn: () => T | Promise<T>): T | Promise<T> {
+    return runWithLoggerContext(fn);
+  }
+
+  /**
    * Add a single context key-value pair
+   * Uses AsyncLocalStorage for reliable context propagation
    */
   addContext(key: string, value: unknown): void {
-    this.persistentContext[key] = value;
+    this.executeInContext(() => {
+      const success = setLoggerContextValue(key, value);
+
+      if (!success) {
+        this.warn(`Logger context unavailable: addContext('${key}') called outside HTTP request`, {
+          guidance: 'For background jobs, use logger.withContext(() => { ... })',
+          location: 'This occurs in: app startup, cron jobs, message queue handlers, WebSocket/gRPC handlers',
+        });
+      }
+    });
   }
 
   /**
    * Clear all persistent context
    */
   clearContext(): void {
-    this.persistentContext = {};
+    this.executeInContext(() => {
+      const map = getAsyncLoggerContext();
+
+      if (!map) {
+        // Silently skip - clearing non-existent context is not an error
+        return;
+      }
+
+      map.clear();
+    });
   }
 
   /**
    * Create a child logger with inherited context
+   * Child logger has isolated context - modifications don't affect parent
+   * Uses AsyncLocalStorage to ensure proper isolation through async operations
    */
   createChildLogger(): LoggerService {
-    const childLogger = new LoggerService();
-    childLogger.setContext(this.persistentContext);
-    return childLogger;
+    return this.executeInContext(() => {
+      // Get parent's context from AsyncLocalStorage
+      const parentMap = getAsyncLoggerContext();
+
+      const childLogger = new LoggerService();
+
+      // If parent has context, clone it for the child with isolated context
+      if (parentMap) {
+        // Create isolated clone so child modifications don't affect parent
+        // This map will be used by the child logger via AsyncLocalStorage.run()
+        const childMap = new Map(parentMap);
+        childLogger.childContextMap = childMap;
+      } else {
+        // Warn when creating child logger without parent context
+        this.warn('Creating child logger without parent context - child will have no inherited context', {
+          guidance: 'Create child loggers within HTTP requests or logger.withContext() blocks',
+        });
+      }
+
+      return childLogger;
+    });
   }
 
   /**
    * Log debug level message
    */
   debug(message: string, data?: Record<string, unknown>): void {
-    this.emit('DEBUG', message, data);
+    this.executeInContext(() => {
+      this.emit('DEBUG', message, data);
+    });
   }
 
   /**
    * Log error level message
    */
   error(message: Error | string, data?: Record<string, unknown>): void {
-    this.emit('ERROR', message, data);
+    this.executeInContext(() => {
+      this.emit('ERROR', message, data);
+    });
   }
 
   /**
    * Log info level message
    */
   info(message: string, data?: Record<string, unknown>): void {
-    this.emit('INFO', message, data);
+    this.executeInContext(() => {
+      this.emit('INFO', message, data);
+    });
   }
 
   /**
-   * Set context that persists across log calls
+   * Set context that persists across log calls (merges with existing context)
    */
-  setContext(context: Record<string, unknown>): void {
-    Object.assign(this.persistentContext, context);
+  setContext(newContext: Record<string, unknown>): void {
+    this.executeInContext(() => {
+      const map = getAsyncLoggerContext();
+
+      if (!map) {
+        this.warn('Logger context unavailable: setContext() called outside HTTP request', {
+          contextKeys: Object.keys(newContext),
+          guidance: 'Wrap non-HTTP operations in logger.withContext(() => { ... })',
+        });
+        return;
+      }
+
+      // Merge new context into existing map
+      Object.entries(newContext).forEach(([key, value]) => {
+        map.set(key, value);
+      });
+    });
   }
 
   /**
    * Log warning level message
    */
   warn(message: string, data?: Record<string, unknown>): void {
-    this.emit('WARN', message, data);
+    this.executeInContext(() => {
+      this.emit('WARN', message, data);
+    });
   }
 
   /**
    * Core method that emits logs to OpenTelemetry
    */
   private emit(level: string, message: Error | string, data?: Record<string, unknown>): void {
-    // Prepare enriched attributes
+    // Prepare enriched attributes with request-scoped context
     const enrichedData = {
       ...data,
-      ...this.persistentContext,
+      ...this.getContext(),
     };
 
     // Mask sensitive fields in all log data

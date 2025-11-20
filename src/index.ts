@@ -61,3 +61,7 @@ export type { AttributeSanitizationConfig } from './utils/span-attributes';
 
 // Request/response logging utilities
 export { addSensitiveFields, getAllSensitiveFields, maskSensitiveFields } from './utils/mask-sensitive-fields';
+
+// Instrumentations and version
+export { NestJSLoggerContextInstrumentation } from './instrumentation/nestjs-logger-context.instrumentation';
+export { VERSION, getPackageVersion } from './version';

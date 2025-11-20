@@ -7,7 +7,7 @@
     "build": "nest build",
     "format": "prettier --write \"src/**/*.ts\"",
     "start": "node -r ../../dist/cjs/register.js dist/src/main.js",
-    "start:dev": "tsx --watch src/main.ts",
+    "start:dev": "tsx -r ../../dist/cjs/register.js --watch src/main.ts",
     "start:debug": "nest start --debug --watch",
     "start:prod": "node -r ../../dist/cjs/register.js dist/src/main.js",
     "start:development": "OTEL_TRACES_EXPORTER=console OTEL_METRICS_EXPORTER=console OTEL_LOGS_EXPORTER=console node -r ../../dist/cjs/register.js dist/src/main.js",

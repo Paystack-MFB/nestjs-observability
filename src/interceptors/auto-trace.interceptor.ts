@@ -27,13 +27,15 @@ interface Response {
  *
  * This interceptor provides automatic tracing for controller methods without automatic argument capture.
  * Features:
- * - Automatically traces all controller methods
+ * - Automatically traces all controller methods with OpenTelemetry spans
  * - Respects @NoTrace and @NoTraceClass decorators
  * - Applies @Trace decorator options
- * - Captures HTTP context
+ * - Captures HTTP context attributes
  * - Integrates with metrics collection
  * - Provides consistent span naming and attributes
  * - Users can manually add span attributes using the span attribute utilities
+ *
+ * Note: Request-scoped logging context is initialized by RequestLoggingInterceptor for HTTP requests
  */
 @Injectable()
 export class AutoTraceInterceptor implements NestInterceptor {
@@ -65,7 +67,7 @@ export class AutoTraceInterceptor implements NestInterceptor {
     const methodName = handler.name;
     const spanName = traceOptions?.spanName ?? `${className}.${methodName}`;
 
-    // Create span with full context
+    // Use consistent tracing pattern for all request types
     return this.tracer.startActiveSpan(spanName, (span: Span) => {
       const startTime = Date.now();
 

@@ -1,8 +1,10 @@
+import * as api from '@opentelemetry/api';
 import { CallHandler, ExecutionContext } from '@nestjs/common';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { of, throwError, lastValueFrom } from 'rxjs';
 
-import { LoggerService } from '../logger/logger.service';
+import { LOGGER_CONTEXT_KEY, LoggerService } from '../logger/logger.service';
+import * as register from '../register';
 import { RequestLoggingInterceptor } from './request-logging.interceptor';
 
 describe('RequestLoggingInterceptor', () => {
@@ -21,6 +23,24 @@ describe('RequestLoggingInterceptor', () => {
     } as unknown as LoggerService;
 
     interceptor = new RequestLoggingInterceptor(logger);
+
+    // Mock logging enabled
+    vi.spyOn(register, 'getHttpRequestLoggingEnabled').mockReturnValue(true);
+
+    // Mock OTEL context (RequestLoggingInterceptor will initialize it)
+    const loggerMap = new Map<string, unknown>();
+    const mockContext = {
+      getValue: vi.fn((key) => (key === LOGGER_CONTEXT_KEY ? loggerMap : undefined)),
+      setValue: vi.fn().mockReturnValue({
+        getValue: vi.fn((key) => (key === LOGGER_CONTEXT_KEY ? loggerMap : undefined)),
+        deleteValue: vi.fn(),
+      }),
+      deleteValue: vi.fn().mockReturnValue({}),
+    };
+    vi.spyOn(api.context, 'active').mockReturnValue(mockContext);
+    vi.spyOn(api.context, 'with').mockImplementation((_context: unknown, fn: () => unknown) => {
+      return fn();
+    });
 
     // Mock execution context
     executionContext = {
@@ -200,5 +220,66 @@ describe('RequestLoggingInterceptor', () => {
     await lastValueFrom(interceptor.intercept(executionContext, callHandler));
 
     expect(loggerInfoSpy).toHaveBeenCalledTimes(2);
+  });
+
+  it('should work with context already initialized by middleware', async () => {
+    // The LoggerContextMiddleware initializes the context before the interceptor runs
+    // This test verifies that the interceptor works correctly when context is already initialized
+
+    await lastValueFrom(interceptor.intercept(executionContext, callHandler));
+
+    // Verify request and response logging still works
+    expect(loggerInfoSpy).toHaveBeenCalledWith(
+      'HTTP Request',
+      expect.objectContaining({
+        endpoint: '/api/test',
+        type: 'request',
+      })
+    );
+
+    expect(loggerInfoSpy).toHaveBeenCalledWith(
+      'HTTP Response',
+      expect.objectContaining({
+        endpoint: '/api/test',
+        type: 'response',
+      })
+    );
+  });
+
+  it('should skip logging when OTEL_LOG_HTTP_REQUESTS is disabled', async () => {
+    vi.spyOn(register, 'getHttpRequestLoggingEnabled').mockReturnValue(false);
+
+    await lastValueFrom(interceptor.intercept(executionContext, callHandler));
+
+    // Verify logging was skipped
+    expect(loggerInfoSpy).not.toHaveBeenCalled();
+    expect(loggerErrorSpy).not.toHaveBeenCalled();
+  });
+
+  it('should skip logging for @NoLogClass decorated class', async () => {
+    // eslint-disable-next-line @typescript-eslint/no-extraneous-class
+    class TestControllerWithNoLogClass {}
+    Reflect.defineMetadata('log:no-log-class', true, TestControllerWithNoLogClass);
+
+    executionContext.getClass = vi.fn().mockReturnValue(TestControllerWithNoLogClass);
+
+    await lastValueFrom(interceptor.intercept(executionContext, callHandler));
+
+    // Verify logging was skipped
+    expect(loggerInfoSpy).not.toHaveBeenCalled();
+  });
+
+  it('should skip logging for @NoLog decorated method', async () => {
+    // eslint-disable-next-line @typescript-eslint/no-extraneous-class
+    class TestController {}
+    Reflect.defineMetadata('log:no-log', true, TestController.prototype, 'testMethod');
+
+    executionContext.getClass = vi.fn().mockReturnValue(TestController);
+    executionContext.getHandler = vi.fn().mockReturnValue({ name: 'testMethod' });
+
+    await lastValueFrom(interceptor.intercept(executionContext, callHandler));
+
+    // Verify logging was skipped
+    expect(loggerInfoSpy).not.toHaveBeenCalled();
   });
 });

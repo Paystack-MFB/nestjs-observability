@@ -1,10 +1,11 @@
 /* eslint-disable @typescript-eslint/no-unsafe-assignment */
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import type { LoggerProvider } from '@opentelemetry/api-logs';
 import { logs } from '@opentelemetry/api-logs';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { LoggerService } from './logger.service';
 import * as maskUtils from '../utils/mask-sensitive-fields';
+import { runWithLoggerContext } from './logger-context-storage';
+import { LoggerService } from './logger.service';
 
 describe('LoggerService', () => {
   let loggerService: LoggerService;
@@ -153,25 +154,27 @@ describe('LoggerService', () => {
       );
     });
 
-    it('should mask sensitive fields in persistent context', () => {
-      loggerService.setContext({
-        userId: '123',
-        token: 'secret_token',
-        environment: 'production',
+    it('should mask sensitive fields in persistent context', async () => {
+      await runWithLoggerContext(() => {
+        loggerService.setContext({
+          userId: '123',
+          token: 'secret_token',
+          environment: 'production',
+        });
+
+        loggerService.info('Operation completed', { operation: 'test' });
+
+        expect(mockEmit).toHaveBeenCalledWith(
+          expect.objectContaining({
+            attributes: expect.objectContaining({
+              userId: '123',
+              token: '****',
+              environment: 'production',
+              operation: 'test',
+            }),
+          })
+        );
       });
-
-      loggerService.info('Operation completed', { operation: 'test' });
-
-      expect(mockEmit).toHaveBeenCalledWith(
-        expect.objectContaining({
-          attributes: expect.objectContaining({
-            userId: '123',
-            token: '****',
-            environment: 'production',
-            operation: 'test',
-          }),
-        })
-      );
     });
 
     it('should apply custom sensitive fields', () => {
@@ -196,46 +199,125 @@ describe('LoggerService', () => {
   });
 
   describe('context management', () => {
-    it('should maintain persistent context', () => {
-      loggerService.setContext({ requestId: 'req-123' });
+    it('should maintain persistent context within request scope', async () => {
+      // Initialize request-scoped context
+      await runWithLoggerContext(() => {
+        loggerService.setContext({ requestId: 'req-123' });
 
-      loggerService.info('First log', { step: 1 });
-      loggerService.info('Second log', { step: 2 });
+        loggerService.info('First log', { step: 1 });
+        loggerService.info('Second log', { step: 2 });
 
-      expect(mockEmit).toHaveBeenNthCalledWith(
-        1,
+        expect(mockEmit).toHaveBeenNthCalledWith(
+          1,
+          expect.objectContaining({
+            attributes: expect.objectContaining({
+              requestId: 'req-123',
+              step: 1,
+            }),
+          })
+        );
+
+        expect(mockEmit).toHaveBeenNthCalledWith(
+          2,
+          expect.objectContaining({
+            attributes: expect.objectContaining({
+              requestId: 'req-123',
+              step: 2,
+            }),
+          })
+        );
+      });
+    });
+
+    it('should clear context', async () => {
+      await runWithLoggerContext(() => {
+        loggerService.setContext({ requestId: 'req-123' });
+        loggerService.clearContext();
+
+        loggerService.info('After clear', { step: 1 });
+
+        expect(mockEmit).toHaveBeenCalledWith(
+          expect.objectContaining({
+            attributes: expect.not.objectContaining({
+              requestId: expect.anything(),
+            }),
+          })
+        );
+      });
+    });
+
+    it('should get context as plain object', async () => {
+      await runWithLoggerContext(() => {
+        loggerService.addContext('userId', '123');
+        loggerService.addContext('requestId', 'req-456');
+
+        const context = loggerService.getContext();
+
+        expect(context).toEqual({
+          userId: '123',
+          requestId: 'req-456',
+        });
+      });
+    });
+
+    it('should return empty object when getting context outside request scope', () => {
+      const context = loggerService.getContext();
+      expect(context).toEqual({});
+    });
+
+    it('should warn when addContext called outside request scope', () => {
+      const warnSpy = vi.spyOn(loggerService, 'warn');
+
+      // Call outside any context
+      loggerService.addContext('key', 'value');
+
+      expect(warnSpy).toHaveBeenCalledWith(
+        expect.stringContaining('Logger context unavailable'),
         expect.objectContaining({
-          attributes: expect.objectContaining({
-            requestId: 'req-123',
-            step: 1,
-          }),
-        })
-      );
-
-      expect(mockEmit).toHaveBeenNthCalledWith(
-        2,
-        expect.objectContaining({
-          attributes: expect.objectContaining({
-            requestId: 'req-123',
-            step: 2,
-          }),
+          guidance: expect.stringContaining('withContext'),
+          location: expect.any(String),
         })
       );
     });
 
-    it('should clear context', () => {
-      loggerService.setContext({ requestId: 'req-123' });
-      loggerService.clearContext();
+    it('should warn when setContext called outside request scope', () => {
+      const warnSpy = vi.spyOn(loggerService, 'warn');
 
-      loggerService.info('After clear', { step: 1 });
+      // Call outside any context
+      loggerService.setContext({ key: 'value' });
 
-      expect(mockEmit).toHaveBeenCalledWith(
+      expect(warnSpy).toHaveBeenCalledWith(
+        expect.stringContaining('Logger context unavailable'),
         expect.objectContaining({
-          attributes: expect.not.objectContaining({
-            requestId: expect.anything(),
-          }),
+          contextKeys: ['key'],
+          guidance: expect.stringContaining('withContext'),
         })
       );
+    });
+
+    it('should warn when creating child logger without parent context', () => {
+      const warnSpy = vi.spyOn(loggerService, 'warn');
+
+      loggerService.createChildLogger();
+
+      expect(warnSpy).toHaveBeenCalledWith(
+        expect.stringContaining('Creating child logger without parent context'),
+        expect.objectContaining({
+          guidance: expect.any(String),
+        })
+      );
+    });
+  });
+
+  describe('isContextAvailable diagnostic', () => {
+    it('should return false when no context exists', () => {
+      expect(loggerService.isContextAvailable()).toBe(false);
+    });
+
+    it('should return true when context exists', async () => {
+      await runWithLoggerContext(() => {
+        expect(loggerService.isContextAvailable()).toBe(true);
+      });
     });
   });
 
@@ -282,6 +364,171 @@ describe('LoggerService', () => {
           severityText: 'DEBUG',
         })
       );
+    });
+  });
+
+  describe('context isolation', () => {
+    it('should isolate context between concurrent requests', async () => {
+      const delay = (ms: number): Promise<void> => new Promise((resolve) => setTimeout(resolve, ms));
+
+      const request1Promise = (async () => {
+        return runWithLoggerContext(async () => {
+          loggerService.addContext('requestId', 'req-1');
+          await delay(10);
+          const context = loggerService.getContext();
+          expect(context).toEqual({ requestId: 'req-1' });
+        });
+      })();
+
+      const request2Promise = (async () => {
+        return runWithLoggerContext(async () => {
+          loggerService.addContext('requestId', 'req-2');
+          await delay(5);
+          const context = loggerService.getContext();
+          expect(context).toEqual({ requestId: 'req-2' });
+        });
+      })();
+
+      await Promise.all([request1Promise, request2Promise]);
+    });
+
+    it('should maintain context through async operations', async () => {
+      await runWithLoggerContext(async () => {
+        loggerService.addContext('requestId', 'req-async');
+
+        // Simulate async operation
+        await new Promise((resolve) => setTimeout(resolve, 2));
+
+        // Context should still be available
+        const context = loggerService.getContext();
+        expect(context).toEqual({ requestId: 'req-async' });
+
+        loggerService.info('Async operation', { step: 1 });
+        expect(mockEmit).toHaveBeenCalledWith(
+          expect.objectContaining({
+            attributes: expect.objectContaining({
+              requestId: 'req-async',
+              step: 1,
+            }),
+          })
+        );
+      });
+    });
+  });
+
+  describe('child logger', () => {
+    it('should create child logger with isolated context', async () => {
+      await runWithLoggerContext(() => {
+        loggerService.addContext('parent', 'value');
+
+        const childLogger = loggerService.createChildLogger();
+        childLogger.addContext('child', 'value');
+
+        // Parent should only have parent context
+        expect(loggerService.getContext()).toEqual({ parent: 'value' });
+
+        // Child should have both parent and child context
+        expect(childLogger.getContext()).toEqual({ parent: 'value', child: 'value' });
+      });
+    });
+
+    it('should isolate child logger modifications from parent', async () => {
+      await runWithLoggerContext(() => {
+        loggerService.addContext('shared', 'initial');
+
+        const childLogger = loggerService.createChildLogger();
+        childLogger.addContext('shared', 'modified');
+        childLogger.addContext('childOnly', 'value');
+
+        // Parent context should remain unchanged
+        expect(loggerService.getContext()).toEqual({ shared: 'initial' });
+
+        // Child should have its own modified context
+        expect(childLogger.getContext()).toEqual({
+          shared: 'modified',
+          childOnly: 'value',
+        });
+      });
+    });
+
+    it('should support multiple child loggers with isolated contexts', async () => {
+      await runWithLoggerContext(() => {
+        loggerService.addContext('parent', 'value');
+
+        const child1 = loggerService.createChildLogger();
+        const child2 = loggerService.createChildLogger();
+
+        child1.addContext('child1', 'value1');
+        child2.addContext('child2', 'value2');
+
+        expect(loggerService.getContext()).toEqual({ parent: 'value' });
+        expect(child1.getContext()).toEqual({ parent: 'value', child1: 'value1' });
+        expect(child2.getContext()).toEqual({ parent: 'value', child2: 'value2' });
+      });
+    });
+
+    it('should create child logger without context when parent has no context', () => {
+      // No context initialized
+      const childLogger = loggerService.createChildLogger();
+
+      expect(childLogger).toBeInstanceOf(LoggerService);
+      expect(childLogger.getContext()).toEqual({});
+    });
+  });
+
+  describe('withContext utility', () => {
+    it('should execute function within new logger context', async () => {
+      await loggerService.withContext(() => {
+        loggerService.addContext('jobId', 'job-123');
+        loggerService.info('Background job', { step: 1 });
+
+        expect(mockEmit).toHaveBeenCalledWith(
+          expect.objectContaining({
+            attributes: expect.objectContaining({
+              jobId: 'job-123',
+              step: 1,
+            }),
+          })
+        );
+      });
+    });
+
+    it('should support async functions in withContext', async () => {
+      await loggerService.withContext(async () => {
+        loggerService.addContext('jobId', 'job-async');
+
+        await new Promise((resolve) => setTimeout(resolve, 5));
+
+        loggerService.info('Async job', { step: 1 });
+
+        expect(mockEmit).toHaveBeenCalledWith(
+          expect.objectContaining({
+            attributes: expect.objectContaining({
+              jobId: 'job-async',
+              step: 1,
+            }),
+          })
+        );
+      });
+    });
+
+    it('should isolate withContext from external context', async () => {
+      await runWithLoggerContext(async () => {
+        loggerService.addContext('external', 'value');
+
+        await loggerService.withContext(async () => {
+          // Should not see external context (withContext creates isolated context)
+          expect(loggerService.getContext()).toEqual({});
+
+          loggerService.addContext('internal', 'value');
+          expect(loggerService.getContext()).toEqual({ internal: 'value' });
+
+          return Promise.resolve();
+        });
+
+        // External context should remain unchanged
+        expect(loggerService.getContext()).toEqual({ external: 'value' });
+      });
     });
   });
 });
