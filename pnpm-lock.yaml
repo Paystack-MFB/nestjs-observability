@@ -100,8 +100,8 @@ importers:
         specifier: ^11.0.0
         version: 11.1.5(@nestjs/common@11.1.5(reflect-metadata@0.1.14)(rxjs@7.8.2))(@nestjs/core@11.1.5)(@nestjs/platform-express@11.1.5)
       '@paystackhq/pkg-ai-coding-rules':
-        specifier: ^1.0.13
-        version: 1.0.13
+        specifier: ^1.1.2
+        version: 1.1.2
       '@types/express':
         specifier: ^5.0.2
         version: 5.0.3
@@ -1456,8 +1456,8 @@ packages:
     peerDependencies:
       '@opentelemetry/api': ^1.1.0
 
-  '@paystackhq/pkg-ai-coding-rules@1.0.13':
-    resolution: {integrity: sha512-kOTR+BQhBfV3byfmCaEoqluruAwW5fnOEFxjhBtZQTb2rh9ix1GtXr4coCLN/NUFTS2x9TDbeZyWQ4iDR2IflQ==, tarball: https://npm.pkg.github.com/download/@paystackhq/pkg-ai-coding-rules/1.0.13/b9638d908785d9a05fc7e784ebfa315292acec62}
+  '@paystackhq/pkg-ai-coding-rules@1.1.2':
+    resolution: {integrity: sha512-i6cwMmmiJUf9TCqT8VG4PQmGiGbKCQGaFv82w19fGAIzpsXmhnt/LHkTuwKC5R/NqWlMtkagURuIBpLM150+7g==, tarball: https://npm.pkg.github.com/download/@paystackhq/pkg-ai-coding-rules/1.1.2/7ce2a2fb5e7dd4a356d02c3ba7feda3d3d2aad6f}
     engines: {node: '>=8'}
     hasBin: true
 
@@ -4922,8 +4922,9 @@ snapshots:
       '@opentelemetry/api': 1.9.0
       '@opentelemetry/core': 2.2.0(@opentelemetry/api@1.9.0)
 
-  '@paystackhq/pkg-ai-coding-rules@1.0.13':
+  '@paystackhq/pkg-ai-coding-rules@1.1.2':
     dependencies:
+      prettier: 3.6.2
       yaml: 1.10.2
 
   '@pkgjs/parseargs@0.11.0':

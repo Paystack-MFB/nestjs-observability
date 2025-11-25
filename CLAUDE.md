@@ -1,12 +1,16 @@
----
-_managed:
-  package: "@paystackhq/pkg-ai-coding-rules"
-  source: bundles/company/paystack.md
-  doNotEdit: true
-alwaysApply: true
-description: Paystack company-wide engineering standards and AI coding rules
----
+# AI Coding Instructions
 
+READ THIS FILE AT THE START OF EACH NEW THREAD/CHAT WINDOW
+
+At the start of each new thread, tell the user "I have read `[this file name]`" ONCE.
+
+Coding rules organized from general to specific:
+
+- Company-wide standards form the foundation
+- More specific rules (competency, framework) build on top
+- In rare cases, specific rules may override general ones
+
+## company:paystack
 
 # Paystack Engineering Standards
 
@@ -75,6 +79,7 @@ When asked to do something, just do it - including obvious follow-up actions nee
 - NEVER use pattern names unless they add clarity (e.g., prefer "Tool" over "ToolFactory")
 
 Good names tell a story about the domain:
+
 - `Tool` not `AbstractToolInterface`
 - `RemoteTool` not `MCPToolWrapper`
 - `Registry` not `ToolRegistryManager`
@@ -92,6 +97,7 @@ Good names tell a story about the domain:
 If you name something "new" or "enhanced" or "improved", you've probably made a mistake and MUST STOP and ask what to do.
 
 Examples:
+
 ```
 // BAD: This uses Zod for validation instead of manual checking
 // BAD: Refactored from the old validation system
@@ -118,7 +124,7 @@ If you catch yourself writing "new", "old", "legacy", "wrapper", "unified", or i
 - YOU MUST NEVER write tests that "test" mocked behavior. If you notice tests that test mocked behavior instead of real logic, you MUST stop and warn about them.
 - YOU MUST NEVER implement mocks in end-to-end tests. We always use real databases, Redis, and other internal infrastructure. The only exception is external HTTP calls to third-party services outside your control.
 - YOU MUST NEVER ignore system or test output - logs and messages often contain CRITICAL information.
-- Test output MUST BE PRISTINE TO PASS. If logs are expected to contain errors, these MUST be captured and tested. If a test is intentionally triggering an error, we *must* capture and validate that the error output is as we expect.
+- Test output MUST BE PRISTINE TO PASS. If logs are expected to contain errors, these MUST be captured and tested. If a test is intentionally triggering an error, we _must_ capture and validate that the error output is as we expect.
 
 ## Systematic Debugging Process
 
@@ -155,3 +161,52 @@ YOU MUST follow this debugging framework for ANY technical issue:
 - NEVER claim to implement a pattern without reading it completely first
 - ALWAYS test after each change
 - IF your first fix doesn't work, STOP and re-analyze rather than adding more fixes
+
+## competency:backend
+
+# Backend Competency Rules
+
+## API Design
+
+- API responses must be consistent in structure across the application
+- Use appropriate HTTP status codes (2xx for success, 4xx for client errors, 5xx for server errors)
+- Validate all input data at the API boundary before processing
+- API endpoints should be idempotent where possible
+
+## Error Handling
+
+- Always return meaningful error messages that help diagnose issues without exposing sensitive implementation details
+- Log errors with sufficient context (request ID, user ID, relevant parameters) for debugging
+- Never expose stack traces or internal system details to API consumers
+- Handle database connection failures and timeouts gracefully
+
+## Data Access
+
+- Prevent SQL injection by using parameterized queries or query builders rather than string concatenation
+- Keep database transactions as short as possible
+- Ensure database connections are properly closed, even when errors occur
+- Use connection pooling for database access
+
+## Security
+
+- Never log or expose authentication tokens, passwords, or sensitive user data
+- Validate and sanitize all user input to prevent injection attacks
+
+## Asynchronous Operations
+
+- Handle promise rejections explicitly - never leave promises unhandled
+- Avoid blocking operations in request handlers
+
+## Testing
+
+- Use the AAA (Arrange-Act-Assert) pattern for test structure
+- Test error conditions and edge cases, not just happy paths
+- Use real database instances in tests, not mocks (except for external HTTP services)
+
+## framework:nestjs
+
+# NestJS Framework Rules
+
+## Module Organization
+
+- Each feature should have its own module with clear boundaries
