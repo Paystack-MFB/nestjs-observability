@@ -8,6 +8,7 @@
  */
 
 import { getNodeAutoInstrumentations } from '@opentelemetry/auto-instrumentations-node';
+import { CompositePropagator, W3CBaggagePropagator, W3CTraceContextPropagator } from '@opentelemetry/core';
 import { OTLPLogExporter } from '@opentelemetry/exporter-logs-otlp-http';
 import { OTLPMetricExporter } from '@opentelemetry/exporter-metrics-otlp-http';
 import { OTLPTraceExporter } from '@opentelemetry/exporter-trace-otlp-http';
@@ -26,6 +27,7 @@ import { ATTR_SERVICE_NAME, ATTR_SERVICE_VERSION } from '@opentelemetry/semantic
 
 import { JSONStdoutLogExporter } from './exporters/json-log-exporter';
 import { NestJSLoggerContextInstrumentation } from './instrumentation/nestjs-logger-context.instrumentation';
+import { TagPropagator } from './propagation/tag-propagator';
 
 // OTLP Exporters imported eagerly so constructor calls are observable in tests
 
@@ -285,6 +287,12 @@ function initializeSDK(): NodeSDK {
     ? [customInstrumentation, ...getNodeAutoInstrumentations()]
     : getNodeAutoInstrumentations();
 
+  // Create composite propagator with W3C standards + custom Tag propagator
+  // This ensures standard trace context is propagated along with our custom Tag header
+  const textMapPropagator = new CompositePropagator({
+    propagators: [new W3CTraceContextPropagator(), new W3CBaggagePropagator(), new TagPropagator()],
+  });
+
   // Create SDK configuration
   const sdkConfig: Partial<import('@opentelemetry/sdk-node').NodeSDKConfiguration> = {
     instrumentations,
@@ -292,6 +300,7 @@ function initializeSDK(): NodeSDK {
     // Exclude processDetector to avoid noisy process.* attributes
     // Keep: envDetector, hostDetector, osDetector, serviceInstanceIdDetector
     resourceDetectors: [envDetector, hostDetector, osDetector, serviceInstanceIdDetector],
+    textMapPropagator,
     traceExporter,
   };
 

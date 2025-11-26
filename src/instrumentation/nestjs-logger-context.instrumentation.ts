@@ -5,6 +5,8 @@ import {
 } from '@opentelemetry/instrumentation';
 import { diag } from '@opentelemetry/api';
 import { VERSION } from '../version';
+import { extractTag } from '../utils/tag-extractor';
+import { initializeRequestLoggerContext, setLoggerContextValue } from '../logger/logger-context-storage';
 
 /**
  * Custom OpenTelemetry instrumentation that automatically injects LoggerContextMiddleware
@@ -92,9 +94,9 @@ export class NestJSLoggerContextInstrumentation extends InstrumentationBase {
         return;
       }
 
-      // Middleware function that initializes logger context
-      const loggerContextMiddleware = (_req: unknown, _res: unknown, next: () => void): void => {
-        this.initializeLoggerContext(next);
+      // Middleware function that initializes logger context and extracts tag
+      const loggerContextMiddleware = (req: unknown, _res: unknown, next: () => void): void => {
+        this.initializeLoggerContext(req, next);
       };
 
       // Inject based on adapter type
@@ -108,9 +110,9 @@ export class NestJSLoggerContextInstrumentation extends InstrumentationBase {
         diag.debug('Injected logger context middleware into Express adapter');
       } else if (typeof instanceTyped.addHook === 'function') {
         // Fastify-style hooks
-        instanceTyped.addHook('onRequest', (_request: unknown, _reply: unknown) => {
+        instanceTyped.addHook('onRequest', (request: unknown, _reply: unknown) => {
           return new Promise<void>((resolve) => {
-            this.initializeLoggerContext(() => {
+            this.initializeLoggerContext(request, () => {
               resolve();
             });
           });
@@ -128,17 +130,22 @@ export class NestJSLoggerContextInstrumentation extends InstrumentationBase {
    * Initialize logger context for a request
    * Creates a new Map using AsyncLocalStorage to ensure context persists
    * through async operations across the entire request lifecycle
+   * Also extracts and stores the tag from request headers
    */
-  private initializeLoggerContext(next: () => void): void {
-    // Import here to avoid circular dependency at module load time
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
-    const { initializeRequestLoggerContext } = require('../logger/logger-context-storage') as {
-      initializeRequestLoggerContext: (fn: () => void) => void;
-    };
-
+  private initializeLoggerContext(req: unknown, next: () => void): void {
     // Initialize request-scoped logger context using AsyncLocalStorage
     // This ensures the context is available to all downstream middleware,
     // handlers, and async operations for this request
-    initializeRequestLoggerContext(next);
+    initializeRequestLoggerContext(() => {
+      // Extract tag from request headers
+      const headers = (req as { headers?: Record<string, string | string[] | undefined> } | undefined)?.headers;
+      const tag = extractTag(headers);
+
+      // Store tag in logger context so it appears in all logs and is available for spans
+      setLoggerContextValue('tag', tag);
+
+      // Continue with request processing
+      next();
+    });
   }
 }
