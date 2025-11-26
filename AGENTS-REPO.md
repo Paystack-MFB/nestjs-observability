@@ -20,19 +20,19 @@ This package provides observability capabilities for Paystack's NestJS backend s
 ## Core Design Principles
 
 1. **Zero Configuration by Default**
-    - All configuration is environment-driven via OpenTelemetry standard variables
-    - No configuration objects needed in application code
-    - Sensible defaults for all settings
+   - All configuration is environment-driven via OpenTelemetry standard variables
+   - No configuration objects needed in application code
+   - Sensible defaults for all settings
 
 2. **Register Pattern**
-    - OpenTelemetry SDK initializes before application code via Node.js `-r` flag
-    - Enables automatic instrumentation of HTTP, database, and external calls
-    - Usage: `node -r @paystackhq/nestjs-observability/register dist/main.js`
+   - OpenTelemetry SDK initializes before application code via Node.js `-r` flag
+   - Enables automatic instrumentation of HTTP, database, and external calls
+   - Usage: `node -r @paystackhq/nestjs-observability/register dist/main.js`
 
 3. **Environment Variable Configuration**
-    - Follows OpenTelemetry specification for variable names (`OTEL_*`)
-    - No custom configuration objects or modules
-    - All behavior controlled via environment variables
+   - Follows OpenTelemetry specification for variable names (`OTEL_*`)
+   - No custom configuration objects or modules
+   - All behavior controlled via environment variables
 
 ## Key Components
 
@@ -83,10 +83,10 @@ Paystack uses **FileBeat** to collect logs and send them to DataDog. This is sep
    ```
 
 3. **How it works:**
-    - Application logs to stdout/stderr in JSON format
-    - FileBeat reads logs from container stdout/stderr
-    - FileBeat forwards structured JSON logs to DataDog
-    - Logs appear in DataDog with proper structure and trace correlation
+   - Application logs to stdout/stderr in JSON format
+   - FileBeat reads logs from container stdout/stderr
+   - FileBeat forwards structured JSON logs to DataDog
+   - Logs appear in DataDog with proper structure and trace correlation
 
 **Important:** Do NOT use `OTEL_LOGS_EXPORTER: otlp` for DataDog with FileBeat. Use `console` exporter so logs go to stdout where FileBeat can collect them.
 
@@ -123,19 +123,19 @@ The package documentation is organized as follows:
 ## Helping with Configuration Issues
 
 1. **Check Environment Variables First**
-    - All behavior is controlled by `OTEL_*` environment variables
-    - For logs with FileBeat: DO NOT set `OTEL_LOGS_EXPORTER` (defaults to `console`) or explicitly set it to `console`
-    - For logs with FileBeat: MUST have `loggingJsonEnabled: true` in Helm values
+   - All behavior is controlled by `OTEL_*` environment variables
+   - For logs with FileBeat: DO NOT set `OTEL_LOGS_EXPORTER` (defaults to `console`) or explicitly set it to `console`
+   - For logs with FileBeat: MUST have `loggingJsonEnabled: true` in Helm values
 
 2. **Verify Register Pattern**
-    - Application must start with `-r @paystackhq/nestjs-observability/register`
-    - Without this, auto-instrumentation won't work
+   - Application must start with `-r @paystackhq/nestjs-observability/register`
+   - Without this, auto-instrumentation won't work
 
 3. **Check DataDog + FileBeat Integration (Logs)**
-    - Logs go to stdout/stderr in JSON format (`loggingJsonEnabled: true`)
-    - FileBeat collects from stdout/stderr and forwards to DataDog
-    - DO NOT use `OTEL_LOGS_EXPORTER: otlp` - this bypasses FileBeat
-    - `datadogAgentEnabled` is NOT required for logs
+   - Logs go to stdout/stderr in JSON format (`loggingJsonEnabled: true`)
+   - FileBeat collects from stdout/stderr and forwards to DataDog
+   - DO NOT use `OTEL_LOGS_EXPORTER: otlp` - this bypasses FileBeat
+   - `datadogAgentEnabled` is NOT required for logs
 
 ## Debugging Missing Logs in DataDog
 
@@ -155,19 +155,19 @@ If logs are not appearing in DataDog:
 When extending this package:
 
 1. **Follow OpenTelemetry Standards**
-    - Use standard OTEL semantic conventions
-    - Support standard OTEL environment variables
-    - Don't create custom configuration patterns
+   - Use standard OTEL semantic conventions
+   - Support standard OTEL environment variables
+   - Don't create custom configuration patterns
 
 2. **Maintain Zero-Config Design**
-    - New features should work with sensible defaults
-    - Configuration via environment variables only
-    - Document new variables in `docs/environment-variables.md`
+   - New features should work with sensible defaults
+   - Configuration via environment variables only
+   - Document new variables in `docs/environment-variables.md`
 
 3. **Test with Real Services**
-    - Test with actual NestJS applications
-    - Verify DataDog integration in Kubernetes
-    - Check impact on existing applications
+   - Test with actual NestJS applications
+   - Verify DataDog integration in Kubernetes
+   - Check impact on existing applications
 
 # Testing Guidelines
 

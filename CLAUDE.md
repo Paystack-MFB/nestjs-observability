@@ -313,7 +313,7 @@ For traces and metrics, you can optionally enable the DataDog agent sidecar:
 datadogAgentEnabled: true # Optional, for traces/metrics only
 
 # DataDog-specific variables
-DD_TRACE_ENABLED: "true"
+DD_TRACE_ENABLED: 'true'
 DD_ENV: staging
 DD_SERVICE: my-service
 ```
@@ -409,8 +409,8 @@ When extending this package:
 ## Standard Service Setup
 
 ```typescript
-import { Module } from "@nestjs/common";
-import { ObservabilityModule } from "@paystackhq/nestjs-observability";
+import { Module } from '@nestjs/common';
+import { ObservabilityModule } from '@paystackhq/nestjs-observability';
 
 @Module({
   imports: [
