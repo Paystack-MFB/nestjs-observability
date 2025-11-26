@@ -53,6 +53,37 @@ TRACING_AUTO_INSTRUMENTATIONS=true
 OTLP_TRACES_ENDPOINT=http://localhost:4318/v1/traces
 ```
 
+## Automatic Request Correlation
+
+The library automatically provides request correlation for all HTTP requests:
+
+```typescript
+// Every HTTP request automatically gets a 'tag' that:
+// 1. Appears in all logs as attributes.tag
+// 2. Appears in all spans as tag attribute
+// 3. Propagates to downstream services via Tag header
+
+// Example log output (automatic):
+{
+  "timestamp": "2025-01-26T14:30:00Z",
+  "severityText": "INFO",
+  "body": "Processing order",
+  "attributes": {
+    "tag": "abc-123-def",  // ← Automatic request correlation
+    "orderId": "order-456",
+    "traceId": "xyz-789"
+  }
+}
+```
+
+**No configuration required** - tag correlation works automatically for all requests.
+
+**Header Support:**
+- Incoming: `tag` or `x-aws-sqsd-attr-tag` (for SQS jobs)
+- Outgoing: `Tag` (automatically added to downstream calls)
+
+For more details, see the [Automatic Request Correlation section in Best Practices](./best-practices.md#automatic-request-correlation-tag).
+
 ## Auto-Tracing with Decorators
 
 The observability library provides automatic tracing for your application with minimal configuration.
