@@ -277,6 +277,7 @@ The library automatically provides request correlation via a `tag` field that ap
 #### How It Works
 
 **Tag is automatically:**
+
 1. **Extracted** from incoming request headers (`tag` or `x-aws-sqsd-attr-tag`)
 2. **Generated** as UUID if no header is present
 3. **Added** to all log `attributes.tag` for the request
@@ -320,6 +321,7 @@ const params = {
 #### 📝 **Note: Tag vs TraceId**
 
 The `tag` field is separate from OpenTelemetry's `traceId`:
+
 - **tag**: Custom correlation ID for Paystack's DataDog workflows (legacy ps-api compatibility)
 - **traceId**: OpenTelemetry standard for distributed tracing
 

@@ -79,6 +79,7 @@ The library automatically provides request correlation for all HTTP requests:
 **No configuration required** - tag correlation works automatically for all requests.
 
 **Header Support:**
+
 - Incoming: `tag` or `x-aws-sqsd-attr-tag` (for SQS jobs)
 - Outgoing: `Tag` (automatically added to downstream calls)
 
