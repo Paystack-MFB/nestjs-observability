@@ -324,6 +324,7 @@ function initializeSDK(): NodeSDK {
     instrumentations: sdkConfig.instrumentations ?? [],
     ...(sdkConfig.resource ? { resource: sdkConfig.resource } : {}),
     ...(sdkConfig.resourceDetectors ? { resourceDetectors: sdkConfig.resourceDetectors } : {}),
+    ...(sdkConfig.textMapPropagator ? { textMapPropagator: sdkConfig.textMapPropagator } : {}),
     ...(sdkConfig.traceExporter ? { traceExporter: sdkConfig.traceExporter } : {}),
     // eslint-disable-next-line @typescript-eslint/no-deprecated
     ...(sdkConfig.metricReader ? { metricReader: sdkConfig.metricReader } : {}),
