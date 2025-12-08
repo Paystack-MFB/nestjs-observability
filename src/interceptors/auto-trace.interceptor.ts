@@ -76,6 +76,12 @@ export class AutoTraceInterceptor implements NestInterceptor {
       span.setAttribute('controller.method', methodName as AttributeValue);
       span.setAttribute('instrumentation.type', 'auto-trace-interceptor' as AttributeValue);
 
+      // Add tag to span attributes for request correlation
+      const tag = this.logger.getContext()['tag'];
+      if (tag && typeof tag === 'string') {
+        span.setAttribute('tag', tag as AttributeValue);
+      }
+
       // Add HTTP attributes if this is an HTTP request
       this.addHttpAttributes(span, context);
 

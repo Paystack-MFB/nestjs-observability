@@ -1,6 +1,6 @@
 {
   "name": "@paystackhq/nestjs-observability",
-  "version": "1.2.0",
+  "version": "1.2.1",
   "description": "A modern, production-ready observability package for NestJS applications with zero-configuration setup using OpenTelemetry 2025 best practices and the register pattern.",
   "type": "commonjs",
   "main": "./dist/cjs/index.js",

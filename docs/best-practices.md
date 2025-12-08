@@ -270,6 +270,63 @@ export class PaymentService {
 }
 ```
 
+### Automatic Request Correlation (Tag)
+
+The library automatically provides request correlation via a `tag` field that appears in all logs and spans for each request. This matches legacy `paystack-api` behavior.
+
+#### How It Works
+
+**Tag is automatically:**
+
+1. **Extracted** from incoming request headers (`tag` or `x-aws-sqsd-attr-tag`)
+2. **Generated** as UUID if no header is present
+3. **Added** to all log `attributes.tag` for the request
+4. **Added** to all span attributes for the request
+5. **Propagated** as `Tag` header to all downstream HTTP calls
+
+**No configuration needed** - this happens automatically for all HTTP requests.
+
+#### ✅ **DO: Search by Tag in DataDog**
+
+```typescript
+// In DataDog, you can search logs and traces by tag:
+// Logs: attributes.tag:"abc-123-def"
+// Traces: tag:"abc-123-def"
+```
+
+#### ✅ **DO: Pass Tag to Downstream Services**
+
+```typescript
+// Tag automatically propagates to downstream services
+// via the 'Tag' header on all HTTP calls
+const response = await axios.get('https://api.example.com/users');
+// The 'Tag' header is automatically added by OpenTelemetry propagator
+```
+
+#### ✅ **DO: Use Tag for SQS Jobs**
+
+```typescript
+// For AWS SQS daemon jobs, send tag as message attribute:
+const params = {
+  MessageAttributes: {
+    tag: {
+      DataType: 'String',
+      StringValue: currentTag, // Pass current request's tag
+    },
+  },
+};
+// SQS daemon converts this to 'x-aws-sqsd-attr-tag' header
+```
+
+#### 📝 **Note: Tag vs TraceId**
+
+The `tag` field is separate from OpenTelemetry's `traceId`:
+
+- **tag**: Custom correlation ID for Paystack's DataDog workflows (legacy ps-api compatibility)
+- **traceId**: OpenTelemetry standard for distributed tracing
+
+Both are available in logs and spans. Use `tag` for business correlation in DataDog.
+
 ### Context Management
 
 #### ✅ **DO: Use Context Effectively**
