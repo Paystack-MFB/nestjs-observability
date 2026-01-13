@@ -4,7 +4,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { of, throwError, lastValueFrom } from 'rxjs';
 
 import { LOGGER_CONTEXT_KEY, LoggerService } from '../logger/logger.service';
-import * as register from '../register';
+import * as sdkCore from '../sdk-core';
 import { RequestLoggingInterceptor } from './request-logging.interceptor';
 
 describe('RequestLoggingInterceptor', () => {
@@ -25,7 +25,7 @@ describe('RequestLoggingInterceptor', () => {
     interceptor = new RequestLoggingInterceptor(logger);
 
     // Mock logging enabled
-    vi.spyOn(register, 'getHttpRequestLoggingEnabled').mockReturnValue(true);
+    vi.spyOn(sdkCore, 'getHttpRequestLoggingEnabled').mockReturnValue(true);
 
     // Mock OTEL context (RequestLoggingInterceptor will initialize it)
     const loggerMap = new Map<string, unknown>();
@@ -247,7 +247,7 @@ describe('RequestLoggingInterceptor', () => {
   });
 
   it('should skip logging when OTEL_LOG_HTTP_REQUESTS is disabled', async () => {
-    vi.spyOn(register, 'getHttpRequestLoggingEnabled').mockReturnValue(false);
+    vi.spyOn(sdkCore, 'getHttpRequestLoggingEnabled').mockReturnValue(false);
 
     await lastValueFrom(interceptor.intercept(executionContext, callHandler));
 
