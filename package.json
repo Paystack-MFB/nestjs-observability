@@ -6,6 +6,19 @@
   "main": "./dist/cjs/index.js",
   "module": "./dist/esm/index.js",
   "types": "./dist/cjs/index.d.ts",
+  "typesVersions": {
+    "*": {
+      "register": [
+        "./dist/cjs/register.d.ts"
+      ],
+      "sdk": [
+        "./dist/cjs/sdk.d.ts"
+      ],
+      "sdk-core": [
+        "./dist/cjs/sdk-core.d.ts"
+      ]
+    }
+  },
   "scripts": {
     "build": "pnpm run clean && pnpm run build:cjs && pnpm run build:esm && pnpm run copy-package-json && pnpm run validate-build",
     "build:cjs": "tsc -p tsconfig.build.cjs.json",
@@ -112,6 +125,18 @@
         "default": "./dist/cjs/register.js"
       },
       "default": "./dist/cjs/register.js"
+    },
+    "./sdk": {
+      "types": "./dist/cjs/sdk.d.ts",
+      "import": {
+        "types": "./dist/esm/sdk.d.ts",
+        "default": "./dist/esm/sdk.js"
+      },
+      "require": {
+        "types": "./dist/cjs/sdk.d.ts",
+        "default": "./dist/cjs/sdk.js"
+      },
+      "default": "./dist/cjs/sdk.js"
     },
     "./package.json": "./package.json"
   },

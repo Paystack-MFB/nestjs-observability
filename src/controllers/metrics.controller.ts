@@ -2,7 +2,7 @@ import { Controller, Get, Header, HttpException, HttpStatus, Optional } from '@n
 
 import { LoggerService } from '../logger/logger.service';
 import { MetricsService } from '../metrics/metrics.service';
-import { getServiceName } from '../register';
+import { getServiceName } from '../sdk-core';
 
 interface MetricsError extends Error {
   message: string;

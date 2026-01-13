@@ -5,7 +5,7 @@ import { metrics } from '@opentelemetry/api';
 import * as promClient from 'prom-client';
 
 import { LoggerService } from '../logger/logger.service';
-import { getServiceEnvironment, getServiceName, getServiceVersion } from '../register';
+import { getServiceEnvironment, getServiceName, getServiceVersion } from '../sdk-core';
 
 /**
  * Enhanced metrics service that integrates with OpenTelemetry global meter provider

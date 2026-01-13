@@ -2,7 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { createContextKey, trace, context } from '@opentelemetry/api';
 import { Logger, logs } from '@opentelemetry/api-logs';
 
-import { getServiceName, getServiceVersion } from '../register';
+import { getServiceName, getServiceVersion } from '../sdk-core';
 import { maskSensitiveFields } from '../utils/mask-sensitive-fields';
 import {
   getLoggerContext as getAsyncLoggerContext,

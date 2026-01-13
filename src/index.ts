@@ -30,14 +30,31 @@ export { MetricsService } from './metrics/metrics.service';
 // Core module and services
 export { ObservabilityModule } from './observability.module';
 
-// Service helper functions
+// Service helper functions (from sdk-core to avoid auto-start)
 export {
   getHttpRequestLoggingEnabled,
   getServiceAttributes,
   getServiceEnvironment,
   getServiceName,
   getServiceVersion,
-} from './register';
+} from './sdk-core';
+
+// SDK building blocks for custom configurations (from sdk-core to avoid auto-start)
+export {
+  createSDK,
+  startSDK,
+  createLogProcessor,
+  createMetricReader,
+  createTraceExporter,
+  createInstrumentations,
+  createResource,
+  createTextMapPropagator,
+  type SDKBuilderOptions,
+  type SpanProcessor,
+  type MetricReader,
+  type LogRecordProcessor,
+  NodeSDK,
+} from './sdk-core';
 
 export { TracingService } from './tracing/tracing.service';
 
