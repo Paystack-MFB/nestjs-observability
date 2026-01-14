@@ -168,6 +168,69 @@ node -r @paystackhq/nestjs-observability/register dist/main.js
 env $(cat .env.production | xargs) node -r @paystackhq/nestjs-observability/register dist/main.js
 ```
 
+### Step 5: Custom Span Processors (Advanced)
+
+For applications that need custom span processors (e.g., Langfuse for LLM observability, custom exporters), import the SDK building blocks instead of using the auto-start register:
+
+**1. Create a custom register file:**
+
+```typescript
+// src/observability/register.ts
+import { startSDK } from '@paystackhq/nestjs-observability/sdk';
+import { LangfuseExporter } from 'langfuse';
+
+// Create your custom span processors
+const langfuseExporter = new LangfuseExporter({
+  publicKey: process.env.LANGFUSE_PUBLIC_KEY,
+  secretKey: process.env.LANGFUSE_SECRET_KEY,
+});
+
+// Start SDK with custom processors
+startSDK({
+  spanProcessors: [langfuseExporter],
+  includeDefaultTraceExporter: true, // Also include OTLP/console exporter
+  registerShutdownHandlers: true,
+});
+```
+
+**2. Update package.json scripts:**
+
+```json
+{
+  "scripts": {
+    "start": "node -r ./dist/observability/register.js dist/main.js",
+    "start:prod": "node -r ./dist/observability/register.js dist/main.js"
+  }
+}
+```
+
+**Available SDK Building Blocks:**
+
+| Export                      | Description                                       |
+| --------------------------- | ------------------------------------------------- |
+| `startSDK(options)`         | Creates and starts SDK with custom configuration  |
+| `createSDK(options)`        | Creates SDK without starting (for manual control) |
+| `createTraceExporter()`     | Creates trace exporter based on env vars          |
+| `createMetricReader()`      | Creates metric reader based on env vars           |
+| `createLogProcessor()`      | Creates log processor based on env vars           |
+| `createInstrumentations()`  | Returns auto-instrumentations                     |
+| `createResource()`          | Creates resource with service attributes          |
+| `createTextMapPropagator()` | Creates W3C + tag propagator                      |
+
+**SDK Builder Options:**
+
+```typescript
+interface SDKBuilderOptions {
+  spanProcessors?: SpanProcessor[]; // Custom span processors
+  includeDefaultTraceExporter?: boolean; // Include env-based exporter (default: true)
+  metricReader?: MetricReader; // Custom metric reader
+  logRecordProcessors?: LogRecordProcessor[]; // Custom log processors
+  registerShutdownHandlers?: boolean; // Register SIGTERM handlers (default: false)
+}
+```
+
+For a complete guide with examples, see [Custom Span Processors Guide](./docs/custom-span-processors.md).
+
 ## 💡 Usage Examples
 
 ### Enhanced Logging with Context
@@ -714,6 +777,7 @@ npm install --save-dev @types/node
 
 - [Environment Variables Guide](./docs/environment-variables.md)
 - [Best Practices](./docs/best-practices.md)
+- [Custom Span Processors Guide](./docs/custom-span-processors.md)
 - [Examples](./examples/basic-app/)
 
 ## 🤝 Contributing

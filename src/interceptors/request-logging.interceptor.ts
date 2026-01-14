@@ -4,7 +4,7 @@ import { tap } from 'rxjs/operators';
 
 import { isNoLogClassEnabled, isNoLogEnabled } from '../decorators/auto-trace.decorators';
 import { LoggerService } from '../logger/logger.service';
-import { getHttpRequestLoggingEnabled } from '../register';
+import { getHttpRequestLoggingEnabled } from '../sdk-core';
 import { maskSensitiveFields } from '../utils/mask-sensitive-fields';
 
 // Express types for better typing

@@ -3,7 +3,7 @@ import type { Span, Tracer } from '@opentelemetry/api';
 import { Injectable } from '@nestjs/common';
 import { trace } from '@opentelemetry/api';
 
-import { getServiceAttributes, getServiceName, getServiceVersion } from '../register';
+import { getServiceAttributes, getServiceName, getServiceVersion } from '../sdk-core';
 
 /**
  * Enhanced tracing service that integrates with OpenTelemetry global tracer provider
