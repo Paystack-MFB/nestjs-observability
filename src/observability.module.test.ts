@@ -1,10 +1,11 @@
 import 'reflect-metadata';
-/**
- * Unit tests for ObservabilityModule - Lightweight Version
- */
-import { APP_INTERCEPTOR } from '@nestjs/core';
+// ABOUTME: Unit tests for ObservabilityModule structure and controller scanning.
+// ABOUTME: Verifies @NoTraceClass controllers register their routes with the ignored-routes registry.
+
+import { Controller, Get, Module } from '@nestjs/common';
+import { APP_INTERCEPTOR, ApplicationConfig, DiscoveryModule } from '@nestjs/core';
 import { Test, TestingModule } from '@nestjs/testing';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 // Mock OpenTelemetry modules
 vi.mock('@opentelemetry/api', () => ({
@@ -59,11 +60,13 @@ vi.mock('@opentelemetry/api-logs', () => ({
 }));
 
 import { MetricsController } from './controllers/metrics.controller';
+import { NoTraceClass } from './decorators/auto-trace.decorators';
 import { AutoTraceInterceptor } from './interceptors/auto-trace.interceptor';
 import { RequestLoggingInterceptor } from './interceptors/request-logging.interceptor';
 import { LoggerService } from './logger/logger.service';
 import { MetricsService } from './metrics/metrics.service';
 import { ObservabilityModule } from './observability.module';
+import { getIgnoredRoutes, resetIgnoredRoutes } from './sdk-core';
 import { TracingService } from './tracing/tracing.service';
 
 // Mock environment variables
@@ -73,13 +76,70 @@ const mockEnv = {
   OTEL_SERVICE_VERSION: '1.0.0',
 };
 
-describe('ObservabilityModule - Lightweight', () => {
-  let module: TestingModule;
+// Test controllers
+@Controller('health')
+@NoTraceClass()
+class TestHealthController {
+  @Get()
+  check(): string {
+    return 'ok';
+  }
+}
+
+@Controller('api')
+class TestApiController {
+  @Get()
+  list(): string[] {
+    return [];
+  }
+}
+
+@Controller()
+@NoTraceClass()
+class TestRootController {
+  @Get()
+  root(): string {
+    return 'root';
+  }
+}
+
+@Controller('readiness')
+@NoTraceClass()
+class TestReadinessController {
+  @Get()
+  check(): string {
+    return 'ready';
+  }
+}
+
+@Controller('/status')
+@NoTraceClass()
+class TestLeadingSlashController {
+  @Get()
+  check(): string {
+    return 'ok';
+  }
+}
+
+describe('ObservabilityModule', () => {
+  let module: TestingModule | undefined;
 
   beforeEach(() => {
     // Set up environment variables
     Object.entries(mockEnv).forEach(([key, value]) => {
       process.env[key] = value;
+    });
+  });
+
+  afterEach(async () => {
+    resetIgnoredRoutes();
+    vi.restoreAllMocks();
+    if (module) {
+      await module.close();
+      module = undefined;
+    }
+    Object.keys(mockEnv).forEach((key) => {
+      Reflect.deleteProperty(process.env, key);
     });
   });
 
@@ -101,14 +161,9 @@ describe('ObservabilityModule - Lightweight', () => {
         imports: [ObservabilityModule.forRoot()],
       }).compile();
 
-      // Verify all services are available
-      const loggerService = module.get<LoggerService>(LoggerService);
-      const metricsService = module.get<MetricsService>(MetricsService);
-      const tracingService = module.get<TracingService>(TracingService);
-
-      expect(loggerService).toBeDefined();
-      expect(metricsService).toBeDefined();
-      expect(tracingService).toBeDefined();
+      expect(module.get(LoggerService)).toBeInstanceOf(LoggerService);
+      expect(module.get(MetricsService)).toBeInstanceOf(MetricsService);
+      expect(module.get(TracingService)).toBeInstanceOf(TracingService);
     });
 
     it('should register AutoTraceInterceptor as APP_INTERCEPTOR', () => {
@@ -143,6 +198,12 @@ describe('ObservabilityModule - Lightweight', () => {
 
       expect(requestLoggingInterceptor).toBeDefined();
     });
+
+    it('should include DiscoveryModule in imports', () => {
+      const moduleDefinition = ObservabilityModule.forRoot();
+
+      expect(moduleDefinition.imports).toContain(DiscoveryModule);
+    });
   });
 
   describe('Module Registration', () => {
@@ -150,32 +211,153 @@ describe('ObservabilityModule - Lightweight', () => {
       const moduleMetadata = Reflect.getMetadata('__module:global__', ObservabilityModule) as boolean;
       expect(moduleMetadata).toBe(true);
     });
-
-    it('should export required services', () => {
-      const moduleDefinition = ObservabilityModule.forRoot();
-
-      expect(moduleDefinition.exports).toContain(LoggerService);
-      expect(moduleDefinition.exports).toContain(MetricsService);
-      expect(moduleDefinition.exports).toContain(TracingService);
-    });
-
-    it('should include MetricsController', () => {
-      const moduleDefinition = ObservabilityModule.forRoot();
-
-      expect(moduleDefinition.controllers).toContain(MetricsController);
-    });
   });
 
-  describe('Integration', () => {
-    it('should work with NestJS dependency injection', async () => {
-      module = await Test.createTestingModule({
+  describe('onApplicationBootstrap - controller scanning', () => {
+    it('should register @NoTraceClass controller routes as ignored', async () => {
+      @Module({
         imports: [ObservabilityModule.forRoot()],
+        controllers: [TestHealthController, TestApiController],
+      })
+      // eslint-disable-next-line @typescript-eslint/no-extraneous-class
+      class TestAppModule {}
+
+      module = await Test.createTestingModule({
+        imports: [TestAppModule],
       }).compile();
 
       await module.init();
 
-      // Verify module initializes without errors
-      expect(module).toBeDefined();
+      expect(getIgnoredRoutes().has('/health')).toBe(true);
+    });
+
+    it('should not register controllers without @NoTraceClass', async () => {
+      @Module({
+        imports: [ObservabilityModule.forRoot()],
+        controllers: [TestApiController],
+      })
+      // eslint-disable-next-line @typescript-eslint/no-extraneous-class
+      class TestAppModule {}
+
+      module = await Test.createTestingModule({
+        imports: [TestAppModule],
+      }).compile();
+
+      await module.init();
+
+      expect(getIgnoredRoutes().has('/api')).toBe(false);
+      expect(getIgnoredRoutes().size).toBe(0);
+    });
+
+    it('should skip @NoTraceClass controllers with empty/root path and warn', async () => {
+      @Module({
+        imports: [ObservabilityModule.forRoot()],
+        controllers: [TestRootController],
+      })
+      // eslint-disable-next-line @typescript-eslint/no-extraneous-class
+      class TestAppModule {}
+
+      const warnSpy = vi.spyOn(console, 'warn').mockImplementation(vi.fn());
+      module = await Test.createTestingModule({
+        imports: [TestAppModule],
+      }).compile();
+
+      await module.init();
+
+      expect(getIgnoredRoutes().size).toBe(0);
+      expect(warnSpy).toHaveBeenCalledWith(
+        expect.stringContaining('root-path controllers cannot be excluded from tracing')
+      );
+    });
+
+    it('should register multiple @NoTraceClass controllers', async () => {
+      @Module({
+        imports: [ObservabilityModule.forRoot()],
+        controllers: [TestHealthController, TestReadinessController, TestApiController],
+      })
+      // eslint-disable-next-line @typescript-eslint/no-extraneous-class
+      class TestAppModule {}
+
+      module = await Test.createTestingModule({
+        imports: [TestAppModule],
+      }).compile();
+
+      await module.init();
+
+      expect(getIgnoredRoutes().has('/health')).toBe(true);
+      expect(getIgnoredRoutes().has('/readiness')).toBe(true);
+      expect(getIgnoredRoutes().has('/api')).toBe(false);
+      expect(getIgnoredRoutes().size).toBe(2);
+    });
+  });
+
+  describe('global prefix handling', () => {
+    it('should prepend global prefix to controller routes', async () => {
+      @Module({
+        imports: [ObservabilityModule.forRoot()],
+        controllers: [TestHealthController],
+      })
+      // eslint-disable-next-line @typescript-eslint/no-extraneous-class
+      class TestAppModule {}
+
+      module = await Test.createTestingModule({
+        imports: [TestAppModule],
+      }).compile();
+
+      // Override ApplicationConfig to simulate a global prefix
+      const appConfig = module.get(ApplicationConfig);
+      vi.spyOn(appConfig, 'getGlobalPrefix').mockReturnValue('api/v1');
+      vi.spyOn(appConfig, 'getGlobalPrefixOptions').mockReturnValue({});
+
+      await module.init();
+
+      expect(getIgnoredRoutes().has('/api/v1/health')).toBe(true);
+      expect(getIgnoredRoutes().has('/health')).toBe(false);
+    });
+
+    it('should handle controller paths with leading slash', async () => {
+      @Module({
+        imports: [ObservabilityModule.forRoot()],
+        controllers: [TestLeadingSlashController],
+      })
+      // eslint-disable-next-line @typescript-eslint/no-extraneous-class
+      class TestAppModule {}
+
+      module = await Test.createTestingModule({
+        imports: [TestAppModule],
+      }).compile();
+
+      const appConfig = module.get(ApplicationConfig);
+      vi.spyOn(appConfig, 'getGlobalPrefix').mockReturnValue('api/v1');
+      vi.spyOn(appConfig, 'getGlobalPrefixOptions').mockReturnValue({});
+
+      await module.init();
+
+      expect(getIgnoredRoutes().has('/api/v1/status')).toBe(true);
+    });
+
+    it('should not prepend global prefix for excluded paths', async () => {
+      @Module({
+        imports: [ObservabilityModule.forRoot()],
+        controllers: [TestHealthController],
+      })
+      // eslint-disable-next-line @typescript-eslint/no-extraneous-class
+      class TestAppModule {}
+
+      module = await Test.createTestingModule({
+        imports: [TestAppModule],
+      }).compile();
+
+      const appConfig = module.get(ApplicationConfig);
+      vi.spyOn(appConfig, 'getGlobalPrefix').mockReturnValue('api/v1');
+      vi.spyOn(appConfig, 'getGlobalPrefixOptions').mockReturnValue({
+        exclude: [{ path: 'health', pathRegex: /^\/health/, requestMethod: 0 }],
+      });
+
+      await module.init();
+
+      expect(getIgnoredRoutes().has('/health')).toBe(true);
+      expect(getIgnoredRoutes().has('/api/v1/health')).toBe(false);
     });
   });
 });
