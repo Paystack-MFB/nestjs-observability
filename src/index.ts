@@ -33,6 +33,7 @@ export { ObservabilityModule } from './observability.module';
 // Service helper functions (from sdk-core to avoid auto-start)
 export {
   getHttpRequestLoggingEnabled,
+  getIgnoreIncomingRoutes,
   getServiceAttributes,
   getServiceEnvironment,
   getServiceName,

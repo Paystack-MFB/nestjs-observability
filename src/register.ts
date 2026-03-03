@@ -23,6 +23,7 @@ export {
   getServiceName,
   getServiceVersion,
   getHttpRequestLoggingEnabled,
+  getIgnoreIncomingRoutes,
   // Building blocks
   createLogProcessor,
   createMetricReader,

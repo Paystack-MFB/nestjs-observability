@@ -101,6 +101,26 @@ export function getHttpRequestLoggingEnabled(): boolean {
 }
 
 /**
+ * Get list of incoming routes to ignore from HTTP instrumentation.
+ * Reads OTEL_IGNORE_INCOMING_ROUTES env var as a comma-separated list.
+ * When set, matching routes will not produce HTTP spans at all.
+ *
+ * @example
+ * OTEL_IGNORE_INCOMING_ROUTES=/health,/readiness
+ */
+export function getIgnoreIncomingRoutes(): string[] {
+  const value = process.env['OTEL_IGNORE_INCOMING_ROUTES'];
+  if (!value) {
+    return [];
+  }
+
+  return value
+    .split(',')
+    .map((route) => route.trim())
+    .filter((route) => route.length > 0);
+}
+
+/**
  * Parse OTLP headers from environment variable string
  */
 function parseOtlpHeaders(headersString?: string): Record<string, string> {
@@ -279,6 +299,9 @@ export function createTraceExporter(): ConsoleSpanExporter | OTLPTraceExporter |
 /**
  * Create instrumentations including auto-instrumentations and custom NestJS logger context.
  * Exported for custom SDK configurations.
+ *
+ * When OTEL_IGNORE_INCOMING_ROUTES is set, the HTTP instrumentation will skip
+ * creating spans for matching incoming request paths.
  */
 export function createInstrumentations(): Instrumentation[] {
   const customInstrumentation = (() => {
@@ -290,7 +313,19 @@ export function createInstrumentations(): Instrumentation[] {
     }
   })();
 
-  const autoInstrumentations = getNodeAutoInstrumentations();
+  const ignoredRoutes = getIgnoreIncomingRoutes();
+
+  const autoInstrumentations =
+    ignoredRoutes.length > 0
+      ? getNodeAutoInstrumentations({
+          '@opentelemetry/instrumentation-http': {
+            ignoreIncomingRequestHook: (request) => {
+              const requestUrl = request.url ?? '';
+              return ignoredRoutes.some((route) => requestUrl === route || requestUrl.startsWith(route + '?'));
+            },
+          },
+        })
+      : getNodeAutoInstrumentations();
 
   return customInstrumentation
     ? [customInstrumentation as Instrumentation, ...autoInstrumentations]

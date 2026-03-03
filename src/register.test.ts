@@ -1,6 +1,12 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 
-import { getHttpRequestLoggingEnabled, getServiceEnvironment, getServiceName, getServiceVersion } from './register';
+import {
+  getHttpRequestLoggingEnabled,
+  getIgnoreIncomingRoutes,
+  getServiceEnvironment,
+  getServiceName,
+  getServiceVersion,
+} from './register';
 
 describe('register helpers', () => {
   const originalEnv = process.env;
@@ -80,6 +86,38 @@ describe('register helpers', () => {
     it('should return false for any other value', () => {
       process.env['OTEL_LOG_HTTP_REQUESTS'] = 'yes';
       expect(getHttpRequestLoggingEnabled()).toBe(false);
+    });
+  });
+
+  describe('getIgnoreIncomingRoutes', () => {
+    it('should return empty array when env var is not set', () => {
+      delete process.env['OTEL_IGNORE_INCOMING_ROUTES'];
+      expect(getIgnoreIncomingRoutes()).toEqual([]);
+    });
+
+    it('should return empty array when env var is empty string', () => {
+      process.env['OTEL_IGNORE_INCOMING_ROUTES'] = '';
+      expect(getIgnoreIncomingRoutes()).toEqual([]);
+    });
+
+    it('should parse a single route', () => {
+      process.env['OTEL_IGNORE_INCOMING_ROUTES'] = '/health';
+      expect(getIgnoreIncomingRoutes()).toEqual(['/health']);
+    });
+
+    it('should parse comma-separated routes', () => {
+      process.env['OTEL_IGNORE_INCOMING_ROUTES'] = '/health,/readiness,/liveness';
+      expect(getIgnoreIncomingRoutes()).toEqual(['/health', '/readiness', '/liveness']);
+    });
+
+    it('should trim whitespace from routes', () => {
+      process.env['OTEL_IGNORE_INCOMING_ROUTES'] = ' /health , /readiness , /liveness ';
+      expect(getIgnoreIncomingRoutes()).toEqual(['/health', '/readiness', '/liveness']);
+    });
+
+    it('should filter out empty strings from trailing commas', () => {
+      process.env['OTEL_IGNORE_INCOMING_ROUTES'] = '/health,,/readiness,';
+      expect(getIgnoreIncomingRoutes()).toEqual(['/health', '/readiness']);
     });
   });
 });
