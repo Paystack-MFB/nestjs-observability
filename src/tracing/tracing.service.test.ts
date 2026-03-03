@@ -2,7 +2,7 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { trace } from '@opentelemetry/api';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { getServiceName, getServiceVersion } from '../register';
+import { getServiceName, getServiceVersion } from '../sdk-core';
 import { TracingService } from './tracing.service';
 
 // Test types
