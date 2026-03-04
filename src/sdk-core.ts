@@ -100,24 +100,61 @@ export function getHttpRequestLoggingEnabled(): boolean {
   return value === 'true' || value === '1';
 }
 
-/**
- * Get list of incoming routes to ignore from HTTP instrumentation.
- * Reads OTEL_IGNORE_INCOMING_ROUTES env var as a comma-separated list.
- * When set, matching routes will not produce HTTP spans at all.
- *
- * @example
- * OTEL_IGNORE_INCOMING_ROUTES=/health,/readiness
- */
-export function getIgnoreIncomingRoutes(): string[] {
-  const value = process.env['OTEL_IGNORE_INCOMING_ROUTES'];
-  if (!value) {
-    return [];
-  }
+// Routes to ignore from HTTP auto-instrumentation.
+// Mutable so routes can be registered at application boot (after SDK init).
+const ignoredRoutes = new Set<string>();
 
-  return value
-    .split(',')
-    .map((route) => route.trim())
-    .filter((route) => route.length > 0);
+/**
+ * Normalize a route path: ensure leading '/', strip trailing '/'
+ */
+function normalizeRoutePath(route: string): string {
+  let normalized = route.startsWith('/') ? route : '/' + route;
+  if (normalized.length > 1 && normalized.endsWith('/')) {
+    normalized = normalized.slice(0, -1);
+  }
+  return normalized;
+}
+
+/**
+ * Register a route to be ignored by HTTP auto-instrumentation.
+ * Routes are prefix-matched with path boundary awareness.
+ * Root paths ('/' or empty) are rejected to avoid suppressing all routes.
+ */
+export function addIgnoredRoute(route: string): void {
+  const normalized = normalizeRoutePath(route);
+  if (normalized === '/') {
+    console.warn('addIgnoredRoute: root path "/" rejected to avoid suppressing all HTTP traces');
+    return;
+  }
+  ignoredRoutes.add(normalized);
+}
+
+/**
+ * Get the current set of ignored routes. Primarily for testing.
+ */
+export function getIgnoredRoutes(): ReadonlySet<string> {
+  return ignoredRoutes;
+}
+
+/**
+ * Clear all ignored routes. For test cleanup between tests.
+ */
+export function resetIgnoredRoutes(): void {
+  ignoredRoutes.clear();
+}
+
+/**
+ * Check if a request URL matches any ignored route.
+ * Uses prefix matching with path boundary awareness:
+ * '/health' matches '/health', '/health/deep', '/health?foo' but NOT '/healthcare'.
+ */
+export function isRouteIgnored(requestUrl: string): boolean {
+  for (const route of ignoredRoutes) {
+    if (requestUrl === route || requestUrl.startsWith(route + '/') || requestUrl.startsWith(route + '?')) {
+      return true;
+    }
+  }
+  return false;
 }
 
 /**
@@ -300,8 +337,8 @@ export function createTraceExporter(): ConsoleSpanExporter | OTLPTraceExporter |
  * Create instrumentations including auto-instrumentations and custom NestJS logger context.
  * Exported for custom SDK configurations.
  *
- * When OTEL_IGNORE_INCOMING_ROUTES is set, the HTTP instrumentation will skip
- * creating spans for matching incoming request paths.
+ * The HTTP instrumentation is configured with a hook that reads from the mutable
+ * ignoredRoutes set, allowing routes to be registered after SDK initialization.
  */
 export function createInstrumentations(): Instrumentation[] {
   const customInstrumentation = (() => {
@@ -313,19 +350,11 @@ export function createInstrumentations(): Instrumentation[] {
     }
   })();
 
-  const ignoredRoutes = getIgnoreIncomingRoutes();
-
-  const autoInstrumentations =
-    ignoredRoutes.length > 0
-      ? getNodeAutoInstrumentations({
-          '@opentelemetry/instrumentation-http': {
-            ignoreIncomingRequestHook: (request) => {
-              const requestUrl = request.url ?? '';
-              return ignoredRoutes.some((route) => requestUrl === route || requestUrl.startsWith(route + '?'));
-            },
-          },
-        })
-      : getNodeAutoInstrumentations();
+  const autoInstrumentations = getNodeAutoInstrumentations({
+    '@opentelemetry/instrumentation-http': {
+      ignoreIncomingRequestHook: (request) => isRouteIgnored(request.url ?? ''),
+    },
+  });
 
   return customInstrumentation
     ? [customInstrumentation as Instrumentation, ...autoInstrumentations]

@@ -3,7 +3,7 @@ import { metrics } from '@opentelemetry/api';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { LoggerService } from '../logger/logger.service';
-import { getServiceName, getServiceVersion } from '../register';
+import { getServiceName, getServiceVersion } from '../sdk-core';
 import { MetricsService } from './metrics.service';
 
 interface MockLoggerService {

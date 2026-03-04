@@ -48,7 +48,11 @@ export {
   getServiceName,
   getServiceVersion,
   getHttpRequestLoggingEnabled,
-  getIgnoreIncomingRoutes,
+  // Ignored routes registry
+  addIgnoredRoute,
+  getIgnoredRoutes,
+  isRouteIgnored,
+  resetIgnoredRoutes,
   // Building block functions
   createLogProcessor,
   createMetricReader,
