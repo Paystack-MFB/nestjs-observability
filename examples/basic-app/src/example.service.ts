@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Inject, Injectable } from '@nestjs/common';
 import {
   LoggerService,
   MetricsService,
@@ -23,9 +23,9 @@ export class ExampleService {
   private responseTimeHistogram: any;
 
   constructor(
-    private readonly logger: LoggerService,
-    private readonly metrics: MetricsService,
-    private readonly tracing: TracingService
+    @Inject(LoggerService) private readonly logger: LoggerService,
+    @Inject(MetricsService) private readonly metrics: MetricsService,
+    @Inject(TracingService) private readonly tracing: TracingService
   ) {
     // Set service context for all logging - ensure logger is available
     if (this.logger && typeof this.logger.setContext === 'function') {

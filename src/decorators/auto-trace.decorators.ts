@@ -1,3 +1,6 @@
+// ABOUTME: Decorators for controlling tracing and logging on classes and methods.
+// ABOUTME: Provides @TraceClass, @Trace, @NoTrace, @NoTraceClass, @NoLog, @NoLogClass.
+
 import { Type } from '@nestjs/common';
 import { Exception, Span, SpanStatusCode, trace } from '@opentelemetry/api';
 import 'reflect-metadata';
@@ -9,6 +12,25 @@ const NO_TRACE_KEY = 'trace:no-trace';
 const NO_TRACE_CLASS_KEY = 'trace:no-trace-class';
 const NO_LOG_KEY = 'log:no-log';
 const NO_LOG_CLASS_KEY = 'log:no-log-class';
+
+// Static registry of classes decorated with @NoTraceClass.
+// Populated at decoration time so IgnoredRouteScanner can iterate them
+// without depending on DiscoveryService.
+const noTraceClasses = new Set<Type>();
+
+/**
+ * Returns the set of classes decorated with @NoTraceClass.
+ */
+export function getNoTraceClasses(): ReadonlySet<Type> {
+  return noTraceClasses;
+}
+
+/**
+ * Clears the @NoTraceClass registry. For testing only.
+ */
+export function resetNoTraceClasses(): void {
+  noTraceClasses.clear();
+}
 
 // Interface for TraceClass options
 export interface TraceClassOptions {
@@ -235,6 +257,7 @@ export function NoTrace() {
 export function NoTraceClass() {
   return function <T extends Type>(target: T): T {
     Reflect.defineMetadata(NO_TRACE_CLASS_KEY, true, target);
+    noTraceClasses.add(target);
     return target;
   };
 }
