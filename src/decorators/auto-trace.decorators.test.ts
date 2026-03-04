@@ -7,11 +7,15 @@ import { describe, expect, it, vi } from 'vitest';
 
 import {
   createTracedMethod,
+  getNoTraceClasses,
   getTraceableMethodNames,
   getTraceOptions,
+  isNoTraceClassEnabled,
   isNoTraceEnabled,
   isTraceClassEnabled,
   NoTrace,
+  NoTraceClass,
+  resetNoTraceClasses,
   Trace,
   TraceClass,
 } from './auto-trace.decorators';
@@ -326,6 +330,46 @@ describe('TypeScript metadata reflection', () => {
     expect(isTraceClassEnabled(TestClass)).toBe(false);
     expect(getTraceOptions(TestClass.prototype, 'testMethod')).toBeUndefined();
     expect(isNoTraceEnabled(TestClass.prototype, 'testMethod')).toBe(false);
+  });
+});
+
+describe('@NoTraceClass', () => {
+  it('should set NoTraceClass metadata on a class', () => {
+    @NoTraceClass()
+    class TestClass {}
+
+    expect(isNoTraceClassEnabled(TestClass)).toBe(true);
+  });
+
+  it('should add the class to the static registry', () => {
+    resetNoTraceClasses();
+
+    @NoTraceClass()
+    class TestClass {}
+
+    expect(getNoTraceClasses().has(TestClass)).toBe(true);
+    expect(getNoTraceClasses().size).toBe(1);
+  });
+
+  it('should not duplicate entries when applied twice', () => {
+    resetNoTraceClasses();
+
+    class TestClass {}
+    NoTraceClass()(TestClass);
+    NoTraceClass()(TestClass);
+
+    expect(getNoTraceClasses().size).toBe(1);
+  });
+
+  it('should clear the registry on reset', () => {
+    resetNoTraceClasses();
+
+    @NoTraceClass()
+    class TestClass {}
+
+    expect(getNoTraceClasses().has(TestClass)).toBe(true);
+    resetNoTraceClasses();
+    expect(getNoTraceClasses().size).toBe(0);
   });
 });
 

@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Inject, Injectable } from '@nestjs/common';
 import {
   addSpanAttribute,
   addSpanAttributes,
@@ -10,7 +10,7 @@ import {
 @Injectable()
 @TraceClass()
 export class UserService {
-  constructor(private readonly logger: LoggerService) {
+  constructor(@Inject(LoggerService) private readonly logger: LoggerService) {
     // Ensure logger is available before setting context
     if (this.logger && typeof this.logger.setContext === 'function') {
       this.logger.setContext({ service: 'UserService' });

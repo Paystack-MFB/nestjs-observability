@@ -15,10 +15,10 @@ import {
   VersioningType,
 } from '@nestjs/common';
 import { PATH_METADATA, VERSION_METADATA } from '@nestjs/common/constants';
-import { APP_INTERCEPTOR, ApplicationConfig, DiscoveryModule, DiscoveryService } from '@nestjs/core';
+import { APP_INTERCEPTOR, ApplicationConfig } from '@nestjs/core';
 
 import { MetricsController } from './controllers/metrics.controller';
-import { isNoTraceClassEnabled } from './decorators/auto-trace.decorators';
+import { getNoTraceClasses } from './decorators/auto-trace.decorators';
 import { AutoTraceInterceptor } from './interceptors/auto-trace.interceptor';
 import { RequestLoggingInterceptor } from './interceptors/request-logging.interceptor';
 import { LoggerService } from './logger/logger.service';
@@ -32,37 +32,31 @@ import { TracingService } from './tracing/tracing.service';
  */
 @Injectable()
 export class IgnoredRouteScanner implements OnApplicationBootstrap {
-  constructor(
-    @Inject(DiscoveryService) private readonly discoveryService: DiscoveryService,
-    @Optional() @Inject(ApplicationConfig) private readonly applicationConfig?: ApplicationConfig
-  ) {}
+  constructor(@Optional() @Inject(ApplicationConfig) private readonly applicationConfig?: ApplicationConfig) {}
 
   onApplicationBootstrap(): void {
     const globalPrefix = this.applicationConfig?.getGlobalPrefix() ?? '';
     const excludedPaths = (this.applicationConfig?.getGlobalPrefixOptions().exclude ?? [])
-      .filter((e) => typeof e === 'object' && 'path' in e)
-      .map((e) => (e as { path: string }).path);
+      .map((e) =>
+        typeof e === 'string' ? e : typeof e === 'object' && 'path' in e ? (e as { path: string }).path : null
+      )
+      .filter((p): p is string => p !== null);
     const versioningOptions = this.applicationConfig?.getVersioning();
 
-    for (const wrapper of this.discoveryService.getControllers()) {
-      if (!wrapper.metatype || typeof wrapper.metatype !== 'function') {
-        continue;
-      }
-
-      if (!isNoTraceClassEnabled(wrapper.metatype as Type)) {
-        continue;
-      }
-
-      const rawPath = Reflect.getMetadata(PATH_METADATA, wrapper.metatype) as string | string[] | undefined;
+    // Iterates all classes decorated with @NoTraceClass regardless of whether they
+    // are registered controllers in the current module tree. Stale entries are harmless
+    // since they match no real routes.
+    for (const metatype of getNoTraceClasses()) {
+      const rawPath = Reflect.getMetadata(PATH_METADATA, metatype) as string | string[] | undefined;
       const controllerPaths = Array.isArray(rawPath) ? rawPath : [rawPath];
 
-      const versionSegments = this.resolveVersionSegments(wrapper.metatype as Type, versioningOptions);
+      const versionSegments = this.resolveVersionSegments(metatype, versioningOptions);
 
       for (const controllerPath of controllerPaths) {
         if (!controllerPath || controllerPath === '/') {
           // console.warn used because LoggerService may not be ready during bootstrap
           console.warn(
-            `@NoTraceClass on ${wrapper.metatype.name} ignored: root-path controllers cannot be excluded from tracing`
+            `@NoTraceClass on ${metatype.name} ignored: root-path controllers cannot be excluded from tracing`
           );
           continue;
         }
@@ -144,7 +138,6 @@ export class ObservabilityModule {
     return {
       controllers: [MetricsController],
       exports: [LoggerService, MetricsService, TracingService],
-      imports: [DiscoveryModule],
       module: ObservabilityModule,
       providers,
     };

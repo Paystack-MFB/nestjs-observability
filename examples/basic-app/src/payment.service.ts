@@ -1,11 +1,11 @@
-import { Injectable } from '@nestjs/common';
+import { Inject, Injectable } from '@nestjs/common';
 import { LoggerService, TraceClass } from '@paystackhq/nestjs-observability';
 
 @Injectable()
 @TraceClass()
 export class PaymentService {
   private readonly payments: Map<string, any> = new Map();
-  constructor(private readonly logger: LoggerService) {}
+  constructor(@Inject(LoggerService) private readonly logger: LoggerService) {}
 
   async processPayment(paymentData: {
     amount: number;

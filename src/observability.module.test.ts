@@ -2,8 +2,8 @@ import 'reflect-metadata';
 // ABOUTME: Unit tests for ObservabilityModule structure and controller scanning.
 // ABOUTME: Verifies @NoTraceClass controllers register their routes with the ignored-routes registry.
 
-import { Controller, Get, Module, VERSION_NEUTRAL, VersioningType } from '@nestjs/common';
-import { APP_INTERCEPTOR, ApplicationConfig, DiscoveryModule } from '@nestjs/core';
+import { Controller, Get, VERSION_NEUTRAL, VersioningType } from '@nestjs/common';
+import { APP_INTERCEPTOR, ApplicationConfig } from '@nestjs/core';
 import { Test, TestingModule } from '@nestjs/testing';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -60,7 +60,7 @@ vi.mock('@opentelemetry/api-logs', () => ({
 }));
 
 import { MetricsController } from './controllers/metrics.controller';
-import { NoTraceClass } from './decorators/auto-trace.decorators';
+import { NoTraceClass, getNoTraceClasses, resetNoTraceClasses } from './decorators/auto-trace.decorators';
 import { AutoTraceInterceptor } from './interceptors/auto-trace.interceptor';
 import { RequestLoggingInterceptor } from './interceptors/request-logging.interceptor';
 import { LoggerService } from './logger/logger.service';
@@ -76,9 +76,8 @@ const mockEnv = {
   OTEL_SERVICE_VERSION: '1.0.0',
 };
 
-// Test controllers
+// Test controllers — @NoTraceClass is applied per-test via the static registry
 @Controller('health')
-@NoTraceClass()
 class TestHealthController {
   @Get()
   check(): string {
@@ -95,7 +94,6 @@ class TestApiController {
 }
 
 @Controller()
-@NoTraceClass()
 class TestRootController {
   @Get()
   root(): string {
@@ -104,7 +102,6 @@ class TestRootController {
 }
 
 @Controller('readiness')
-@NoTraceClass()
 class TestReadinessController {
   @Get()
   check(): string {
@@ -113,7 +110,6 @@ class TestReadinessController {
 }
 
 @Controller('/status')
-@NoTraceClass()
 class TestLeadingSlashController {
   @Get()
   check(): string {
@@ -122,7 +118,6 @@ class TestLeadingSlashController {
 }
 
 @Controller(['health', 'healthz'])
-@NoTraceClass()
 class TestMultiPathController {
   @Get()
   check(): string {
@@ -131,7 +126,6 @@ class TestMultiPathController {
 }
 
 @Controller(['/', 'status'])
-@NoTraceClass()
 class TestArrayWithRootController {
   @Get()
   check(): string {
@@ -140,7 +134,6 @@ class TestArrayWithRootController {
 }
 
 @Controller({ path: 'users', version: '1' })
-@NoTraceClass()
 class TestVersionedController {
   @Get()
   list(): string[] {
@@ -149,7 +142,6 @@ class TestVersionedController {
 }
 
 @Controller({ path: 'users', version: ['1', '2'] })
-@NoTraceClass()
 class TestMultiVersionController {
   @Get()
   list(): string[] {
@@ -158,7 +150,6 @@ class TestMultiVersionController {
 }
 
 @Controller({ path: 'users', version: VERSION_NEUTRAL })
-@NoTraceClass()
 class TestVersionNeutralController {
   @Get()
   list(): string[] {
@@ -167,7 +158,6 @@ class TestVersionNeutralController {
 }
 
 @Controller('users')
-@NoTraceClass()
 class TestUnversionedUsersController {
   @Get()
   list(): string[] {
@@ -179,6 +169,7 @@ describe('ObservabilityModule', () => {
   let module: TestingModule | undefined;
 
   beforeEach(() => {
+    resetNoTraceClasses();
     // Set up environment variables
     Object.entries(mockEnv).forEach(([key, value]) => {
       process.env[key] = value;
@@ -253,10 +244,10 @@ describe('ObservabilityModule', () => {
       expect(requestLoggingInterceptor).toBeDefined();
     });
 
-    it('should include DiscoveryModule in imports', () => {
+    it('should not require external module imports', () => {
       const moduleDefinition = ObservabilityModule.forRoot();
 
-      expect(moduleDefinition.imports).toContain(DiscoveryModule);
+      expect(moduleDefinition.imports).toBeUndefined();
     });
   });
 
@@ -268,17 +259,26 @@ describe('ObservabilityModule', () => {
   });
 
   describe('onApplicationBootstrap - controller scanning', () => {
-    it('should register @NoTraceClass controller routes as ignored', async () => {
-      @Module({
+    it('should not register duplicate routes when NoTraceClass is applied twice', async () => {
+      NoTraceClass()(TestHealthController);
+      NoTraceClass()(TestHealthController);
+
+      module = await Test.createTestingModule({
         imports: [ObservabilityModule.forRoot()],
-        controllers: [TestHealthController, TestApiController],
-      })
-      // eslint-disable-next-line @typescript-eslint/no-extraneous-class
-      class TestAppModule {}
+      }).compile();
+
+      await module.init();
+
+      expect(getIgnoredRoutes().has('/health')).toBe(true);
+      expect(getIgnoredRoutes().size).toBe(1);
+    });
+
+    it('should register @NoTraceClass controller routes as ignored', async () => {
+      NoTraceClass()(TestHealthController);
 
       const warnSpy = vi.spyOn(console, 'warn').mockImplementation(vi.fn());
       module = await Test.createTestingModule({
-        imports: [TestAppModule],
+        imports: [ObservabilityModule.forRoot()],
       }).compile();
 
       await module.init();
@@ -288,15 +288,11 @@ describe('ObservabilityModule', () => {
     });
 
     it('should not register controllers without @NoTraceClass', async () => {
-      @Module({
-        imports: [ObservabilityModule.forRoot()],
-        controllers: [TestApiController],
-      })
-      // eslint-disable-next-line @typescript-eslint/no-extraneous-class
-      class TestAppModule {}
+      // TestApiController has @Controller('api') but no @NoTraceClass
+      expect(getNoTraceClasses().has(TestApiController)).toBe(false);
 
       module = await Test.createTestingModule({
-        imports: [TestAppModule],
+        imports: [ObservabilityModule.forRoot()],
       }).compile();
 
       await module.init();
@@ -306,16 +302,11 @@ describe('ObservabilityModule', () => {
     });
 
     it('should skip @NoTraceClass controllers with empty/root path and warn', async () => {
-      @Module({
-        imports: [ObservabilityModule.forRoot()],
-        controllers: [TestRootController],
-      })
-      // eslint-disable-next-line @typescript-eslint/no-extraneous-class
-      class TestAppModule {}
+      NoTraceClass()(TestRootController);
 
       const warnSpy = vi.spyOn(console, 'warn').mockImplementation(vi.fn());
       module = await Test.createTestingModule({
-        imports: [TestAppModule],
+        imports: [ObservabilityModule.forRoot()],
       }).compile();
 
       await module.init();
@@ -327,16 +318,12 @@ describe('ObservabilityModule', () => {
     });
 
     it('should register multiple @NoTraceClass controllers', async () => {
-      @Module({
-        imports: [ObservabilityModule.forRoot()],
-        controllers: [TestHealthController, TestReadinessController, TestApiController],
-      })
-      // eslint-disable-next-line @typescript-eslint/no-extraneous-class
-      class TestAppModule {}
+      NoTraceClass()(TestHealthController);
+      NoTraceClass()(TestReadinessController);
 
       const warnSpy = vi.spyOn(console, 'warn').mockImplementation(vi.fn());
       module = await Test.createTestingModule({
-        imports: [TestAppModule],
+        imports: [ObservabilityModule.forRoot()],
       }).compile();
 
       await module.init();
@@ -349,16 +336,11 @@ describe('ObservabilityModule', () => {
     });
 
     it('should register all paths for array-path controller', async () => {
-      @Module({
-        imports: [ObservabilityModule.forRoot()],
-        controllers: [TestMultiPathController],
-      })
-      // eslint-disable-next-line @typescript-eslint/no-extraneous-class
-      class TestAppModule {}
+      NoTraceClass()(TestMultiPathController);
 
       const warnSpy = vi.spyOn(console, 'warn').mockImplementation(vi.fn());
       module = await Test.createTestingModule({
-        imports: [TestAppModule],
+        imports: [ObservabilityModule.forRoot()],
       }).compile();
 
       await module.init();
@@ -370,16 +352,11 @@ describe('ObservabilityModule', () => {
     });
 
     it('should warn for root paths in array but register valid ones', async () => {
-      @Module({
-        imports: [ObservabilityModule.forRoot()],
-        controllers: [TestArrayWithRootController],
-      })
-      // eslint-disable-next-line @typescript-eslint/no-extraneous-class
-      class TestAppModule {}
+      NoTraceClass()(TestArrayWithRootController);
 
       const warnSpy = vi.spyOn(console, 'warn').mockImplementation(vi.fn());
       module = await Test.createTestingModule({
-        imports: [TestAppModule],
+        imports: [ObservabilityModule.forRoot()],
       }).compile();
 
       await module.init();
@@ -395,18 +372,12 @@ describe('ObservabilityModule', () => {
 
   describe('global prefix handling', () => {
     it('should prepend global prefix to controller routes', async () => {
-      @Module({
-        imports: [ObservabilityModule.forRoot()],
-        controllers: [TestHealthController],
-      })
-      // eslint-disable-next-line @typescript-eslint/no-extraneous-class
-      class TestAppModule {}
+      NoTraceClass()(TestHealthController);
 
       module = await Test.createTestingModule({
-        imports: [TestAppModule],
+        imports: [ObservabilityModule.forRoot()],
       }).compile();
 
-      // Override ApplicationConfig to simulate a global prefix
       const appConfig = module.get(ApplicationConfig);
       vi.spyOn(appConfig, 'getGlobalPrefix').mockReturnValue('api/v1');
       vi.spyOn(appConfig, 'getGlobalPrefixOptions').mockReturnValue({});
@@ -418,15 +389,10 @@ describe('ObservabilityModule', () => {
     });
 
     it('should handle controller paths with leading slash', async () => {
-      @Module({
-        imports: [ObservabilityModule.forRoot()],
-        controllers: [TestLeadingSlashController],
-      })
-      // eslint-disable-next-line @typescript-eslint/no-extraneous-class
-      class TestAppModule {}
+      NoTraceClass()(TestLeadingSlashController);
 
       module = await Test.createTestingModule({
-        imports: [TestAppModule],
+        imports: [ObservabilityModule.forRoot()],
       }).compile();
 
       const appConfig = module.get(ApplicationConfig);
@@ -438,16 +404,45 @@ describe('ObservabilityModule', () => {
       expect(getIgnoredRoutes().has('/api/v1/status')).toBe(true);
     });
 
-    it('should not prepend global prefix for excluded paths', async () => {
-      @Module({
-        imports: [ObservabilityModule.forRoot()],
-        controllers: [TestHealthController],
-      })
-      // eslint-disable-next-line @typescript-eslint/no-extraneous-class
-      class TestAppModule {}
+    it('should normalize global prefix with leading slash', async () => {
+      NoTraceClass()(TestHealthController);
 
       module = await Test.createTestingModule({
-        imports: [TestAppModule],
+        imports: [ObservabilityModule.forRoot()],
+      }).compile();
+
+      const appConfig = module.get(ApplicationConfig);
+      vi.spyOn(appConfig, 'getGlobalPrefix').mockReturnValue('/api/v1');
+      vi.spyOn(appConfig, 'getGlobalPrefixOptions').mockReturnValue({});
+
+      await module.init();
+
+      expect(getIgnoredRoutes().has('/api/v1/health')).toBe(true);
+    });
+
+    it('should not prepend global prefix for string-format excluded paths', async () => {
+      NoTraceClass()(TestHealthController);
+
+      module = await Test.createTestingModule({
+        imports: [ObservabilityModule.forRoot()],
+      }).compile();
+
+      const appConfig = module.get(ApplicationConfig);
+      vi.spyOn(appConfig, 'getGlobalPrefix').mockReturnValue('api/v1');
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-explicit-any
+      vi.spyOn(appConfig, 'getGlobalPrefixOptions').mockReturnValue({ exclude: ['health'] as any });
+
+      await module.init();
+
+      expect(getIgnoredRoutes().has('/health')).toBe(true);
+      expect(getIgnoredRoutes().has('/api/v1/health')).toBe(false);
+    });
+
+    it('should not prepend global prefix for excluded paths', async () => {
+      NoTraceClass()(TestHealthController);
+
+      module = await Test.createTestingModule({
+        imports: [ObservabilityModule.forRoot()],
       }).compile();
 
       const appConfig = module.get(ApplicationConfig);
@@ -463,15 +458,10 @@ describe('ObservabilityModule', () => {
     });
 
     it('should apply global prefix to each path in array', async () => {
-      @Module({
-        imports: [ObservabilityModule.forRoot()],
-        controllers: [TestMultiPathController],
-      })
-      // eslint-disable-next-line @typescript-eslint/no-extraneous-class
-      class TestAppModule {}
+      NoTraceClass()(TestMultiPathController);
 
       module = await Test.createTestingModule({
-        imports: [TestAppModule],
+        imports: [ObservabilityModule.forRoot()],
       }).compile();
 
       const appConfig = module.get(ApplicationConfig);
@@ -488,15 +478,10 @@ describe('ObservabilityModule', () => {
     });
 
     it('should exclude individual array paths from global prefix independently', async () => {
-      @Module({
-        imports: [ObservabilityModule.forRoot()],
-        controllers: [TestMultiPathController],
-      })
-      // eslint-disable-next-line @typescript-eslint/no-extraneous-class
-      class TestAppModule {}
+      NoTraceClass()(TestMultiPathController);
 
       module = await Test.createTestingModule({
-        imports: [TestAppModule],
+        imports: [ObservabilityModule.forRoot()],
       }).compile();
 
       const appConfig = module.get(ApplicationConfig);
@@ -517,15 +502,10 @@ describe('ObservabilityModule', () => {
 
   describe('URI versioning', () => {
     it('should prepend version prefix for URI-versioned controllers', async () => {
-      @Module({
-        imports: [ObservabilityModule.forRoot()],
-        controllers: [TestVersionedController],
-      })
-      // eslint-disable-next-line @typescript-eslint/no-extraneous-class
-      class TestAppModule {}
+      NoTraceClass()(TestVersionedController);
 
       module = await Test.createTestingModule({
-        imports: [TestAppModule],
+        imports: [ObservabilityModule.forRoot()],
       }).compile();
 
       const appConfig = module.get(ApplicationConfig);
@@ -542,15 +522,10 @@ describe('ObservabilityModule', () => {
     });
 
     it('should use custom version prefix', async () => {
-      @Module({
-        imports: [ObservabilityModule.forRoot()],
-        controllers: [TestVersionedController],
-      })
-      // eslint-disable-next-line @typescript-eslint/no-extraneous-class
-      class TestAppModule {}
+      NoTraceClass()(TestVersionedController);
 
       module = await Test.createTestingModule({
-        imports: [TestAppModule],
+        imports: [ObservabilityModule.forRoot()],
       }).compile();
 
       const appConfig = module.get(ApplicationConfig);
@@ -568,15 +543,10 @@ describe('ObservabilityModule', () => {
     });
 
     it('should handle prefix: false', async () => {
-      @Module({
-        imports: [ObservabilityModule.forRoot()],
-        controllers: [TestVersionedController],
-      })
-      // eslint-disable-next-line @typescript-eslint/no-extraneous-class
-      class TestAppModule {}
+      NoTraceClass()(TestVersionedController);
 
       module = await Test.createTestingModule({
-        imports: [TestAppModule],
+        imports: [ObservabilityModule.forRoot()],
       }).compile();
 
       const appConfig = module.get(ApplicationConfig);
@@ -594,15 +564,10 @@ describe('ObservabilityModule', () => {
     });
 
     it('should combine global prefix with version', async () => {
-      @Module({
-        imports: [ObservabilityModule.forRoot()],
-        controllers: [TestVersionedController],
-      })
-      // eslint-disable-next-line @typescript-eslint/no-extraneous-class
-      class TestAppModule {}
+      NoTraceClass()(TestVersionedController);
 
       module = await Test.createTestingModule({
-        imports: [TestAppModule],
+        imports: [ObservabilityModule.forRoot()],
       }).compile();
 
       const appConfig = module.get(ApplicationConfig);
@@ -619,16 +584,33 @@ describe('ObservabilityModule', () => {
       expect(getIgnoredRoutes().size).toBe(1);
     });
 
-    it('should register routes for each version in multi-version controller', async () => {
-      @Module({
-        imports: [ObservabilityModule.forRoot()],
-        controllers: [TestMultiVersionController],
-      })
-      // eslint-disable-next-line @typescript-eslint/no-extraneous-class
-      class TestAppModule {}
+    it('should not prepend global prefix for excluded versioned paths', async () => {
+      NoTraceClass()(TestVersionedController);
 
       module = await Test.createTestingModule({
-        imports: [TestAppModule],
+        imports: [ObservabilityModule.forRoot()],
+      }).compile();
+
+      const appConfig = module.get(ApplicationConfig);
+      vi.spyOn(appConfig, 'getGlobalPrefix').mockReturnValue('api');
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-explicit-any
+      vi.spyOn(appConfig, 'getGlobalPrefixOptions').mockReturnValue({ exclude: ['users'] as any });
+      vi.spyOn(appConfig, 'getVersioning').mockReturnValue({
+        type: VersioningType.URI,
+      });
+
+      await module.init();
+
+      expect(getIgnoredRoutes().has('/v1/users')).toBe(true);
+      expect(getIgnoredRoutes().has('/api/v1/users')).toBe(false);
+      expect(getIgnoredRoutes().size).toBe(1);
+    });
+
+    it('should register routes for each version in multi-version controller', async () => {
+      NoTraceClass()(TestMultiVersionController);
+
+      module = await Test.createTestingModule({
+        imports: [ObservabilityModule.forRoot()],
       }).compile();
 
       const appConfig = module.get(ApplicationConfig);
@@ -646,15 +628,10 @@ describe('ObservabilityModule', () => {
     });
 
     it('should not add version segment for VERSION_NEUTRAL', async () => {
-      @Module({
-        imports: [ObservabilityModule.forRoot()],
-        controllers: [TestVersionNeutralController],
-      })
-      // eslint-disable-next-line @typescript-eslint/no-extraneous-class
-      class TestAppModule {}
+      NoTraceClass()(TestVersionNeutralController);
 
       module = await Test.createTestingModule({
-        imports: [TestAppModule],
+        imports: [ObservabilityModule.forRoot()],
       }).compile();
 
       const appConfig = module.get(ApplicationConfig);
@@ -671,15 +648,10 @@ describe('ObservabilityModule', () => {
     });
 
     it('should not add version segment for non-URI versioning types', async () => {
-      @Module({
-        imports: [ObservabilityModule.forRoot()],
-        controllers: [TestVersionedController],
-      })
-      // eslint-disable-next-line @typescript-eslint/no-extraneous-class
-      class TestAppModule {}
+      NoTraceClass()(TestVersionedController);
 
       module = await Test.createTestingModule({
-        imports: [TestAppModule],
+        imports: [ObservabilityModule.forRoot()],
       }).compile();
 
       const appConfig = module.get(ApplicationConfig);
@@ -698,15 +670,10 @@ describe('ObservabilityModule', () => {
     });
 
     it('should use defaultVersion when controller has no explicit version', async () => {
-      @Module({
-        imports: [ObservabilityModule.forRoot()],
-        controllers: [TestUnversionedUsersController],
-      })
-      // eslint-disable-next-line @typescript-eslint/no-extraneous-class
-      class TestAppModule {}
+      NoTraceClass()(TestUnversionedUsersController);
 
       module = await Test.createTestingModule({
-        imports: [TestAppModule],
+        imports: [ObservabilityModule.forRoot()],
       }).compile();
 
       const appConfig = module.get(ApplicationConfig);
