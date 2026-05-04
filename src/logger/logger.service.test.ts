@@ -1,6 +1,6 @@
 /* eslint-disable @typescript-eslint/no-unsafe-assignment */
 import type { LoggerProvider } from '@opentelemetry/api-logs';
-import { logs } from '@opentelemetry/api-logs';
+import { SeverityNumber, logs } from '@opentelemetry/api-logs';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import * as maskUtils from '../utils/mask-sensitive-fields';
@@ -328,6 +328,7 @@ describe('LoggerService', () => {
       expect(mockEmit).toHaveBeenCalledWith(
         expect.objectContaining({
           body: 'Info message',
+          severityNumber: SeverityNumber.INFO,
           severityText: 'INFO',
         })
       );
@@ -339,6 +340,7 @@ describe('LoggerService', () => {
       expect(mockEmit).toHaveBeenCalledWith(
         expect.objectContaining({
           body: 'Error message',
+          severityNumber: SeverityNumber.ERROR,
           severityText: 'ERROR',
         })
       );
@@ -350,6 +352,7 @@ describe('LoggerService', () => {
       expect(mockEmit).toHaveBeenCalledWith(
         expect.objectContaining({
           body: 'Warning message',
+          severityNumber: SeverityNumber.WARN,
           severityText: 'WARN',
         })
       );
@@ -361,6 +364,7 @@ describe('LoggerService', () => {
       expect(mockEmit).toHaveBeenCalledWith(
         expect.objectContaining({
           body: 'Debug message',
+          severityNumber: SeverityNumber.DEBUG,
           severityText: 'DEBUG',
         })
       );
