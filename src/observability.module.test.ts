@@ -49,15 +49,19 @@ vi.mock('@opentelemetry/api', () => ({
   },
 }));
 
-vi.mock('@opentelemetry/api-logs', () => ({
-  logs: {
-    getLoggerProvider: vi.fn().mockReturnValue({
-      getLogger: vi.fn().mockReturnValue({
-        emit: vi.fn(),
+vi.mock('@opentelemetry/api-logs', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@opentelemetry/api-logs')>();
+  return {
+    ...actual,
+    logs: {
+      getLoggerProvider: vi.fn().mockReturnValue({
+        getLogger: vi.fn().mockReturnValue({
+          emit: vi.fn(),
+        }),
       }),
-    }),
-  },
-}));
+    },
+  };
+});
 
 import { MetricsController } from './controllers/metrics.controller';
 import { NoTraceClass, getNoTraceClasses, resetNoTraceClasses } from './decorators/auto-trace.decorators';

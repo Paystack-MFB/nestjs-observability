@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { createContextKey, trace, context } from '@opentelemetry/api';
-import { Logger, logs } from '@opentelemetry/api-logs';
+import { Logger, SeverityNumber, logs } from '@opentelemetry/api-logs';
 
 import { getServiceName, getServiceVersion } from '../sdk-core';
 import { maskSensitiveFields } from '../utils/mask-sensitive-fields';
@@ -17,6 +17,8 @@ import {
 // Kept for backward compatibility with OpenTelemetry API but AsyncLocalStorage is now primary
 export const LOGGER_CONTEXT_KEY = createContextKey('logger-context');
 
+type LogLevel = 'DEBUG' | 'ERROR' | 'INFO' | 'WARN';
+
 /**
  * Enhanced NestJS logger that integrates with OpenTelemetry global providers
  * Provides structured logging with automatic trace context correlation
@@ -24,6 +26,13 @@ export const LOGGER_CONTEXT_KEY = createContextKey('logger-context');
  */
 @Injectable()
 export class LoggerService {
+  private static readonly SEVERITY_MAP: Record<LogLevel, SeverityNumber> = {
+    DEBUG: SeverityNumber.DEBUG,
+    INFO: SeverityNumber.INFO,
+    WARN: SeverityNumber.WARN,
+    ERROR: SeverityNumber.ERROR,
+  };
+
   private readonly otelLogger: Logger;
   private childContextMap?: LoggerContextMap;
 
@@ -209,7 +218,7 @@ export class LoggerService {
   /**
    * Core method that emits logs to OpenTelemetry
    */
-  private emit(level: string, message: Error | string, data?: Record<string, unknown>): void {
+  private emit(level: LogLevel, message: Error | string, data?: Record<string, unknown>): void {
     // Prepare enriched attributes with request-scoped context
     const enrichedData = {
       ...data,
@@ -232,6 +241,7 @@ export class LoggerService {
         attributes: maskedData as Record<string, boolean | number | string | string[]>,
         body: sanitizedBody,
         context: logContext,
+        severityNumber: LoggerService.SEVERITY_MAP[level],
         severityText: level,
         ...(message instanceof Error && { exception: message }),
       });
