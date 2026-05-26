@@ -99,9 +99,6 @@ importers:
       '@nestjs/testing':
         specifier: ^11.0.0
         version: 11.1.5(@nestjs/common@11.1.5(reflect-metadata@0.1.14)(rxjs@7.8.2))(@nestjs/core@11.1.5)(@nestjs/platform-express@11.1.5)
-      '@paystackhq/pkg-ai-coding-rules':
-        specifier: ^1.1.2
-        version: 1.1.2
       '@types/express':
         specifier: ^5.0.2
         version: 5.0.3
@@ -1455,11 +1452,6 @@ packages:
     engines: {node: ^18.19.0 || >=20.6.0}
     peerDependencies:
       '@opentelemetry/api': ^1.1.0
-
-  '@paystackhq/pkg-ai-coding-rules@1.1.2':
-    resolution: {integrity: sha512-i6cwMmmiJUf9TCqT8VG4PQmGiGbKCQGaFv82w19fGAIzpsXmhnt/LHkTuwKC5R/NqWlMtkagURuIBpLM150+7g==, tarball: https://npm.pkg.github.com/download/@paystackhq/pkg-ai-coding-rules/1.1.2/7ce2a2fb5e7dd4a356d02c3ba7feda3d3d2aad6f}
-    engines: {node: '>=8'}
-    hasBin: true
 
   '@pkgjs/parseargs@0.11.0':
     resolution: {integrity: sha512-+1VkjdD0QBLPodGrJUeqarH8VAIvQODIbwh9XpP5Syisf7YoQgsJKPNFoqqLQlu+VQ/tVSshMR6loPMn8U+dPg==}
@@ -3343,10 +3335,6 @@ packages:
     resolution: {integrity: sha512-0pfFzegeDWJHJIAmTLRP2DwHjdF5s7jo9tuztdQxAhINCdvS+3nGINqPd00AphqJR/0LhANUS6/+7SCb98YOfA==}
     engines: {node: '>=10'}
 
-  yaml@1.10.2:
-    resolution: {integrity: sha512-r3vXyErRCYJ7wg28yvBY5VSoAF8ZvlcW9/BwUzEtUsjvX/DKs24dIkuwjtuprwJJHsbyUbLApepYTR1BN4uHrg==}
-    engines: {node: '>= 6'}
-
   yaml@2.8.0:
     resolution: {integrity: sha512-4lLa/EcQCB0cJkyts+FpIRx5G/llPxfP6VQU5KByHEhLxY3IJCH0f0Hy1MHI8sClTvsIb8qwRJ6R/ZdlDJ/leQ==}
     engines: {node: '>= 14.6'}
@@ -4921,11 +4909,6 @@ snapshots:
     dependencies:
       '@opentelemetry/api': 1.9.0
       '@opentelemetry/core': 2.2.0(@opentelemetry/api@1.9.0)
-
-  '@paystackhq/pkg-ai-coding-rules@1.1.2':
-    dependencies:
-      prettier: 3.6.2
-      yaml: 1.10.2
 
   '@pkgjs/parseargs@0.11.0':
     optional: true
@@ -6868,8 +6851,6 @@ snapshots:
   xtend@4.0.2: {}
 
   y18n@5.0.8: {}
-
-  yaml@1.10.2: {}
 
   yaml@2.8.0: {}
 
