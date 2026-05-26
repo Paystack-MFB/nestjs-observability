@@ -20,7 +20,7 @@ import {
 } from '@opentelemetry/resources';
 import type { Resource } from '@opentelemetry/resources';
 import { BatchLogRecordProcessor, ConsoleLogRecordExporter } from '@opentelemetry/sdk-logs';
-import type { LogRecordProcessor } from '@opentelemetry/sdk-logs';
+import type { LogRecord, LogRecordProcessor } from '@opentelemetry/sdk-logs';
 import { ConsoleMetricExporter, PeriodicExportingMetricReader } from '@opentelemetry/sdk-metrics';
 import type { MetricReader } from '@opentelemetry/sdk-metrics';
 import { NodeSDK } from '@opentelemetry/sdk-node';
@@ -182,10 +182,8 @@ function parseOtlpHeaders(headersString?: string): Record<string, string> {
  * Create log processor based on environment variables.
  * Exported for custom SDK configurations.
  */
-export function createLogProcessor(): BatchLogRecordProcessor | undefined {
-  const exporterType = process.env['OTEL_LOGS_EXPORTER'] ?? 'console';
-
-  switch (exporterType) {
+function createSingleLogProcessor(exporterType: string): BatchLogRecordProcessor | undefined {
+  switch (exporterType.trim()) {
     case 'json':
       try {
         return new BatchLogRecordProcessor(new JSONStdoutLogExporter());
@@ -224,6 +222,35 @@ export function createLogProcessor(): BatchLogRecordProcessor | undefined {
     default:
       return undefined;
   }
+}
+
+export function createLogProcessor(): BatchLogRecordProcessor | undefined {
+  const exporterEnv = process.env['OTEL_LOGS_EXPORTER'] ?? 'console';
+  const exporterTypes = exporterEnv
+    .split(',')
+    .map((s) => s.trim())
+    .filter(Boolean);
+
+  if (exporterTypes.length === 1) {
+    return createSingleLogProcessor(exporterTypes[0]);
+  }
+
+  const processors = exporterTypes
+    .map((t) => createSingleLogProcessor(t))
+    .filter((p): p is BatchLogRecordProcessor => p !== undefined);
+
+  if (processors.length === 0) return undefined;
+  if (processors.length === 1) return processors[0];
+
+  // Return the first processor and register the rest via a composite wrapper
+  // by monkey-patching onEmit to fan out to all processors.
+  const [primary, ...rest] = processors;
+  const originalOnEmit = primary.onEmit.bind(primary);
+  primary.onEmit = (logRecord: LogRecord) => {
+    originalOnEmit(logRecord);
+    for (const p of rest) p.onEmit(logRecord);
+  };
+  return primary;
 }
 
 /**
