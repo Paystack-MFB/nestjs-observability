@@ -290,5 +290,4 @@ tramp
 .\#*
 
 # Project specific
-# NOTE: dist/ is NOT ignored - we want to track built files for library distribution
-dist/
+# dist/ is tracked for git-based installs (no npm publish)

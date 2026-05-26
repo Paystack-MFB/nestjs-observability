@@ -1,0 +1,43 @@
+import { OTLPTraceExporter } from '@opentelemetry/exporter-trace-otlp-http';
+import type { Instrumentation } from '@opentelemetry/instrumentation';
+import type { Resource } from '@opentelemetry/resources';
+import { BatchLogRecordProcessor } from '@opentelemetry/sdk-logs';
+import type { LogRecordProcessor } from '@opentelemetry/sdk-logs';
+import type { MetricReader } from '@opentelemetry/sdk-metrics';
+import { NodeSDK } from '@opentelemetry/sdk-node';
+import type { SpanProcessor } from '@opentelemetry/sdk-trace-base';
+import { ConsoleSpanExporter } from '@opentelemetry/sdk-trace-node';
+import type { TextMapPropagator } from '@opentelemetry/api';
+export interface SDKBuilderOptions {
+    spanProcessors?: SpanProcessor[];
+    includeDefaultTraceExporter?: boolean;
+    metricReader?: MetricReader;
+    logRecordProcessors?: LogRecordProcessor[];
+    registerShutdownHandlers?: boolean;
+}
+export type { SpanProcessor } from '@opentelemetry/sdk-trace-base';
+export type { MetricReader } from '@opentelemetry/sdk-metrics';
+export type { LogRecordProcessor } from '@opentelemetry/sdk-logs';
+export declare function getServiceAttributes(): Record<string, string>;
+export declare function getServiceEnvironment(): string;
+export declare function getServiceName(): string;
+export declare function getServiceVersion(): string;
+export declare function getHttpRequestLoggingEnabled(): boolean;
+export declare function addIgnoredRoute(route: string): void;
+export declare function getIgnoredRoutes(): ReadonlySet<string>;
+export declare function resetIgnoredRoutes(): void;
+export declare function isRouteIgnored(requestUrl: string): boolean;
+export declare function createLogProcessor(): BatchLogRecordProcessor | undefined;
+export declare function createMetricReader(): MetricReader | undefined;
+export declare function createTraceExporter(): ConsoleSpanExporter | OTLPTraceExporter | undefined;
+export declare function createInstrumentations(): Instrumentation[];
+export declare function createResource(): Resource;
+export declare function createTextMapPropagator(): TextMapPropagator;
+export declare function gracefulShutdown(signal: string): Promise<void>;
+export declare function initializeSDK(options?: SDKBuilderOptions): NodeSDK;
+export declare function createSDK(options?: SDKBuilderOptions): NodeSDK;
+export declare function startSDK(options?: SDKBuilderOptions): NodeSDK;
+export declare function getSDK(): NodeSDK | null;
+export declare function setSDK(sdkInstance: NodeSDK | null): void;
+export { NodeSDK } from '@opentelemetry/sdk-node';
+//# sourceMappingURL=sdk-core.d.ts.map
