@@ -17,6 +17,7 @@ export declare class LoggerService {
     setContext(newContext: Record<string, unknown>): void;
     warn(message: string, data?: Record<string, unknown>): void;
     private emit;
+    private writeStdoutIfEnabled;
     private sanitizeLogData;
     private sanitizeLogMessage;
 }

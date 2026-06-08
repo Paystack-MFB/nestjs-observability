@@ -535,4 +535,100 @@ describe('LoggerService', () => {
       });
     });
   });
+
+  describe('LOG_TO_CONSOLE stdout mirror', () => {
+    let logSpy: ReturnType<typeof vi.spyOn>;
+    let warnSpy: ReturnType<typeof vi.spyOn>;
+    let errorSpy: ReturnType<typeof vi.spyOn>;
+    const originalLogToConsole = process.env['LOG_TO_CONSOLE'];
+
+    beforeEach(() => {
+      logSpy = vi.spyOn(console, 'log').mockImplementation(() => undefined);
+      warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+      errorSpy = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    });
+
+    afterEach(() => {
+      if (originalLogToConsole === undefined) {
+        delete process.env['LOG_TO_CONSOLE'];
+      } else {
+        process.env['LOG_TO_CONSOLE'] = originalLogToConsole;
+      }
+    });
+
+    it('does NOT write to stdout when LOG_TO_CONSOLE is unset', () => {
+      delete process.env['LOG_TO_CONSOLE'];
+      loggerService.info('hello');
+      expect(logSpy).not.toHaveBeenCalled();
+      // OTel emit still fires
+      expect(mockEmit).toHaveBeenCalled();
+    });
+
+    it('writes one line to stdout when LOG_TO_CONSOLE=true (info → console.log)', () => {
+      process.env['LOG_TO_CONSOLE'] = 'true';
+      loggerService.info('Request: GET /accounts 200 OK', { method: 'GET' });
+      expect(logSpy).toHaveBeenCalledTimes(1);
+      const line = logSpy.mock.calls[0][0] as string;
+      expect(line).toContain('INFO');
+      expect(line).toContain('Request: GET /accounts 200 OK');
+      expect(line).toContain('"method":"GET"');
+    });
+
+    it('accepts LOG_TO_CONSOLE=1 as truthy', () => {
+      process.env['LOG_TO_CONSOLE'] = '1';
+      loggerService.info('hello');
+      expect(logSpy).toHaveBeenCalledTimes(1);
+    });
+
+    it('routes warn → console.warn, error → console.error', () => {
+      process.env['LOG_TO_CONSOLE'] = 'true';
+      loggerService.warn('careful');
+      loggerService.error('boom');
+      expect(warnSpy).toHaveBeenCalledTimes(1);
+      expect(errorSpy).toHaveBeenCalledTimes(1);
+    });
+
+    it('prefixes with the context tag when present, drops it from the JSON data segment', async () => {
+      process.env['LOG_TO_CONSOLE'] = 'true';
+      await runWithLoggerContext(() => {
+        loggerService.addContext('context', 'MyService');
+        loggerService.info('hi', { extra: 1 });
+      });
+      const line = logSpy.mock.calls[0][0] as string;
+      expect(line).toContain('[MyService] hi');
+      expect(line).toContain('"extra":1');
+      // The context tag shouldn't appear twice — only in the prefix.
+      expect(line).not.toContain('"context":"MyService"');
+    });
+
+    it('omits the data segment when there are no attributes after dropping context', () => {
+      process.env['LOG_TO_CONSOLE'] = 'true';
+      loggerService.info('plain');
+      const line = logSpy.mock.calls[0][0] as string;
+      expect(line.endsWith('plain')).toBe(true);
+    });
+
+    it('always emits to OTel regardless of LOG_TO_CONSOLE value', () => {
+      process.env['LOG_TO_CONSOLE'] = 'true';
+      loggerService.info('hello');
+      expect(mockEmit).toHaveBeenCalledTimes(1);
+    });
+
+    it('handles circular references without throwing', () => {
+      process.env['LOG_TO_CONSOLE'] = 'true';
+      const circular: Record<string, unknown> = {};
+      circular['self'] = circular;
+      // `maskSensitiveFields` upstream already replaces circular refs
+      // with "[Circular Reference]" before they reach the stdout mirror,
+      // so JSON.stringify never sees the cycle. The defensive
+      // safeStringify catch is a belt-and-braces guard for any future
+      // path that bypasses the mask. The user-visible contract is just
+      // "doesn't throw, produces something readable."
+      expect(() => {
+        loggerService.info('cyc', circular);
+      }).not.toThrow();
+      const line = logSpy.mock.calls[0][0] as string;
+      expect(line).toContain('cyc');
+    });
+  });
 });

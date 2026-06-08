@@ -216,7 +216,23 @@ export class LoggerService {
   }
 
   /**
-   * Core method that emits logs to OpenTelemetry
+   * Core method that emits logs to OpenTelemetry, and optionally mirrors
+   * a single-line summary to stdout for `kubectl logs <pod>` debugging.
+   *
+   * The stdout mirror is gated on `LOG_TO_CONSOLE` (truthy = on). It is
+   * not the same as `OTEL_LOGS_EXPORTER=console`:
+   *
+   *   - `OTEL_LOGS_EXPORTER=console` wires the SDK's
+   *     `ConsoleLogRecordExporter`, which `util.inspect`s every
+   *     ReadableLogRecord across multiple stdout lines — fine for SDK
+   *     debugging, terrible for any downstream collector that expects
+   *     JSON-per-line (Filebeat with `co.elastic.logs/json.*` wraps each
+   *     inner brace in its own `{"body": "  },"}` event).
+   *
+   *   - `LOG_TO_CONSOLE=true` writes ONE formatted line per log call,
+   *     after the OTel push. The OTLP pipeline still gets the full
+   *     structured LogRecord; stdout gets a human-readable summary.
+   *     Safe to enable in production.
    */
   private emit(level: LogLevel, message: Error | string, data?: Record<string, unknown>): void {
     // Prepare enriched attributes with request-scoped context
@@ -227,6 +243,8 @@ export class LoggerService {
 
     // Mask sensitive fields in all log data
     const maskedData = maskSensitiveFields(enrichedData);
+    // Sanitize all string fields to prevent log injection in stdout mirror output
+    const sanitizedData = this.sanitizeLogData(maskedData) as Record<string, unknown>;
 
     // Determine the log body and sanitize it to prevent log injection
     const rawBody = message instanceof Error ? message.message : message;
@@ -250,6 +268,40 @@ export class LoggerService {
       console.error('LoggerService emit failed:', error);
       // Note: Console fallback logging removed to avoid potential log injection
     }
+
+    // Optional stdout mirror — independent of the OTel pipeline. See
+    // method-level doc for the LOG_TO_CONSOLE vs OTEL_LOGS_EXPORTER
+    // distinction. `sanitizedData` has all string fields recursively sanitized.
+    this.writeStdoutIfEnabled(level, sanitizedBody, sanitizedData);
+  }
+
+  /**
+   * Write one line to stdout if `LOG_TO_CONSOLE` is truthy. Format:
+   *
+   *   `{ISO timestamp} {LEVEL} [{context-tag}] {body} {JSON-stringified data}`
+   *
+   * `context-tag` is the value of `context['context']` if set (the
+   * conventional NestJS class-name tag). `data` is omitted entirely if
+   * empty. JSON stringify is wrapped in try/catch — a circular ref
+   * produces `[unserialisable]` rather than throwing.
+   */
+  private writeStdoutIfEnabled(level: LogLevel, body: string, data: Record<string, unknown>): void {
+    const flag = process.env['LOG_TO_CONSOLE'];
+    if (flag !== 'true' && flag !== '1') {
+      return;
+    }
+    const ts = new Date().toISOString();
+    const ctxTag = data['context'];
+    const sanitizedCtxTag = typeof ctxTag === 'string' && ctxTag.length > 0 ? this.sanitizeLogMessage(ctxTag) : '';
+    const prefix = sanitizedCtxTag.length > 0 ? `[${sanitizedCtxTag}] ` : '';
+    // Drop the `context` key from the printed data — it's already on
+    // the prefix and would just duplicate.
+    const { context: _ctx, ...rest } = data;
+    const dataStr = Object.keys(rest).length > 0 ? ` ${safeStringify(rest)}` : '';
+    const line = `${ts} ${level.padEnd(5)} ${prefix}${body}${dataStr}`;
+    if (level === 'ERROR') console.error(line);
+    else if (level === 'WARN') console.warn(line);
+    else console.log(line);
   }
 
   /**
@@ -301,5 +353,18 @@ export class LoggerService {
       })
       .join('')
       .trim();
+  }
+}
+
+/**
+ * JSON.stringify that swallows circular-ref errors so a bad attribute
+ * shape never throws out of the stdout-mirror path. Returns
+ * `[unserialisable]` on failure rather than escalating.
+ */
+function safeStringify(data: Record<string, unknown>): string {
+  try {
+    return JSON.stringify(data);
+  } catch {
+    return '[unserialisable]';
   }
 }
