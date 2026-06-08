@@ -243,6 +243,8 @@ export class LoggerService {
 
     // Mask sensitive fields in all log data
     const maskedData = maskSensitiveFields(enrichedData);
+    // Sanitize all string fields to prevent log injection in stdout mirror output
+    const sanitizedData = this.sanitizeLogData(maskedData) as Record<string, unknown>;
 
     // Determine the log body and sanitize it to prevent log injection
     const rawBody = message instanceof Error ? message.message : message;
@@ -269,10 +271,8 @@ export class LoggerService {
 
     // Optional stdout mirror — independent of the OTel pipeline. See
     // method-level doc for the LOG_TO_CONSOLE vs OTEL_LOGS_EXPORTER
-    // distinction. `maskedData` types as `unknown` upstream; the writer
-    // only treats it as a record (no field-by-field access beyond
-    // `context`), so the narrow cast is safe.
-    this.writeStdoutIfEnabled(level, sanitizedBody, maskedData as Record<string, unknown>);
+    // distinction. `sanitizedData` has all string fields recursively sanitized.
+    this.writeStdoutIfEnabled(level, sanitizedBody, sanitizedData);
   }
 
   /**
@@ -292,7 +292,9 @@ export class LoggerService {
     }
     const ts = new Date().toISOString();
     const ctxTag = data['context'];
-    const prefix = typeof ctxTag === 'string' && ctxTag.length > 0 ? `[${ctxTag}] ` : '';
+    const sanitizedCtxTag =
+      typeof ctxTag === 'string' && ctxTag.length > 0 ? this.sanitizeLogMessage(ctxTag) : '';
+    const prefix = sanitizedCtxTag.length > 0 ? `[${sanitizedCtxTag}] ` : '';
     // Drop the `context` key from the printed data — it's already on
     // the prefix and would just duplicate.
     const { context: _ctx, ...rest } = data;
