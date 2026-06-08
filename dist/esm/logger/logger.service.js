@@ -141,6 +141,25 @@ let LoggerService = class LoggerService {
         catch (error) {
             console.error('LoggerService emit failed:', error);
         }
+        this.writeStdoutIfEnabled(level, sanitizedBody, maskedData);
+    }
+    writeStdoutIfEnabled(level, body, data) {
+        const flag = process.env['LOG_TO_CONSOLE'];
+        if (flag !== 'true' && flag !== '1') {
+            return;
+        }
+        const ts = new Date().toISOString();
+        const ctxTag = data['context'];
+        const prefix = typeof ctxTag === 'string' && ctxTag.length > 0 ? `[${ctxTag}] ` : '';
+        const { context: _ctx, ...rest } = data;
+        const dataStr = Object.keys(rest).length > 0 ? ` ${safeStringify(rest)}` : '';
+        const line = `${ts} ${level.padEnd(5)} ${prefix}${body}${dataStr}`;
+        if (level === 'ERROR')
+            console.error(line);
+        else if (level === 'WARN')
+            console.warn(line);
+        else
+            console.log(line);
     }
     sanitizeLogData(obj) {
         if (obj === null || obj === undefined) {
@@ -182,4 +201,12 @@ LoggerService = LoggerService_1 = __decorate([
     __metadata("design:paramtypes", [])
 ], LoggerService);
 export { LoggerService };
+function safeStringify(data) {
+    try {
+        return JSON.stringify(data);
+    }
+    catch {
+        return '[unserialisable]';
+    }
+}
 //# sourceMappingURL=logger.service.js.map
