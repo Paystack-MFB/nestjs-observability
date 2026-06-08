@@ -292,8 +292,7 @@ export class LoggerService {
     }
     const ts = new Date().toISOString();
     const ctxTag = data['context'];
-    const sanitizedCtxTag =
-      typeof ctxTag === 'string' && ctxTag.length > 0 ? this.sanitizeLogMessage(ctxTag) : '';
+    const sanitizedCtxTag = typeof ctxTag === 'string' && ctxTag.length > 0 ? this.sanitizeLogMessage(ctxTag) : '';
     const prefix = sanitizedCtxTag.length > 0 ? `[${sanitizedCtxTag}] ` : '';
     // Drop the `context` key from the printed data — it's already on
     // the prefix and would just duplicate.
