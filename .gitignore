@@ -7,6 +7,13 @@ yarn-debug.log*
 yarn-error.log*
 pnpm-debug.log*
 
+# This package is built with pnpm; pnpm-lock.yaml is the lockfile of
+# record. package-lock.json showing up here is always an accidental
+# `npm install` and breaks consumers — when pnpm fetches the git
+# tarball it sees package-lock.json and tries to delegate to `npm
+# install`, which fails on consumers that don't have npm in PATH.
+package-lock.json
+
 # Runtime data
 pids
 *.pid
