@@ -225,7 +225,11 @@ function createSingleLogProcessor(exporterType: string): BatchLogRecordProcessor
 }
 
 export function createLogProcessor(): BatchLogRecordProcessor | undefined {
-  const exporterEnv = process.env['OTEL_LOGS_EXPORTER'] ?? 'console';
+  // Default to 'none' when unset (was 'console'). The OTel ConsoleLogRecord
+  // exporter writes multi-line util.inspect output that log shippers mangle;
+  // consumers wanting stdout logs use their own logger (or set
+  // OTEL_LOGS_EXPORTER=console explicitly). Unknown/none -> no processor.
+  const exporterEnv = process.env['OTEL_LOGS_EXPORTER'] ?? 'none';
   const exporterTypes = exporterEnv
     .split(',')
     .map((s) => s.trim())
@@ -258,7 +262,10 @@ export function createLogProcessor(): BatchLogRecordProcessor | undefined {
  * Exported for custom SDK configurations.
  */
 export function createMetricReader(): MetricReader | undefined {
-  const exporterType = process.env['OTEL_METRICS_EXPORTER'] ?? 'console';
+  // Default to 'none' when unset (was 'console'): a library shouldn't spin up a
+  // ConsoleMetricExporter dumping metrics to stdout unless asked. Console is
+  // opt-in (OTEL_METRICS_EXPORTER=console).
+  const exporterType = process.env['OTEL_METRICS_EXPORTER'] ?? 'none';
 
   switch (exporterType) {
     case 'none':
@@ -309,7 +316,7 @@ export function createMetricReader(): MetricReader | undefined {
         });
       }
     case 'console':
-    default:
+      // Opt-in only.
       if (process.env['NODE_ENV'] === 'test') {
         return new PeriodicExportingMetricReader({
           exporter: new ConsoleMetricExporter(),
@@ -321,6 +328,9 @@ export function createMetricReader(): MetricReader | undefined {
         exportIntervalMillis: 10000, // Export metrics every 10 seconds
         exportTimeoutMillis: 5000, // 5 second timeout, less than 10 second interval
       });
+    default:
+      // Unknown/unset value -> emit nothing.
+      return undefined;
   }
 }
 
@@ -329,7 +339,13 @@ export function createMetricReader(): MetricReader | undefined {
  * Exported for custom SDK configurations.
  */
 export function createTraceExporter(): ConsoleSpanExporter | OTLPTraceExporter | undefined {
-  const exporterType = process.env['OTEL_TRACES_EXPORTER'] ?? 'console';
+  // Default to 'none' when unset. Previously defaulted to 'console', which
+  // installed a ConsoleSpanExporter that pretty-prints every span to stdout —
+  // in containerized consumers a log shipper then ingests each line as its own
+  // record and floods the log backend with span fragments. A library must not
+  // emit telemetry to stdout just because a consumer didn't set an exporter;
+  // console is now opt-in (OTEL_TRACES_EXPORTER=console).
+  const exporterType = process.env['OTEL_TRACES_EXPORTER'] ?? 'none';
 
   switch (exporterType) {
     case 'none':
@@ -351,12 +367,17 @@ export function createTraceExporter(): ConsoleSpanExporter | OTLPTraceExporter |
           url: endpoint,
         });
       } catch (error) {
-        console.warn('Failed to create OTLP trace exporter, falling back to console:', error);
-        return new ConsoleSpanExporter();
+        // Don't fall back to console — that reintroduces the stdout span flood.
+        // Failing to build the OTLP exporter means no traces, surfaced loudly.
+        console.warn('Failed to create OTLP trace exporter, traces disabled:', error);
+        return undefined;
       }
     case 'console':
-    default:
+      // Opt-in only.
       return new ConsoleSpanExporter();
+    default:
+      // Unknown/unset value -> emit nothing rather than spamming stdout.
+      return undefined;
   }
 }
 

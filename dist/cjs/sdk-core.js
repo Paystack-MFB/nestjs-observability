@@ -140,7 +140,7 @@ function createSingleLogProcessor(exporterType) {
     }
 }
 function createLogProcessor() {
-    const exporterEnv = process.env['OTEL_LOGS_EXPORTER'] ?? 'console';
+    const exporterEnv = process.env['OTEL_LOGS_EXPORTER'] ?? 'none';
     const exporterTypes = exporterEnv
         .split(',')
         .map((s) => s.trim())
@@ -165,7 +165,7 @@ function createLogProcessor() {
     return primary;
 }
 function createMetricReader() {
-    const exporterType = process.env['OTEL_METRICS_EXPORTER'] ?? 'console';
+    const exporterType = process.env['OTEL_METRICS_EXPORTER'] ?? 'none';
     switch (exporterType) {
         case 'none':
             return undefined;
@@ -205,7 +205,6 @@ function createMetricReader() {
                 });
             }
         case 'console':
-        default:
             if (process.env['NODE_ENV'] === 'test') {
                 return new sdk_metrics_1.PeriodicExportingMetricReader({
                     exporter: new sdk_metrics_1.ConsoleMetricExporter(),
@@ -217,10 +216,12 @@ function createMetricReader() {
                 exportIntervalMillis: 10000,
                 exportTimeoutMillis: 5000,
             });
+        default:
+            return undefined;
     }
 }
 function createTraceExporter() {
-    const exporterType = process.env['OTEL_TRACES_EXPORTER'] ?? 'console';
+    const exporterType = process.env['OTEL_TRACES_EXPORTER'] ?? 'none';
     switch (exporterType) {
         case 'none':
             return undefined;
@@ -236,12 +237,13 @@ function createTraceExporter() {
                 });
             }
             catch (error) {
-                console.warn('Failed to create OTLP trace exporter, falling back to console:', error);
-                return new sdk_trace_node_1.ConsoleSpanExporter();
+                console.warn('Failed to create OTLP trace exporter, traces disabled:', error);
+                return undefined;
             }
         case 'console':
-        default:
             return new sdk_trace_node_1.ConsoleSpanExporter();
+        default:
+            return undefined;
     }
 }
 function createInstrumentations() {
