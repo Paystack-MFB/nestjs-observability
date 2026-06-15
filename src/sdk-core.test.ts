@@ -2,6 +2,9 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 
 import {
   addIgnoredRoute,
+  createLogProcessor,
+  createMetricReader,
+  createTraceExporter,
   getHttpRequestLoggingEnabled,
   getIgnoredRoutes,
   getServiceEnvironment,
@@ -10,6 +13,7 @@ import {
   isRouteIgnored,
   resetIgnoredRoutes,
 } from './sdk-core';
+import { ConsoleSpanExporter } from '@opentelemetry/sdk-trace-node';
 
 describe('sdk-core helpers', () => {
   const originalEnv = process.env;
@@ -218,6 +222,69 @@ describe('sdk-core helpers', () => {
       expect(isRouteIgnored('/health')).toBe(false);
       addIgnoredRoute('/health');
       expect(isRouteIgnored('/health')).toBe(true);
+    });
+  });
+
+  describe('exporter factories — safe defaults (no console-dump when unset)', () => {
+    beforeEach(() => {
+      delete process.env['OTEL_TRACES_EXPORTER'];
+      delete process.env['OTEL_METRICS_EXPORTER'];
+      delete process.env['OTEL_LOGS_EXPORTER'];
+    });
+
+    describe('createTraceExporter', () => {
+      it('returns undefined when OTEL_TRACES_EXPORTER is unset (was ConsoleSpanExporter)', () => {
+        expect(createTraceExporter()).toBeUndefined();
+      });
+
+      it('returns undefined for "none"', () => {
+        process.env['OTEL_TRACES_EXPORTER'] = 'none';
+        expect(createTraceExporter()).toBeUndefined();
+      });
+
+      it('returns undefined for an unknown value (no stdout flood from a typo)', () => {
+        process.env['OTEL_TRACES_EXPORTER'] = 'otpl'; // typo
+        expect(createTraceExporter()).toBeUndefined();
+      });
+
+      it('returns a ConsoleSpanExporter only when explicitly requested', () => {
+        process.env['OTEL_TRACES_EXPORTER'] = 'console';
+        expect(createTraceExporter()).toBeInstanceOf(ConsoleSpanExporter);
+      });
+
+      it('returns an OTLP exporter for "otlp"', () => {
+        process.env['OTEL_TRACES_EXPORTER'] = 'otlp';
+        const exporter = createTraceExporter();
+        expect(exporter).toBeDefined();
+        expect(exporter).not.toBeInstanceOf(ConsoleSpanExporter);
+      });
+    });
+
+    describe('createMetricReader', () => {
+      it('returns undefined when OTEL_METRICS_EXPORTER is unset (was console)', () => {
+        expect(createMetricReader()).toBeUndefined();
+      });
+
+      it('returns undefined for "none"', () => {
+        process.env['OTEL_METRICS_EXPORTER'] = 'none';
+        expect(createMetricReader()).toBeUndefined();
+      });
+
+      it('returns a reader only when console is explicitly requested', () => {
+        process.env['OTEL_METRICS_EXPORTER'] = 'console';
+        expect(createMetricReader()).toBeDefined();
+      });
+    });
+
+    describe('createLogProcessor', () => {
+      it('returns undefined when OTEL_LOGS_EXPORTER is unset (was console)', () => {
+        expect(createLogProcessor()).toBeUndefined();
+      });
+
+      it('returns a processor when otlp is explicitly requested', () => {
+        process.env['OTEL_LOGS_EXPORTER'] = 'otlp';
+        expect(createLogProcessor()).toBeDefined();
+      });
     });
   });
 });

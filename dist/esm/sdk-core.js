@@ -116,7 +116,7 @@ function createSingleLogProcessor(exporterType) {
     }
 }
 export function createLogProcessor() {
-    const exporterEnv = process.env['OTEL_LOGS_EXPORTER'] ?? 'console';
+    const exporterEnv = process.env['OTEL_LOGS_EXPORTER'] ?? 'none';
     const exporterTypes = exporterEnv
         .split(',')
         .map((s) => s.trim())
@@ -141,7 +141,7 @@ export function createLogProcessor() {
     return primary;
 }
 export function createMetricReader() {
-    const exporterType = process.env['OTEL_METRICS_EXPORTER'] ?? 'console';
+    const exporterType = process.env['OTEL_METRICS_EXPORTER'] ?? 'none';
     switch (exporterType) {
         case 'none':
             return undefined;
@@ -181,7 +181,6 @@ export function createMetricReader() {
                 });
             }
         case 'console':
-        default:
             if (process.env['NODE_ENV'] === 'test') {
                 return new PeriodicExportingMetricReader({
                     exporter: new ConsoleMetricExporter(),
@@ -193,10 +192,12 @@ export function createMetricReader() {
                 exportIntervalMillis: 10000,
                 exportTimeoutMillis: 5000,
             });
+        default:
+            return undefined;
     }
 }
 export function createTraceExporter() {
-    const exporterType = process.env['OTEL_TRACES_EXPORTER'] ?? 'console';
+    const exporterType = process.env['OTEL_TRACES_EXPORTER'] ?? 'none';
     switch (exporterType) {
         case 'none':
             return undefined;
@@ -212,12 +213,13 @@ export function createTraceExporter() {
                 });
             }
             catch (error) {
-                console.warn('Failed to create OTLP trace exporter, falling back to console:', error);
-                return new ConsoleSpanExporter();
+                console.warn('Failed to create OTLP trace exporter, traces disabled:', error);
+                return undefined;
             }
         case 'console':
-        default:
             return new ConsoleSpanExporter();
+        default:
+            return undefined;
     }
 }
 export function createInstrumentations() {
