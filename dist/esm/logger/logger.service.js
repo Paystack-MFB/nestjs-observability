@@ -124,6 +124,7 @@ let LoggerService = class LoggerService {
             ...this.getContext(),
         };
         const maskedData = maskSensitiveFields(enrichedData);
+        const sanitizedData = this.sanitizeLogData(maskedData);
         const rawBody = message instanceof Error ? message.message : message;
         const sanitizedBody = this.sanitizeLogMessage(rawBody);
         const activeSpan = trace.getActiveSpan();
@@ -141,7 +142,7 @@ let LoggerService = class LoggerService {
         catch (error) {
             console.error('LoggerService emit failed:', error);
         }
-        this.writeStdoutIfEnabled(level, sanitizedBody, maskedData);
+        this.writeStdoutIfEnabled(level, sanitizedBody, sanitizedData);
     }
     writeStdoutIfEnabled(level, body, data) {
         const flag = process.env['LOG_TO_CONSOLE'];
@@ -150,7 +151,8 @@ let LoggerService = class LoggerService {
         }
         const ts = new Date().toISOString();
         const ctxTag = data['context'];
-        const prefix = typeof ctxTag === 'string' && ctxTag.length > 0 ? `[${ctxTag}] ` : '';
+        const sanitizedCtxTag = typeof ctxTag === 'string' && ctxTag.length > 0 ? this.sanitizeLogMessage(ctxTag) : '';
+        const prefix = sanitizedCtxTag.length > 0 ? `[${sanitizedCtxTag}] ` : '';
         const { context: _ctx, ...rest } = data;
         const dataStr = Object.keys(rest).length > 0 ? ` ${safeStringify(rest)}` : '';
         const line = `${ts} ${level.padEnd(5)} ${prefix}${body}${dataStr}`;
